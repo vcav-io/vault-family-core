@@ -26,17 +26,17 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    
+
     println!("VCAV Verifier");
     println!("Receipt: {}", args.receipt);
     println!("Public key: {}", args.pubkey);
-    
+
     // TODO: Load receipt
     // TODO: Load public key
     // TODO: Verify signature
     // TODO: Validate schema compliance
     // TODO: Check budget bounds
-    
+
     println!("Verification not yet implemented");
     Ok(())
 }
