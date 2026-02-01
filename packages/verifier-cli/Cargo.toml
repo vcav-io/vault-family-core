@@ -1,0 +1,20 @@
+[package]
+name = "verifier-cli"
+description = "VCAV Verifier: Offline receipt verification CLI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "vcav-verify"
+path = "src/main.rs"
+
+[dependencies]
+guardian-core = { path = "../guardian-core" }
+receipt-core = { path = "../receipt-core" }
+serde.workspace = true
+serde_json.workspace = true
+ed25519-dalek.workspace = true
+sha2.workspace = true
+clap.workspace = true
+anyhow.workspace = true

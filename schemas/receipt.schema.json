@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/receipt.schema.json",
+  "title": "Receipt",
+  "description": "Cryptographic receipt proving session execution and constraints",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Receipt schema version"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "32-byte hex-encoded session identifier"
+    },
+    "purpose_code": {
+      "type": "string",
+      "enum": [
+        "COMPATIBILITY",
+        "SCHEDULING",
+        "MEDIATION",
+        "NEGOTIATION"
+      ],
+      "description": "Purpose code for this session"
+    },
+    "participant_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Agent IDs of participants (sorted lexicographically)"
+    },
+    "runtime_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hash of vault runtime image"
+    },
+    "guardian_policy_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hash of guardian policy configuration"
+    },
+    "output_schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Version of the output schema used"
+    },
+    "session_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of session start"
+    },
+    "session_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of session end"
+    },
+    "fixed_window_duration_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 600,
+      "description": "Fixed window duration enforced (e.g., 120)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "COMPLETED",
+        "ABORTED"
+      ],
+      "description": "Session completion status"
+    },
+    "output": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "object" }
+      ],
+      "description": "Vault result (null if ABORTED)"
+    },
+    "output_entropy_bits": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 32,
+      "description": "Calculated entropy of this output"
+    },
+    "budget_usage": {
+      "type": "object",
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Hash of sorted participant IDs"
+        },
+        "window_start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Start of current 30-day budget window"
+        },
+        "bits_used_before": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Bits used by this pair before this session"
+        },
+        "bits_used_after": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Bits used by this pair after this session"
+        },
+        "budget_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Budget limit for this pair (128 default, 512 elevated)"
+        },
+        "budget_tier": {
+          "type": "string",
+          "enum": [
+            "DEFAULT",
+            "ELEVATED",
+            "CUSTOM"
+          ],
+          "description": "Active budget tier"
+        }
+      },
+      "required": [
+        "pair_id",
+        "window_start",
+        "bits_used_before",
+        "bits_used_after",
+        "budget_limit",
+        "budget_tier"
+      ],
+      "additionalProperties": false,
+      "description": "Privacy budget accounting"
+    },
+    "attestation": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "properties": {
+            "enclave_measurement": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64,96}$",
+              "description": "Enclave measurement hash"
+            },
+            "attestation_document": {
+              "type": "string",
+              "description": "Base64-encoded attestation document"
+            },
+            "attestation_timestamp": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When attestation was generated"
+            }
+          },
+          "required": [
+            "enclave_measurement",
+            "attestation_document",
+            "attestation_timestamp"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Enclave attestation (null in dev mode)"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{128}$",
+      "description": "64-byte hex-encoded Ed25519 signature over canonical receipt"
+    }
+  },
+  "required": [
+    "schema_version",
+    "session_id",
+    "purpose_code",
+    "participant_ids",
+    "runtime_hash",
+    "guardian_policy_hash",
+    "output_schema_version",
+    "session_start",
+    "session_end",
+    "fixed_window_duration_seconds",
+    "status",
+    "output",
+    "output_entropy_bits",
+    "budget_usage",
+    "signature"
+  ],
+  "additionalProperties": false
+}
