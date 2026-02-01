@@ -1,0 +1,45 @@
+//! Generates a test receipt and key for manual CLI testing
+
+use chrono::{TimeZone, Utc};
+use guardian_core::{BudgetTier, Purpose};
+use receipt_core::{generate_keypair, public_key_to_hex, sign_receipt, BudgetUsageRecord, UnsignedReceipt};
+
+fn main() {
+    let (signing_key, verifying_key) = generate_keypair();
+    
+    let unsigned = UnsignedReceipt {
+        schema_version: "1.0.0".to_string(),
+        session_id: "b".repeat(64),
+        purpose_code: Purpose::Compatibility,
+        participant_ids: vec!["agent-a".to_string(), "agent-b".to_string()],
+        runtime_hash: "c".repeat(64),
+        guardian_policy_hash: "d".repeat(64),
+        output_schema_version: "1.0.0".to_string(),
+        session_start: Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap(),
+        session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
+        fixed_window_duration_seconds: 120,
+        status: receipt_core::ReceiptStatus::Completed,
+        output: Some(serde_json::json!({
+            "decision": "PROCEED",
+            "confidence_bucket": "HIGH"
+        })),
+        output_entropy_bits: 8,
+        budget_usage: BudgetUsageRecord {
+            pair_id: "a".repeat(64),
+            window_start: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
+            bits_used_before: 0,
+            bits_used_after: 11,
+            budget_limit: 128,
+            budget_tier: BudgetTier::Default,
+        },
+        attestation: None,
+    };
+    
+    let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+    let receipt = unsigned.sign(signature);
+    
+    std::fs::write("test_receipt.json", serde_json::to_string_pretty(&receipt).unwrap()).unwrap();
+    std::fs::write("vault.pub", public_key_to_hex(&verifying_key)).unwrap();
+    
+    println!("Created test_receipt.json and vault.pub");
+}
