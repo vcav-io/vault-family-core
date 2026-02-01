@@ -112,6 +112,15 @@ pub struct Receipt {
     /// SHA-256 hash of guardian policy configuration
     pub guardian_policy_hash: String,
 
+    /// SHA-256 hash of GGUF model weights file
+    pub model_weights_hash: String,
+
+    /// Version of llama.cpp bindings (semver or git SHA)
+    pub llama_cpp_version: String,
+
+    /// SHA-256 hash of inference configuration
+    pub inference_config_hash: String,
+
     /// Version of the output schema used
     pub output_schema_version: String,
 
@@ -193,6 +202,15 @@ pub struct UnsignedReceipt {
     /// SHA-256 hash of guardian policy configuration
     pub guardian_policy_hash: String,
 
+    /// SHA-256 hash of GGUF model weights file
+    pub model_weights_hash: String,
+
+    /// Version of llama.cpp bindings (semver or git SHA)
+    pub llama_cpp_version: String,
+
+    /// SHA-256 hash of inference configuration
+    pub inference_config_hash: String,
+
     /// Version of the output schema used
     pub output_schema_version: String,
 
@@ -232,6 +250,9 @@ impl UnsignedReceipt {
             participant_ids: self.participant_ids,
             runtime_hash: self.runtime_hash,
             guardian_policy_hash: self.guardian_policy_hash,
+            model_weights_hash: self.model_weights_hash,
+            llama_cpp_version: self.llama_cpp_version,
+            inference_config_hash: self.inference_config_hash,
             output_schema_version: self.output_schema_version,
             session_start: self.session_start,
             session_end: self.session_end,
@@ -258,6 +279,9 @@ pub struct ReceiptBuilder {
     participant_ids: Option<Vec<String>>,
     runtime_hash: Option<String>,
     guardian_policy_hash: Option<String>,
+    model_weights_hash: Option<String>,
+    llama_cpp_version: Option<String>,
+    inference_config_hash: Option<String>,
     output_schema_version: Option<String>,
     session_start: Option<DateTime<Utc>>,
     session_end: Option<DateTime<Utc>>,
@@ -303,6 +327,24 @@ impl ReceiptBuilder {
     /// Set the guardian policy hash (64 hex chars)
     pub fn guardian_policy_hash(mut self, hash: impl Into<String>) -> Self {
         self.guardian_policy_hash = Some(hash.into());
+        self
+    }
+
+    /// Set the model weights hash (64 hex chars)
+    pub fn model_weights_hash(mut self, hash: impl Into<String>) -> Self {
+        self.model_weights_hash = Some(hash.into());
+        self
+    }
+
+    /// Set the llama.cpp version (semver or git SHA)
+    pub fn llama_cpp_version(mut self, version: impl Into<String>) -> Self {
+        self.llama_cpp_version = Some(version.into());
+        self
+    }
+
+    /// Set the inference config hash (64 hex chars)
+    pub fn inference_config_hash(mut self, hash: impl Into<String>) -> Self {
+        self.inference_config_hash = Some(hash.into());
         self
     }
 
@@ -371,6 +413,9 @@ impl ReceiptBuilder {
             participant_ids: self.participant_ids?,
             runtime_hash: self.runtime_hash?,
             guardian_policy_hash: self.guardian_policy_hash?,
+            model_weights_hash: self.model_weights_hash?,
+            llama_cpp_version: self.llama_cpp_version?,
+            inference_config_hash: self.inference_config_hash?,
             output_schema_version: self.output_schema_version?,
             session_start: self.session_start?,
             session_end: self.session_end?,
@@ -409,6 +454,9 @@ mod tests {
             participant_ids: vec!["agent-a".to_string(), "agent-b".to_string()],
             runtime_hash: "c".repeat(64),
             guardian_policy_hash: "d".repeat(64),
+            model_weights_hash: "e".repeat(64),
+            llama_cpp_version: "0.1.0".to_string(),
+            inference_config_hash: "f".repeat(64),
             output_schema_version: "1.0.0".to_string(),
             session_start: Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap(),
             session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
@@ -529,6 +577,9 @@ mod tests {
             .participant_ids(vec!["agent-b".to_string(), "agent-a".to_string()])
             .runtime_hash("c".repeat(64))
             .guardian_policy_hash("d".repeat(64))
+            .model_weights_hash("e".repeat(64))
+            .llama_cpp_version("0.1.0")
+            .inference_config_hash("f".repeat(64))
             .output_schema_version("1.0.0")
             .session_start(start)
             .session_end(end)
@@ -569,6 +620,9 @@ mod tests {
             .participant_ids(vec!["zebra".to_string(), "alpha".to_string()])
             .runtime_hash("b".repeat(64))
             .guardian_policy_hash("c".repeat(64))
+            .model_weights_hash("d".repeat(64))
+            .llama_cpp_version("0.1.0")
+            .inference_config_hash("e".repeat(64))
             .output_schema_version("1.0.0")
             .session_start(start)
             .session_end(end)

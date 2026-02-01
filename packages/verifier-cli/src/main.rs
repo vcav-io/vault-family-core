@@ -5,8 +5,16 @@
 //! Usage:
 //!   vcav-verify receipt.json --pubkey vault.pub
 //!   vcav-verify receipt.json --pubkey vault.pub --schema-dir ./schemas
+//!   vcav-verify receipt.json --pubkey vault.pub --skip-schema-validation
+//!
+//! Exit codes:
+//!   0 - Valid (all checks passed)
+//!   1 - Invalid (signature or schema validation failed)
+//!   2 - Schema validation skipped (when --skip-schema-validation used)
 
-use anyhow::{bail, Context, Result};
+mod embedded_schemas;
+
+use anyhow::Result;
 use clap::Parser;
 use receipt_core::{parse_public_key_hex, verify_receipt, Receipt, UnsignedReceipt};
 use std::fs;
@@ -24,9 +32,13 @@ struct Args {
     #[arg(short, long)]
     pubkey: String,
 
-    /// Path to schema directory (optional, for schema validation)
+    /// Path to schema directory (overrides embedded schemas)
     #[arg(short, long)]
     schema_dir: Option<String>,
+
+    /// Skip schema validation (NOT RECOMMENDED - prints warning)
+    #[arg(long, default_value = "false")]
+    skip_schema_validation: bool,
 
     /// Output format: text (default) or json
     #[arg(short, long, default_value = "text")]
@@ -52,21 +64,44 @@ struct VerificationResult {
     status: Option<String>,
     signature_valid: bool,
     schema_valid: Option<bool>,
+    schema_skipped: bool,
     errors: Vec<String>,
+}
+
+/// Machine-readable verification status codes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VerificationStatus {
+    Ok,
+    FailSignature,
+    FailSchema,
+    SkippedSchema,
+}
+
+impl std::fmt::Display for VerificationStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VerificationStatus::Ok => write!(f, "OK"),
+            VerificationStatus::FailSignature => write!(f, "FAIL_SIGNATURE"),
+            VerificationStatus::FailSchema => write!(f, "FAIL_SCHEMA"),
+            VerificationStatus::SkippedSchema => write!(f, "SKIPPED_SCHEMA"),
+        }
+    }
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let result = verify(&args);
+    let (result, status, schema_skipped) = verify(&args);
 
     match args.format {
         OutputFormat::Text => {
             if !args.quiet {
+                // Print machine-readable status on first line
+                println!("{}", status);
+                println!();
+
                 match &result {
                     Ok(receipt) => {
-                        println!("VALID");
-                        println!();
                         println!("Session ID: {}", receipt.session_id);
                         println!("Status: {}", receipt.status);
                         println!("Purpose: {:?}", receipt.purpose_code);
@@ -78,24 +113,31 @@ fn main() -> Result<()> {
                             receipt.budget_usage.budget_limit,
                             receipt.budget_usage.budget_tier
                         );
+
+                        if schema_skipped {
+                            eprintln!();
+                            eprintln!("WARNING: Schema validation was skipped");
+                        }
                     }
                     Err(e) => {
-                        println!("INVALID");
-                        println!();
                         println!("Error: {e:#}");
                     }
                 }
+            } else {
+                // Quiet mode: just print status
+                println!("{}", status);
             }
         }
         OutputFormat::Json => {
             let json_result = match &result {
                 Ok(receipt) => VerificationResult {
-                    valid: true,
+                    valid: status == VerificationStatus::Ok,
                     receipt_file: args.receipt.clone(),
                     session_id: Some(receipt.session_id.clone()),
                     status: Some(receipt.status.to_string()),
                     signature_valid: true,
-                    schema_valid: args.schema_dir.as_ref().map(|_| true),
+                    schema_valid: if schema_skipped { None } else { Some(true) },
+                    schema_skipped,
                     errors: vec![],
                 },
                 Err(e) => VerificationResult {
@@ -103,8 +145,15 @@ fn main() -> Result<()> {
                     receipt_file: args.receipt.clone(),
                     session_id: None,
                     status: None,
-                    signature_valid: false,
-                    schema_valid: None,
+                    signature_valid: status != VerificationStatus::FailSignature,
+                    schema_valid: if schema_skipped {
+                        None
+                    } else if status == VerificationStatus::FailSchema {
+                        Some(false)
+                    } else {
+                        None
+                    },
+                    schema_skipped,
                     errors: vec![format!("{e:#}")],
                 },
             };
@@ -112,42 +161,148 @@ fn main() -> Result<()> {
         }
     }
 
-    if result.is_ok() {
-        Ok(())
-    } else {
-        std::process::exit(1);
+    // Exit codes:
+    // 0 - Valid
+    // 1 - Invalid (signature or schema)
+    // 2 - Schema validation skipped
+    match status {
+        VerificationStatus::Ok => Ok(()),
+        VerificationStatus::SkippedSchema => std::process::exit(2),
+        _ => std::process::exit(1),
     }
 }
 
-fn verify(args: &Args) -> Result<Receipt> {
+fn verify(args: &Args) -> (Result<Receipt>, VerificationStatus, bool) {
     // Load receipt
-    let receipt_content = fs::read_to_string(&args.receipt)
-        .with_context(|| format!("Failed to read receipt file: {}", args.receipt))?;
+    let receipt_content = match fs::read_to_string(&args.receipt) {
+        Ok(content) => content,
+        Err(e) => {
+            return (
+                Err(anyhow::anyhow!(
+                    "Failed to read receipt file: {}: {}",
+                    args.receipt,
+                    e
+                )),
+                VerificationStatus::FailSignature,
+                false,
+            );
+        }
+    };
 
-    let receipt: Receipt =
-        serde_json::from_str(&receipt_content).with_context(|| "Failed to parse receipt JSON")?;
+    let receipt: Receipt = match serde_json::from_str(&receipt_content) {
+        Ok(r) => r,
+        Err(e) => {
+            return (
+                Err(anyhow::anyhow!("Failed to parse receipt JSON: {}", e)),
+                VerificationStatus::FailSignature,
+                false,
+            );
+        }
+    };
 
     // Load public key
-    let pubkey_content = fs::read_to_string(&args.pubkey)
-        .with_context(|| format!("Failed to read public key file: {}", args.pubkey))?;
+    let pubkey_content = match fs::read_to_string(&args.pubkey) {
+        Ok(content) => content,
+        Err(e) => {
+            return (
+                Err(anyhow::anyhow!(
+                    "Failed to read public key file: {}: {}",
+                    args.pubkey,
+                    e
+                )),
+                VerificationStatus::FailSignature,
+                false,
+            );
+        }
+    };
 
     let pubkey_hex = pubkey_content.trim();
-    let public_key = parse_public_key_hex(pubkey_hex)
-        .with_context(|| "Failed to parse public key (expected 64 hex characters)")?;
+    let public_key = match parse_public_key_hex(pubkey_hex) {
+        Ok(key) => key,
+        Err(e) => {
+            return (
+                Err(anyhow::anyhow!(
+                    "Failed to parse public key (expected 64 hex characters): {}",
+                    e
+                )),
+                VerificationStatus::FailSignature,
+                false,
+            );
+        }
+    };
 
     // Convert Receipt to UnsignedReceipt for verification
     let unsigned = to_unsigned(&receipt);
 
     // Verify signature
-    verify_receipt(&unsigned, &receipt.signature, &public_key)
-        .with_context(|| "Signature verification failed")?;
-
-    // Optional: Schema validation
-    if let Some(schema_dir) = &args.schema_dir {
-        validate_schema(&receipt, schema_dir)?;
+    if let Err(e) = verify_receipt(&unsigned, &receipt.signature, &public_key) {
+        return (
+            Err(anyhow::anyhow!("Signature verification failed: {}", e)),
+            VerificationStatus::FailSignature,
+            false,
+        );
     }
 
-    Ok(receipt)
+    // Schema validation
+    if args.skip_schema_validation {
+        // User explicitly skipped schema validation
+        return (Ok(receipt), VerificationStatus::SkippedSchema, true);
+    }
+
+    // Load schema registry (from directory or embedded)
+    let registry = if let Some(schema_dir) = &args.schema_dir {
+        match guardian_core::SchemaRegistry::load_from_directory(Path::new(schema_dir)) {
+            Ok(r) => r,
+            Err(e) => {
+                return (
+                    Err(anyhow::anyhow!(
+                        "Failed to load schemas from {}: {}",
+                        schema_dir,
+                        e
+                    )),
+                    VerificationStatus::FailSchema,
+                    false,
+                );
+            }
+        }
+    } else {
+        // Use embedded schemas (default)
+        match embedded_schemas::load_embedded_registry() {
+            Ok(r) => r,
+            Err(e) => {
+                return (
+                    Err(anyhow::anyhow!("Failed to load embedded schemas: {}", e)),
+                    VerificationStatus::FailSchema,
+                    false,
+                );
+            }
+        }
+    };
+
+    // Validate against schema
+    let receipt_json = match serde_json::to_value(&receipt) {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                Err(anyhow::anyhow!(
+                    "Failed to serialize receipt for schema validation: {}",
+                    e
+                )),
+                VerificationStatus::FailSchema,
+                false,
+            );
+        }
+    };
+
+    if let Err(e) = registry.validate("receipt", &receipt_json) {
+        return (
+            Err(anyhow::anyhow!("Receipt failed schema validation: {}", e)),
+            VerificationStatus::FailSchema,
+            false,
+        );
+    }
+
+    (Ok(receipt), VerificationStatus::Ok, false)
 }
 
 /// Convert a signed Receipt to an UnsignedReceipt for signature verification
@@ -159,6 +314,9 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         participant_ids: receipt.participant_ids.clone(),
         runtime_hash: receipt.runtime_hash.clone(),
         guardian_policy_hash: receipt.guardian_policy_hash.clone(),
+        model_weights_hash: receipt.model_weights_hash.clone(),
+        llama_cpp_version: receipt.llama_cpp_version.clone(),
+        inference_config_hash: receipt.inference_config_hash.clone(),
         output_schema_version: receipt.output_schema_version.clone(),
         session_start: receipt.session_start,
         session_end: receipt.session_end,
@@ -169,26 +327,6 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         budget_usage: receipt.budget_usage.clone(),
         attestation: receipt.attestation.clone(),
     }
-}
-
-/// Validate receipt against JSON schema
-fn validate_schema(receipt: &Receipt, schema_dir: &str) -> Result<()> {
-    let schema_path = Path::new(schema_dir);
-    if !schema_path.exists() {
-        bail!("Schema directory does not exist: {schema_dir}");
-    }
-
-    let registry = guardian_core::SchemaRegistry::load_from_directory(schema_path)
-        .with_context(|| format!("Failed to load schemas from: {schema_dir}"))?;
-
-    let receipt_json = serde_json::to_value(receipt)
-        .with_context(|| "Failed to serialize receipt for schema validation")?;
-
-    registry
-        .validate("receipt", &receipt_json)
-        .with_context(|| "Receipt failed schema validation")?;
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -208,6 +346,9 @@ mod tests {
             participant_ids: vec!["agent-a".to_string(), "agent-b".to_string()],
             runtime_hash: "c".repeat(64),
             guardian_policy_hash: "d".repeat(64),
+            model_weights_hash: "e".repeat(64),
+            llama_cpp_version: "0.1.0".to_string(),
+            inference_config_hash: "f".repeat(64),
             output_schema_version: "1.0.0".to_string(),
             session_start: Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap(),
             session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
@@ -215,7 +356,8 @@ mod tests {
             status: receipt_core::ReceiptStatus::Completed,
             output: Some(serde_json::json!({
                 "decision": "PROCEED",
-                "confidence_bucket": "HIGH"
+                "confidence_bucket": "HIGH",
+                "reason_code": "UNKNOWN"
             })),
             output_entropy_bits: 8,
             budget_usage: BudgetUsageRecord {
@@ -255,12 +397,14 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
             schema_dir: None,
+            skip_schema_validation: false,
             format: OutputFormat::Text,
             quiet: false,
         };
 
-        let result = verify(&args);
+        let (result, status, _) = verify(&args);
         assert!(result.is_ok());
+        assert_eq!(status, VerificationStatus::Ok);
     }
 
     #[test]
@@ -276,12 +420,14 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: wrong_pubkey_file.path().to_str().unwrap().to_string(),
             schema_dir: None,
+            skip_schema_validation: false,
             format: OutputFormat::Text,
             quiet: false,
         };
 
-        let result = verify(&args);
+        let (result, status, _) = verify(&args);
         assert!(result.is_err());
+        assert_eq!(status, VerificationStatus::FailSignature);
         assert!(result.unwrap_err().to_string().contains("Signature"));
     }
 
@@ -306,11 +452,12 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
             schema_dir: None,
+            skip_schema_validation: false,
             format: OutputFormat::Text,
             quiet: false,
         };
 
-        let result = verify(&args);
+        let (result, _, _) = verify(&args);
         assert!(result.is_err());
     }
 
@@ -327,11 +474,12 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
             schema_dir: None,
+            skip_schema_validation: false,
             format: OutputFormat::Text,
             quiet: false,
         };
 
-        let result = verify(&args);
+        let (result, _, _) = verify(&args);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("parse"));
     }
@@ -342,11 +490,12 @@ mod tests {
             receipt: "/nonexistent/receipt.json".to_string(),
             pubkey: "/nonexistent/key.pub".to_string(),
             schema_dir: None,
+            skip_schema_validation: false,
             format: OutputFormat::Text,
             quiet: false,
         };
 
-        let result = verify(&args);
+        let (result, _, _) = verify(&args);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("receipt"));
     }
@@ -362,11 +511,12 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: bad_pubkey_file.path().to_str().unwrap().to_string(),
             schema_dir: None,
+            skip_schema_validation: false,
             format: OutputFormat::Text,
             quiet: false,
         };
 
-        let result = verify(&args);
+        let (result, _, _) = verify(&args);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("public key"));
     }
@@ -407,14 +557,69 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
             schema_dir: Some(schema_dir.to_str().unwrap().to_string()),
+            skip_schema_validation: false,
             format: OutputFormat::Text,
             quiet: false,
         };
 
-        let result = verify(&args);
+        let (result, status, _) = verify(&args);
         if let Err(e) = &result {
             eprintln!("Schema validation error: {e:#}");
         }
         assert!(result.is_ok());
+        assert_eq!(status, VerificationStatus::Ok);
+    }
+
+    #[test]
+    fn test_verify_with_embedded_schemas() {
+        // Test that embedded schemas work (default behavior)
+        let (receipt_file, pubkey_file, _receipt) = create_test_files();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            schema_dir: None,
+            skip_schema_validation: false,
+            format: OutputFormat::Text,
+            quiet: false,
+        };
+
+        let (result, status, schema_skipped) = verify(&args);
+        assert!(result.is_ok());
+        assert_eq!(status, VerificationStatus::Ok);
+        assert!(!schema_skipped);
+    }
+
+    #[test]
+    fn test_verify_with_skip_schema_validation() {
+        let (receipt_file, pubkey_file, _receipt) = create_test_files();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            schema_dir: None,
+            skip_schema_validation: true,
+            format: OutputFormat::Text,
+            quiet: false,
+        };
+
+        let (result, status, schema_skipped) = verify(&args);
+        assert!(result.is_ok());
+        assert_eq!(status, VerificationStatus::SkippedSchema);
+        assert!(schema_skipped);
+    }
+
+    #[test]
+    fn test_verification_status_display() {
+        assert_eq!(VerificationStatus::Ok.to_string(), "OK");
+        assert_eq!(
+            VerificationStatus::FailSignature.to_string(),
+            "FAIL_SIGNATURE"
+        );
+        assert_eq!(VerificationStatus::FailSchema.to_string(), "FAIL_SCHEMA");
+        assert_eq!(
+            VerificationStatus::SkippedSchema.to_string(),
+            "SKIPPED_SCHEMA"
+        );
     }
 }
