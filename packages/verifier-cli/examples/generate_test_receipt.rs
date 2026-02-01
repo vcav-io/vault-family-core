@@ -2,11 +2,13 @@
 
 use chrono::{TimeZone, Utc};
 use guardian_core::{BudgetTier, Purpose};
-use receipt_core::{generate_keypair, public_key_to_hex, sign_receipt, BudgetUsageRecord, UnsignedReceipt};
+use receipt_core::{
+    generate_keypair, public_key_to_hex, sign_receipt, BudgetUsageRecord, UnsignedReceipt,
+};
 
 fn main() {
     let (signing_key, verifying_key) = generate_keypair();
-    
+
     let unsigned = UnsignedReceipt {
         schema_version: "1.0.0".to_string(),
         session_id: "b".repeat(64),
@@ -34,12 +36,16 @@ fn main() {
         },
         attestation: None,
     };
-    
+
     let signature = sign_receipt(&unsigned, &signing_key).unwrap();
     let receipt = unsigned.sign(signature);
-    
-    std::fs::write("test_receipt.json", serde_json::to_string_pretty(&receipt).unwrap()).unwrap();
+
+    std::fs::write(
+        "test_receipt.json",
+        serde_json::to_string_pretty(&receipt).unwrap(),
+    )
+    .unwrap();
     std::fs::write("vault.pub", public_key_to_hex(&verifying_key)).unwrap();
-    
+
     println!("Created test_receipt.json and vault.pub");
 }
