@@ -1,15 +1,18 @@
 //! Ed25519 signing with domain separation
 //!
-//! Signs receipts using Ed25519 with domain separation to prevent
-//! cross-protocol attacks.
+//! Signs receipts and session handoffs using Ed25519 with domain separation
+//! to prevent cross-protocol attacks.
 //!
-//! Message format: "VCAV-RECEIPT-V1:" || canonical_json(receipt_without_signature)
+//! Message formats:
+//! - Receipts: "VCAV-RECEIPT-V1:" || canonical_json(receipt_without_signature)
+//! - Handoffs: "VCAV-HANDOFF-V1:" || canonical_json(handoff_without_signatures)
 
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::canonicalize::canonicalize_serializable;
+use crate::handoff::UnsignedSessionHandoff;
 use crate::receipt::UnsignedReceipt;
 
 // ============================================================================
@@ -18,6 +21,9 @@ use crate::receipt::UnsignedReceipt;
 
 /// Domain separation prefix for receipt signatures
 pub const DOMAIN_PREFIX: &str = "VCAV-RECEIPT-V1:";
+
+/// Domain separation prefix for session handoff signatures
+pub const SESSION_HANDOFF_DOMAIN_PREFIX: &str = "VCAV-HANDOFF-V1:";
 
 // ============================================================================
 // SigningError
@@ -157,6 +163,60 @@ pub fn generate_keypair() -> (SigningKey, VerifyingKey) {
     let signing_key = SigningKey::generate(&mut rand::thread_rng());
     let verifying_key = signing_key.verifying_key();
     (signing_key, verifying_key)
+}
+
+// ============================================================================
+// SessionHandoff Signing Functions
+// ============================================================================
+
+/// Create the message to sign for a session handoff.
+///
+/// Message = SESSION_HANDOFF_DOMAIN_PREFIX || canonical_json(handoff)
+pub fn create_handoff_signing_message(
+    handoff: &UnsignedSessionHandoff,
+) -> Result<Vec<u8>, SigningError> {
+    let canonical = canonicalize_serializable(handoff)?;
+    let mut message = SESSION_HANDOFF_DOMAIN_PREFIX.as_bytes().to_vec();
+    message.extend(canonical.as_bytes());
+    Ok(message)
+}
+
+/// Sign an unsigned session handoff with the given signing key.
+///
+/// Returns the signature as a 128-character hex string.
+pub fn sign_handoff(
+    handoff: &UnsignedSessionHandoff,
+    signing_key: &SigningKey,
+) -> Result<String, SigningError> {
+    let message = create_handoff_signing_message(handoff)?;
+    let hash = hash_message(&message);
+
+    let signature = signing_key.sign(&hash);
+    Ok(hex::encode(signature.to_bytes()))
+}
+
+/// Verify a session handoff signature.
+///
+/// # Arguments
+/// * `handoff` - The unsigned session handoff data
+/// * `signature_hex` - The 128-character hex-encoded signature
+/// * `public_key` - The verifying key
+pub fn verify_handoff(
+    handoff: &UnsignedSessionHandoff,
+    signature_hex: &str,
+    public_key: &VerifyingKey,
+) -> Result<(), SigningError> {
+    // Parse signature from hex
+    let signature = parse_signature_hex(signature_hex)?;
+
+    // Recreate the message that was signed
+    let message = create_handoff_signing_message(handoff)?;
+    let hash = hash_message(&message);
+
+    // Verify
+    public_key
+        .verify(&hash, &signature)
+        .map_err(|_| SigningError::VerificationFailed)
 }
 
 #[cfg(test)]
@@ -433,5 +493,153 @@ mod tests {
 
         let err = SigningError::VerificationFailed;
         assert!(err.to_string().contains("failed"));
+    }
+
+    // ==================== SessionHandoff Signing Tests ====================
+
+    fn sample_unsigned_handoff() -> UnsignedSessionHandoff {
+        use crate::handoff::{BudgetTierV2, HashRef};
+
+        UnsignedSessionHandoff {
+            handoff_id: "handoff-12345678".to_string(),
+            participants: vec!["agent-alice-123".to_string(), "agent-bob-456".to_string()],
+            contract_id: "dating.v1.d2".to_string(),
+            contract_version: 1,
+            contract_hash: HashRef::sha256("dGVzdC1jb250cmFjdC1oYXNo"),
+            budget_tier: BudgetTierV2::Small,
+            ttl_seconds: 120,
+            operator_endpoint_id: "operator-prod-001".to_string(),
+            capability_tokens: vec![],
+        }
+    }
+
+    #[test]
+    fn test_handoff_domain_prefix() {
+        assert_eq!(SESSION_HANDOFF_DOMAIN_PREFIX, "VCAV-HANDOFF-V1:");
+    }
+
+    #[test]
+    fn test_create_handoff_signing_message() {
+        let handoff = sample_unsigned_handoff();
+        let message = create_handoff_signing_message(&handoff).unwrap();
+
+        // Should start with domain prefix
+        assert!(message.starts_with(SESSION_HANDOFF_DOMAIN_PREFIX.as_bytes()));
+
+        // Rest should be canonical JSON
+        let json_part = &message[SESSION_HANDOFF_DOMAIN_PREFIX.len()..];
+        let json_str = std::str::from_utf8(json_part).unwrap();
+
+        // Should be valid JSON
+        let _: serde_json::Value = serde_json::from_str(json_str).unwrap();
+    }
+
+    #[test]
+    fn test_handoff_signing_message_deterministic() {
+        let handoff = sample_unsigned_handoff();
+
+        let msg1 = create_handoff_signing_message(&handoff).unwrap();
+        let msg2 = create_handoff_signing_message(&handoff).unwrap();
+
+        assert_eq!(msg1, msg2);
+    }
+
+    #[test]
+    fn test_sign_handoff() {
+        let handoff = sample_unsigned_handoff();
+        let (signing_key, _) = generate_keypair();
+
+        let signature = sign_handoff(&handoff, &signing_key).unwrap();
+
+        // Signature should be 128 hex characters (64 bytes)
+        assert_eq!(signature.len(), 128);
+        assert!(signature.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_sign_and_verify_handoff() {
+        let handoff = sample_unsigned_handoff();
+        let (signing_key, verifying_key) = generate_keypair();
+
+        let signature = sign_handoff(&handoff, &signing_key).unwrap();
+        let result = verify_handoff(&handoff, &signature, &verifying_key);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_handoff_wrong_key() {
+        let handoff = sample_unsigned_handoff();
+        let (signing_key, _) = generate_keypair();
+        let (_, wrong_verifying_key) = generate_keypair();
+
+        let signature = sign_handoff(&handoff, &signing_key).unwrap();
+        let result = verify_handoff(&handoff, &signature, &wrong_verifying_key);
+
+        assert!(matches!(result, Err(SigningError::VerificationFailed)));
+    }
+
+    #[test]
+    fn test_verify_tampered_handoff() {
+        let handoff = sample_unsigned_handoff();
+        let (signing_key, verifying_key) = generate_keypair();
+
+        let signature = sign_handoff(&handoff, &signing_key).unwrap();
+
+        // Modify the handoff
+        let mut tampered = handoff.clone();
+        tampered.ttl_seconds = 999;
+
+        let result = verify_handoff(&tampered, &signature, &verifying_key);
+        assert!(matches!(result, Err(SigningError::VerificationFailed)));
+    }
+
+    #[test]
+    fn test_handoff_signature_deterministic() {
+        let handoff = sample_unsigned_handoff();
+        let (signing_key, _) = generate_keypair();
+
+        // Ed25519 is deterministic
+        let sig1 = sign_handoff(&handoff, &signing_key).unwrap();
+        let sig2 = sign_handoff(&handoff, &signing_key).unwrap();
+
+        assert_eq!(sig1, sig2);
+    }
+
+    #[test]
+    fn test_handoff_and_receipt_domain_separation() {
+        // Ensure handoff and receipt use different domain prefixes
+        assert_ne!(DOMAIN_PREFIX, SESSION_HANDOFF_DOMAIN_PREFIX);
+
+        // Ensure a signature from one domain cannot be used for the other
+        let handoff = sample_unsigned_handoff();
+        let receipt = sample_unsigned_receipt();
+        let (signing_key, _verifying_key) = generate_keypair();
+
+        let handoff_sig = sign_handoff(&handoff, &signing_key).unwrap();
+        let receipt_sig = sign_receipt(&receipt, &signing_key).unwrap();
+
+        // Signatures should be different
+        assert_ne!(handoff_sig, receipt_sig);
+    }
+
+    #[test]
+    fn test_handoff_canonical_json_format() {
+        let handoff = sample_unsigned_handoff();
+        let message = create_handoff_signing_message(&handoff).unwrap();
+
+        let json_part = &message[SESSION_HANDOFF_DOMAIN_PREFIX.len()..];
+        let json_str = std::str::from_utf8(json_part).unwrap();
+
+        // Canonical JSON should have no whitespace
+        assert!(!json_str.contains(' '));
+        assert!(!json_str.contains('\n'));
+        assert!(!json_str.contains('\t'));
+
+        // Keys should be sorted alphabetically
+        // budget_tier should come before capability_tokens, etc.
+        let budget_pos = json_str.find("\"budget_tier\"").unwrap();
+        let capability_pos = json_str.find("\"capability_tokens\"").unwrap();
+        assert!(budget_pos < capability_pos);
     }
 }
