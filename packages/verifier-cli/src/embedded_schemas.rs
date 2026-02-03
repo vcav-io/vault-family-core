@@ -17,6 +17,8 @@ pub const RELATIONSHIP_TOKEN_SCHEMA: &str =
 pub const SESSION_ABORT_SCHEMA: &str = include_str!("../../../schemas/session_abort.schema.json");
 pub const VAULT_RESULT_COMPATIBILITY_SCHEMA: &str =
     include_str!("../../../schemas/vault_result_compatibility.schema.json");
+pub const VAULT_RESULT_COMPATIBILITY_D2_SCHEMA: &str =
+    include_str!("../../../schemas/vault_result_compatibility_d2.schema.json");
 pub const VAULT_RESULT_MEDIATION_SCHEMA: &str =
     include_str!("../../../schemas/vault_result_mediation.schema.json");
 pub const VAULT_RESULT_NEGOTIATION_SCHEMA: &str =
@@ -61,6 +63,10 @@ const SCHEMAS: &[SchemaEntry] = &[
     SchemaEntry {
         filename: "vault_result_compatibility.schema.json",
         content: VAULT_RESULT_COMPATIBILITY_SCHEMA,
+    },
+    SchemaEntry {
+        filename: "vault_result_compatibility_d2.schema.json",
+        content: VAULT_RESULT_COMPATIBILITY_D2_SCHEMA,
     },
     SchemaEntry {
         filename: "vault_result_mediation.schema.json",
