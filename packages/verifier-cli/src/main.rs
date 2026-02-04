@@ -204,7 +204,10 @@ fn verify(args: &Args) -> VerifyDetails {
                 schema_skipped: false,
                 output_schema_valid: None,
                 output_schema_id: None,
-                error: Some(format!("Failed to read receipt file: {}: {}", args.receipt, e)),
+                error: Some(format!(
+                    "Failed to read receipt file: {}: {}",
+                    args.receipt, e
+                )),
             };
         }
     };
@@ -233,7 +236,10 @@ fn verify(args: &Args) -> VerifyDetails {
                 schema_skipped: false,
                 output_schema_valid: None,
                 output_schema_id: None,
-                error: Some(format!("Failed to read public key file: {}: {}", args.pubkey, e)),
+                error: Some(format!(
+                    "Failed to read public key file: {}: {}",
+                    args.pubkey, e
+                )),
             };
         }
     };
@@ -352,7 +358,9 @@ fn verify(args: &Args) -> VerifyDetails {
             let schema_id = args.output_schema_id.clone().unwrap_or_else(|| {
                 // Infer schema from purpose code
                 match receipt.purpose_code {
-                    guardian_core::Purpose::Compatibility => "vault_result_compatibility".to_string(),
+                    guardian_core::Purpose::Compatibility => {
+                        "vault_result_compatibility".to_string()
+                    }
                     guardian_core::Purpose::Scheduling => "vault_result_scheduling".to_string(),
                     guardian_core::Purpose::Mediation => "vault_result_mediation".to_string(),
                     guardian_core::Purpose::Negotiation => "vault_result_negotiation".to_string(),
