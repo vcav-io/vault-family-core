@@ -7,6 +7,8 @@ use chrono::{DateTime, Utc};
 use guardian_core::{BudgetTier, Purpose};
 use serde::{Deserialize, Serialize};
 
+use crate::agreement::ModelIdentity;
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -145,6 +147,10 @@ pub struct Receipt {
     /// Privacy budget accounting
     pub budget_usage: BudgetUsageRecord,
 
+    /// Identity of the model used for vault execution (optional, Phase 3+)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_identity: Option<ModelIdentity>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -235,6 +241,10 @@ pub struct UnsignedReceipt {
     /// Privacy budget accounting
     pub budget_usage: BudgetUsageRecord,
 
+    /// Identity of the model used for vault execution (optional, Phase 3+)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_identity: Option<ModelIdentity>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -261,6 +271,7 @@ impl UnsignedReceipt {
             output: self.output,
             output_entropy_bits: self.output_entropy_bits,
             budget_usage: self.budget_usage,
+            model_identity: self.model_identity,
             attestation: self.attestation,
             signature,
         }
@@ -290,6 +301,7 @@ pub struct ReceiptBuilder {
     output: Option<serde_json::Value>,
     output_entropy_bits: Option<u32>,
     budget_usage: Option<BudgetUsageRecord>,
+    model_identity: Option<ModelIdentity>,
     attestation: Option<Attestation>,
 }
 
@@ -396,6 +408,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the model identity (optional, Phase 3+)
+    pub fn model_identity(mut self, identity: Option<ModelIdentity>) -> Self {
+        self.model_identity = identity;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
         self.attestation = attestation;
@@ -424,6 +442,7 @@ impl ReceiptBuilder {
             output: self.output,
             output_entropy_bits: self.output_entropy_bits?,
             budget_usage: self.budget_usage?,
+            model_identity: self.model_identity,
             attestation: self.attestation,
         })
     }
@@ -469,6 +488,7 @@ mod tests {
             })),
             output_entropy_bits: 8,
             budget_usage: sample_budget_usage(),
+            model_identity: None,
             attestation: None,
         }
     }

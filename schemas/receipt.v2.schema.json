@@ -21,7 +21,8 @@
         "COMPATIBILITY",
         "SCHEDULING",
         "MEDIATION",
-        "NEGOTIATION"
+        "NEGOTIATION",
+        "SCHEDULING_COMPAT_V1"
       ],
       "description": "Purpose code for this session"
     },
@@ -206,6 +207,29 @@
         }
       ],
       "description": "Enclave attestation (null in dev mode)"
+    },
+    "model_identity": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["LOCAL", "OPENAI"],
+          "description": "Model provider"
+        },
+        "model_id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Model identifier"
+        },
+        "model_version": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Model version"
+        }
+      },
+      "required": ["provider", "model_id"],
+      "additionalProperties": false,
+      "description": "Identity of the model used for vault execution (optional, Phase 3+)"
     },
     "signature": {
       "type": "string",

@@ -364,6 +364,9 @@ fn verify(args: &Args) -> VerifyDetails {
                     guardian_core::Purpose::Scheduling => "vault_result_scheduling".to_string(),
                     guardian_core::Purpose::Mediation => "vault_result_mediation".to_string(),
                     guardian_core::Purpose::Negotiation => "vault_result_negotiation".to_string(),
+                    guardian_core::Purpose::SchedulingCompatV1 => {
+                        "vault_result_scheduling_compat_v1".to_string()
+                    }
                 }
             });
 
@@ -420,6 +423,7 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         output: receipt.output.clone(),
         output_entropy_bits: receipt.output_entropy_bits,
         budget_usage: receipt.budget_usage.clone(),
+        model_identity: receipt.model_identity.clone(),
         attestation: receipt.attestation.clone(),
     }
 }
@@ -463,6 +467,7 @@ mod tests {
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
             },
+            model_identity: None,
             attestation: None,
         }
     }
@@ -781,6 +786,7 @@ mod tests {
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
             },
+            model_identity: None,
             attestation: None,
         }
     }

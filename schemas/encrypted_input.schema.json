@@ -27,7 +27,8 @@
         "COMPATIBILITY",
         "SCHEDULING",
         "MEDIATION",
-        "NEGOTIATION"
+        "NEGOTIATION",
+        "SCHEDULING_COMPAT_V1"
       ],
       "description": "Purpose code determining which output schema applies"
     },

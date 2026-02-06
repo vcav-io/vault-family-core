@@ -16,12 +16,14 @@
 //! - [`canonicalize`] - RFC 8785 JSON Canonicalization Scheme
 //! - [`signer`] - Ed25519 signing with domain separation
 
+pub mod agreement;
 pub mod canonicalize;
 pub mod handoff;
 pub mod receipt;
 pub mod signer;
 
 // Re-export key types
+pub use agreement::{compute_agreement_hash, ModelIdentity, SessionAgreementFields, AGREEMENT_DOMAIN_PREFIX};
 pub use canonicalize::{canonicalize, canonicalize_serializable};
 pub use handoff::{
     BudgetTierV2, HashRef, SessionHandoff, UnsignedSessionHandoff, UnsignedSessionHandoffBuilder,

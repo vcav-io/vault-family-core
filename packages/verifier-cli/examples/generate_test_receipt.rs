@@ -37,6 +37,7 @@ fn main() {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
         },
+        model_identity: None,
         attestation: None,
     };
 

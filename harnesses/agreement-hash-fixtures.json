@@ -1,0 +1,68 @@
+[
+  {
+    "name": "basic_scheduling_compat",
+    "fields": {
+      "session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "participants": ["agent-alice", "agent-bob"],
+      "contract_id": "SCHEDULING_COMPAT_V1",
+      "purpose_code": "SCHEDULING_COMPAT_V1",
+      "model_identity": {
+        "provider": "OPENAI",
+        "model_id": "gpt-4.1",
+        "model_version": "2025-04-14"
+      },
+      "output_budget": 4,
+      "symmetry_rule": "SYMMETRIC",
+      "input_schema_hashes": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "expiry": "2025-06-01T00:00:00Z"
+    },
+    "expected_hash": "04eddd8c3f9011410ca8895b7f534ee37f7e80d37ff45d36e4a0edddd48dda33"
+  },
+  {
+    "name": "different_model_local",
+    "fields": {
+      "session_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "participants": ["agent-alice", "agent-bob"],
+      "contract_id": "SCHEDULING_COMPAT_V1",
+      "purpose_code": "SCHEDULING_COMPAT_V1",
+      "model_identity": {
+        "provider": "LOCAL",
+        "model_id": "llama-3.1-8b-instruct-q4"
+      },
+      "output_budget": 4,
+      "symmetry_rule": "SYMMETRIC",
+      "input_schema_hashes": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "expiry": "2025-06-01T00:00:00Z"
+    },
+    "expected_hash": "f2b53f0921c136dcd5d286fc6282803578dd9de770d54728624bb99d61a33cd4"
+  },
+  {
+    "name": "three_participants",
+    "fields": {
+      "session_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "participants": ["agent-alice", "agent-bob", "agent-charlie"],
+      "contract_id": "MEDIATION",
+      "purpose_code": "MEDIATION",
+      "model_identity": {
+        "provider": "OPENAI",
+        "model_id": "gpt-4.1",
+        "model_version": "2025-04-14"
+      },
+      "output_budget": 16,
+      "symmetry_rule": "SYMMETRIC",
+      "input_schema_hashes": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      ],
+      "expiry": "2025-12-31T23:59:59Z"
+    },
+    "expected_hash": "395d7562336284e0f4a1494658a67f62bf15964ac50f8b3c11057ceabfd7939f"
+  }
+]
