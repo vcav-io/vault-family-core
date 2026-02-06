@@ -153,6 +153,11 @@
       "additionalProperties": false,
       "description": "Privacy budget accounting"
     },
+    "agreement_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 agreement hash binding session to negotiated contract terms"
+    },
     "attestation": {
       "oneOf": [
         { "type": "null" },

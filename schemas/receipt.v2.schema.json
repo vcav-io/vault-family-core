@@ -208,6 +208,11 @@
       ],
       "description": "Enclave attestation (null in dev mode)"
     },
+    "agreement_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 agreement hash binding session to negotiated contract terms"
+    },
     "model_identity": {
       "type": "object",
       "properties": {

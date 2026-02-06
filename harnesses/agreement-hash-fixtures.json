@@ -1,68 +1,138 @@
-[
-  {
-    "name": "basic_scheduling_compat",
-    "fields": {
-      "session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "participants": ["agent-alice", "agent-bob"],
-      "contract_id": "SCHEDULING_COMPAT_V1",
-      "purpose_code": "SCHEDULING_COMPAT_V1",
-      "model_identity": {
-        "provider": "OPENAI",
-        "model_id": "gpt-4.1",
-        "model_version": "2025-04-14"
+{
+  "pre_agreement_tests": [
+    {
+      "name": "basic_scheduling_compat_pre",
+      "fields": {
+        "participants": ["agent-alice", "agent-bob"],
+        "contract_id": "SCHEDULING_COMPAT_V1",
+        "purpose_code": "SCHEDULING_COMPAT_V1",
+        "model_identity": {
+          "provider": "OPENAI",
+          "model_id": "gpt-4.1",
+          "model_version": "2025-04-14"
+        },
+        "output_budget": 4,
+        "symmetry_rule": "SYMMETRIC",
+        "input_schema_hashes": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "expiry": "2025-06-01T00:00:00Z"
       },
-      "output_budget": 4,
-      "symmetry_rule": "SYMMETRIC",
-      "input_schema_hashes": [
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-      ],
-      "expiry": "2025-06-01T00:00:00Z"
+      "expected_hash": "5610ee8171b1b4259db3c06aca4a638016bbe3eff53ca27cce6c2cbcecb4c29a"
     },
-    "expected_hash": "04eddd8c3f9011410ca8895b7f534ee37f7e80d37ff45d36e4a0edddd48dda33"
-  },
-  {
-    "name": "different_model_local",
-    "fields": {
-      "session_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "participants": ["agent-alice", "agent-bob"],
-      "contract_id": "SCHEDULING_COMPAT_V1",
-      "purpose_code": "SCHEDULING_COMPAT_V1",
-      "model_identity": {
-        "provider": "LOCAL",
-        "model_id": "llama-3.1-8b-instruct-q4"
+    {
+      "name": "local_model_pre",
+      "fields": {
+        "participants": ["agent-alice", "agent-bob"],
+        "contract_id": "SCHEDULING_COMPAT_V1",
+        "purpose_code": "SCHEDULING_COMPAT_V1",
+        "model_identity": {
+          "provider": "LOCAL",
+          "model_id": "llama-3.1-8b-instruct-q4"
+        },
+        "output_budget": 4,
+        "symmetry_rule": "SYMMETRIC",
+        "input_schema_hashes": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "expiry": "2025-06-01T00:00:00Z"
       },
-      "output_budget": 4,
-      "symmetry_rule": "SYMMETRIC",
-      "input_schema_hashes": [
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-      ],
-      "expiry": "2025-06-01T00:00:00Z"
+      "expected_hash": "aa8d9862b9ab384ae109422a7a73ffad381859d5c28c37453eb2bbe7b0346b31"
     },
-    "expected_hash": "f2b53f0921c136dcd5d286fc6282803578dd9de770d54728624bb99d61a33cd4"
-  },
-  {
-    "name": "three_participants",
-    "fields": {
-      "session_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "participants": ["agent-alice", "agent-bob", "agent-charlie"],
-      "contract_id": "MEDIATION",
-      "purpose_code": "MEDIATION",
-      "model_identity": {
-        "provider": "OPENAI",
-        "model_id": "gpt-4.1",
-        "model_version": "2025-04-14"
+    {
+      "name": "three_participants_pre",
+      "fields": {
+        "participants": ["agent-alice", "agent-bob", "agent-charlie"],
+        "contract_id": "MEDIATION",
+        "purpose_code": "MEDIATION",
+        "model_identity": {
+          "provider": "OPENAI",
+          "model_id": "gpt-4.1",
+          "model_version": "2025-04-14"
+        },
+        "output_budget": 16,
+        "symmetry_rule": "SYMMETRIC",
+        "input_schema_hashes": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ],
+        "expiry": "2025-12-31T23:59:59Z"
       },
-      "output_budget": 16,
-      "symmetry_rule": "SYMMETRIC",
-      "input_schema_hashes": [
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-      ],
-      "expiry": "2025-12-31T23:59:59Z"
+      "expected_hash": "23ab189bf5979eb8614285cca5a605f78e4850a6e8e89be95f2f0a8628b18509"
+    }
+  ],
+  "full_agreement_tests": [
+    {
+      "name": "basic_scheduling_compat",
+      "fields": {
+        "session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "pre_agreement_hash": "5610ee8171b1b4259db3c06aca4a638016bbe3eff53ca27cce6c2cbcecb4c29a",
+        "participants": ["agent-alice", "agent-bob"],
+        "contract_id": "SCHEDULING_COMPAT_V1",
+        "purpose_code": "SCHEDULING_COMPAT_V1",
+        "model_identity": {
+          "provider": "OPENAI",
+          "model_id": "gpt-4.1",
+          "model_version": "2025-04-14"
+        },
+        "output_budget": 4,
+        "symmetry_rule": "SYMMETRIC",
+        "input_schema_hashes": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "expiry": "2025-06-01T00:00:00Z"
+      },
+      "expected_hash": "567a37f4fe67fe0cafbb81bfc0f8ba64d02f9c85e7722224643bed4f2c3fdd81"
     },
-    "expected_hash": "395d7562336284e0f4a1494658a67f62bf15964ac50f8b3c11057ceabfd7939f"
-  }
-]
+    {
+      "name": "different_model_local",
+      "fields": {
+        "session_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "pre_agreement_hash": "aa8d9862b9ab384ae109422a7a73ffad381859d5c28c37453eb2bbe7b0346b31",
+        "participants": ["agent-alice", "agent-bob"],
+        "contract_id": "SCHEDULING_COMPAT_V1",
+        "purpose_code": "SCHEDULING_COMPAT_V1",
+        "model_identity": {
+          "provider": "LOCAL",
+          "model_id": "llama-3.1-8b-instruct-q4"
+        },
+        "output_budget": 4,
+        "symmetry_rule": "SYMMETRIC",
+        "input_schema_hashes": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "expiry": "2025-06-01T00:00:00Z"
+      },
+      "expected_hash": "5fafe162041b6418a8e51d99318a8032ee5d5cb0cceebf5cc743bb7fda1b4108"
+    },
+    {
+      "name": "three_participants",
+      "fields": {
+        "session_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "pre_agreement_hash": "23ab189bf5979eb8614285cca5a605f78e4850a6e8e89be95f2f0a8628b18509",
+        "participants": ["agent-alice", "agent-bob", "agent-charlie"],
+        "contract_id": "MEDIATION",
+        "purpose_code": "MEDIATION",
+        "model_identity": {
+          "provider": "OPENAI",
+          "model_id": "gpt-4.1",
+          "model_version": "2025-04-14"
+        },
+        "output_budget": 16,
+        "symmetry_rule": "SYMMETRIC",
+        "input_schema_hashes": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ],
+        "expiry": "2025-12-31T23:59:59Z"
+      },
+      "expected_hash": "dab26e57b81d1766b57d9e3e665f112a07597052958cc2059fd6c47db9661d37"
+    }
+  ]
+}

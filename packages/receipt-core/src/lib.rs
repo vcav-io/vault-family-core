@@ -23,7 +23,10 @@ pub mod receipt;
 pub mod signer;
 
 // Re-export key types
-pub use agreement::{compute_agreement_hash, ModelIdentity, SessionAgreementFields, AGREEMENT_DOMAIN_PREFIX};
+pub use agreement::{
+    compute_agreement_hash, compute_pre_agreement_hash, ModelIdentity, PreAgreementFields,
+    SessionAgreementFields, AGREEMENT_DOMAIN_PREFIX, PRE_AGREEMENT_DOMAIN_PREFIX,
+};
 pub use canonicalize::{canonicalize, canonicalize_serializable};
 pub use handoff::{
     BudgetTierV2, HashRef, SessionHandoff, UnsignedSessionHandoff, UnsignedSessionHandoffBuilder,
