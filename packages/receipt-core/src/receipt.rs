@@ -151,6 +151,10 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_identity: Option<ModelIdentity>,
 
+    /// SHA-256 agreement hash binding session to negotiated contract terms (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agreement_hash: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -245,6 +249,10 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_identity: Option<ModelIdentity>,
 
+    /// SHA-256 agreement hash binding session to negotiated contract terms (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agreement_hash: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -272,6 +280,7 @@ impl UnsignedReceipt {
             output_entropy_bits: self.output_entropy_bits,
             budget_usage: self.budget_usage,
             model_identity: self.model_identity,
+            agreement_hash: self.agreement_hash,
             attestation: self.attestation,
             signature,
         }
@@ -302,6 +311,7 @@ pub struct ReceiptBuilder {
     output_entropy_bits: Option<u32>,
     budget_usage: Option<BudgetUsageRecord>,
     model_identity: Option<ModelIdentity>,
+    agreement_hash: Option<String>,
     attestation: Option<Attestation>,
 }
 
@@ -414,6 +424,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the agreement hash (optional)
+    pub fn agreement_hash(mut self, hash: Option<String>) -> Self {
+        self.agreement_hash = hash;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
         self.attestation = attestation;
@@ -443,6 +459,7 @@ impl ReceiptBuilder {
             output_entropy_bits: self.output_entropy_bits?,
             budget_usage: self.budget_usage?,
             model_identity: self.model_identity,
+            agreement_hash: self.agreement_hash,
             attestation: self.attestation,
         })
     }
@@ -489,6 +506,7 @@ mod tests {
             output_entropy_bits: 8,
             budget_usage: sample_budget_usage(),
             model_identity: None,
+            agreement_hash: None,
             attestation: None,
         }
     }

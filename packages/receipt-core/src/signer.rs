@@ -257,6 +257,7 @@ mod tests {
                 budget_tier: BudgetTier::Default,
             },
             model_identity: None,
+            agreement_hash: None,
             attestation: None,
         }
     }

@@ -136,6 +136,10 @@ fn main() -> Result<()> {
                         receipt.budget_usage.budget_tier
                     );
 
+                    if let Some(ref agreement_hash) = receipt.agreement_hash {
+                        println!("Agreement hash: {}", agreement_hash);
+                    }
+
                     if let Some(schema_id) = &details.output_schema_id {
                         println!("Output schema: {}", schema_id);
                         if let Some(valid) = details.output_schema_valid {
@@ -424,6 +428,7 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         output_entropy_bits: receipt.output_entropy_bits,
         budget_usage: receipt.budget_usage.clone(),
         model_identity: receipt.model_identity.clone(),
+        agreement_hash: receipt.agreement_hash.clone(),
         attestation: receipt.attestation.clone(),
     }
 }
@@ -468,6 +473,7 @@ mod tests {
                 budget_tier: BudgetTier::Default,
             },
             model_identity: None,
+            agreement_hash: None,
             attestation: None,
         }
     }
@@ -787,6 +793,7 @@ mod tests {
                 budget_tier: BudgetTier::Default,
             },
             model_identity: None,
+            agreement_hash: None,
             attestation: None,
         }
     }

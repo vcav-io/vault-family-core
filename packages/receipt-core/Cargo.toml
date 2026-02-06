@@ -16,5 +16,9 @@ thiserror.workspace = true
 rand.workspace = true
 hex.workspace = true
 
+[[bin]]
+name = "vcav-agreement-hash"
+path = "src/bin/vcav-agreement-hash.rs"
+
 [dev-dependencies]
 proptest.workspace = true
