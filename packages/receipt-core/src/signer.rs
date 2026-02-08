@@ -258,6 +258,7 @@ mod tests {
             },
             model_identity: None,
             agreement_hash: None,
+            receipt_key_id: None,
             attestation: None,
         }
     }

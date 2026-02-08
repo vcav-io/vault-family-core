@@ -155,6 +155,10 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agreement_hash: Option<String>,
 
+    /// Stable identifier for verifying key used to sign this receipt (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_key_id: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -253,6 +257,10 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agreement_hash: Option<String>,
 
+    /// Stable identifier for verifying key used to sign this receipt (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_key_id: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -281,6 +289,7 @@ impl UnsignedReceipt {
             budget_usage: self.budget_usage,
             model_identity: self.model_identity,
             agreement_hash: self.agreement_hash,
+            receipt_key_id: self.receipt_key_id,
             attestation: self.attestation,
             signature,
         }
@@ -312,6 +321,7 @@ pub struct ReceiptBuilder {
     budget_usage: Option<BudgetUsageRecord>,
     model_identity: Option<ModelIdentity>,
     agreement_hash: Option<String>,
+    receipt_key_id: Option<String>,
     attestation: Option<Attestation>,
 }
 
@@ -430,6 +440,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the receipt key id (optional)
+    pub fn receipt_key_id(mut self, key_id: Option<String>) -> Self {
+        self.receipt_key_id = key_id;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
         self.attestation = attestation;
@@ -460,6 +476,7 @@ impl ReceiptBuilder {
             budget_usage: self.budget_usage?,
             model_identity: self.model_identity,
             agreement_hash: self.agreement_hash,
+            receipt_key_id: self.receipt_key_id,
             attestation: self.attestation,
         })
     }
@@ -507,6 +524,7 @@ mod tests {
             budget_usage: sample_budget_usage(),
             model_identity: None,
             agreement_hash: None,
+            receipt_key_id: None,
             attestation: None,
         }
     }
