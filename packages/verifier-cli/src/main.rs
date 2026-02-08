@@ -251,7 +251,8 @@ fn verify(args: &Args) -> VerifyDetails {
     };
 
     let public_key = if let Some(keyring_dir) = &args.keyring_dir {
-        match load_public_key_from_keyring(Path::new(keyring_dir)) {
+        match load_public_key_from_keyring(Path::new(keyring_dir), receipt.receipt_key_id.as_deref())
+        {
             Ok(key) => key,
             Err(e) => {
                 return VerifyDetails {
@@ -443,6 +444,7 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         budget_usage: receipt.budget_usage.clone(),
         model_identity: receipt.model_identity.clone(),
         agreement_hash: receipt.agreement_hash.clone(),
+        receipt_key_id: receipt.receipt_key_id.clone(),
         attestation: receipt.attestation.clone(),
     }
 }
@@ -459,7 +461,10 @@ fn load_public_key_from_file(pubkey_path: &str) -> Result<receipt_core::Verifyin
     })
 }
 
-fn load_public_key_from_keyring(keyring_dir: &Path) -> Result<receipt_core::VerifyingKey, String> {
+fn load_public_key_from_keyring(
+    keyring_dir: &Path,
+    receipt_key_id: Option<&str>,
+) -> Result<receipt_core::VerifyingKey, String> {
     validate_keyring_trust_root(keyring_dir)?;
 
     let active_path = keyring_dir.join("active.json");
@@ -484,13 +489,75 @@ fn load_public_key_from_keyring(keyring_dir: &Path) -> Result<receipt_core::Veri
         ));
     }
 
-    parse_public_key_hex(active.verifying_key_hex.trim()).map_err(|e| {
+    let selected = match receipt_key_id {
+        None => active,
+        Some(id) if id == active.key_id => active,
+        Some(id) => load_retired_key_record(keyring_dir, id)?,
+    };
+
+    parse_public_key_hex(selected.verifying_key_hex.trim()).map_err(|e| {
         format!(
-            "Failed to parse keyring active verifying key hex in {}: {}",
-            active_path.display(),
+            "Failed to parse keyring verifying key hex for key_id {}: {}",
+            selected.key_id,
             e
         )
     })
+}
+
+fn load_retired_key_record(keyring_dir: &Path, key_id: &str) -> Result<KeyRecord, String> {
+    let retired_dir = keyring_dir.join("retired");
+    if !retired_dir.exists() {
+        return Err(format!(
+            "Receipt key_id {} not found in active key and retired/ does not exist in {}",
+            key_id,
+            keyring_dir.display()
+        ));
+    }
+
+    let entries = fs::read_dir(&retired_dir).map_err(|e| {
+        format!(
+            "Failed to read keyring retired directory {}: {}",
+            retired_dir.display(),
+            e
+        )
+    })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| {
+            format!(
+                "Failed to read keyring retired directory entry {}: {}",
+                retired_dir.display(),
+                e
+            )
+        })?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let content = fs::read_to_string(&path).map_err(|e| {
+            format!(
+                "Failed to read retired key record {}: {}",
+                path.display(),
+                e
+            )
+        })?;
+        let record: KeyRecord = serde_json::from_str(&content).map_err(|e| {
+            format!(
+                "Failed to parse retired key record {}: {}",
+                path.display(),
+                e
+            )
+        })?;
+        if record.key_id == key_id {
+            return Ok(record);
+        }
+    }
+
+    Err(format!(
+        "Receipt key_id {} not found in keyring {}",
+        key_id,
+        keyring_dir.display()
+    ))
 }
 
 fn validate_keyring_trust_root(keyring_dir: &Path) -> Result<(), String> {
@@ -620,6 +687,7 @@ mod tests {
             },
             model_identity: None,
             agreement_hash: None,
+            receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         }
     }
@@ -1029,6 +1097,7 @@ mod tests {
             },
             model_identity: None,
             agreement_hash: None,
+            receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         }
     }
