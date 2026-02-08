@@ -17,6 +17,8 @@ mod embedded_schemas;
 use anyhow::Result;
 use clap::Parser;
 use receipt_core::{parse_public_key_hex, verify_receipt, Receipt, UnsignedReceipt};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -31,6 +33,13 @@ struct Args {
     /// Path to vault public key file (hex-encoded, 64 characters)
     #[arg(short, long)]
     pubkey: String,
+
+    /// Path to receipt keyring directory (uses active.json + TRUST_ROOT)
+    ///
+    /// When set, verifier loads the verifying key from keyring active key and
+    /// validates TRUST_ROOT integrity pins before signature verification.
+    #[arg(long)]
+    keyring_dir: Option<String>,
 
     /// Path to schema directory (overrides embedded schemas)
     #[arg(short, long)]
@@ -109,6 +118,17 @@ struct VerifyDetails {
     output_schema_valid: Option<bool>,
     output_schema_id: Option<String>,
     error: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct KeyRecord {
+    key_id: String,
+    verifying_key_hex: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TrustRootPins {
+    files: BTreeMap<String, String>,
 }
 
 fn main() -> Result<()> {
@@ -230,39 +250,33 @@ fn verify(args: &Args) -> VerifyDetails {
         }
     };
 
-    // Load public key
-    let pubkey_content = match fs::read_to_string(&args.pubkey) {
-        Ok(content) => content,
-        Err(e) => {
-            return VerifyDetails {
-                receipt: None,
-                status: VerificationStatus::FailSignature,
-                schema_skipped: false,
-                output_schema_valid: None,
-                output_schema_id: None,
-                error: Some(format!(
-                    "Failed to read public key file: {}: {}",
-                    args.pubkey, e
-                )),
-            };
+    let public_key = if let Some(keyring_dir) = &args.keyring_dir {
+        match load_public_key_from_keyring(Path::new(keyring_dir)) {
+            Ok(key) => key,
+            Err(e) => {
+                return VerifyDetails {
+                    receipt: None,
+                    status: VerificationStatus::FailSignature,
+                    schema_skipped: false,
+                    output_schema_valid: None,
+                    output_schema_id: None,
+                    error: Some(e),
+                };
+            }
         }
-    };
-
-    let pubkey_hex = pubkey_content.trim();
-    let public_key = match parse_public_key_hex(pubkey_hex) {
-        Ok(key) => key,
-        Err(e) => {
-            return VerifyDetails {
-                receipt: None,
-                status: VerificationStatus::FailSignature,
-                schema_skipped: false,
-                output_schema_valid: None,
-                output_schema_id: None,
-                error: Some(format!(
-                    "Failed to parse public key (expected 64 hex characters): {}",
-                    e
-                )),
-            };
+    } else {
+        match load_public_key_from_file(&args.pubkey) {
+            Ok(key) => key,
+            Err(e) => {
+                return VerifyDetails {
+                    receipt: None,
+                    status: VerificationStatus::FailSignature,
+                    schema_skipped: false,
+                    output_schema_valid: None,
+                    output_schema_id: None,
+                    error: Some(e),
+                };
+            }
         }
     };
 
@@ -433,6 +447,138 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
     }
 }
 
+fn load_public_key_from_file(pubkey_path: &str) -> Result<receipt_core::VerifyingKey, String> {
+    let pubkey_content = fs::read_to_string(pubkey_path)
+        .map_err(|e| format!("Failed to read public key file: {}: {}", pubkey_path, e))?;
+    let pubkey_hex = pubkey_content.trim();
+    parse_public_key_hex(pubkey_hex).map_err(|e| {
+        format!(
+            "Failed to parse public key (expected 64 hex characters): {}",
+            e
+        )
+    })
+}
+
+fn load_public_key_from_keyring(keyring_dir: &Path) -> Result<receipt_core::VerifyingKey, String> {
+    validate_keyring_trust_root(keyring_dir)?;
+
+    let active_path = keyring_dir.join("active.json");
+    let active_content = fs::read_to_string(&active_path).map_err(|e| {
+        format!(
+            "Failed to read keyring active key file: {}: {}",
+            active_path.display(),
+            e
+        )
+    })?;
+    let active: KeyRecord = serde_json::from_str(&active_content).map_err(|e| {
+        format!(
+            "Failed to parse keyring active key file: {}: {}",
+            active_path.display(),
+            e
+        )
+    })?;
+    if active.key_id.trim().is_empty() {
+        return Err(format!(
+            "Invalid keyring active key file: {} has empty key_id",
+            active_path.display()
+        ));
+    }
+
+    parse_public_key_hex(active.verifying_key_hex.trim()).map_err(|e| {
+        format!(
+            "Failed to parse keyring active verifying key hex in {}: {}",
+            active_path.display(),
+            e
+        )
+    })
+}
+
+fn validate_keyring_trust_root(keyring_dir: &Path) -> Result<(), String> {
+    let trust_root_path = keyring_dir.join("TRUST_ROOT");
+    let trust_root_content = fs::read_to_string(&trust_root_path).map_err(|e| {
+        format!(
+            "Failed to read keyring trust root file: {}: {}",
+            trust_root_path.display(),
+            e
+        )
+    })?;
+    let trust_root: TrustRootPins = serde_json::from_str(&trust_root_content).map_err(|e| {
+        format!(
+            "Failed to parse keyring trust root file {}: {}",
+            trust_root_path.display(),
+            e
+        )
+    })?;
+
+    let mut actual = BTreeMap::new();
+
+    let active_path = keyring_dir.join("active.json");
+    let active_content = fs::read(&active_path).map_err(|e| {
+        format!(
+            "Failed to read keyring active file for trust-root check: {}: {}",
+            active_path.display(),
+            e
+        )
+    })?;
+    actual.insert("active.json".to_string(), sha256_hex(&active_content));
+
+    let retired_dir = keyring_dir.join("retired");
+    if retired_dir.exists() {
+        let entries = fs::read_dir(&retired_dir).map_err(|e| {
+            format!(
+                "Failed to read keyring retired directory for trust-root check: {}: {}",
+                retired_dir.display(),
+                e
+            )
+        })?;
+        for entry in entries {
+            let entry = entry.map_err(|e| {
+                format!(
+                    "Failed to read keyring retired directory entry in {}: {}",
+                    retired_dir.display(),
+                    e
+                )
+            })?;
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let file_name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| {
+                    format!(
+                        "Invalid UTF-8 file name in retired key directory: {}",
+                        path.display()
+                    )
+                })?;
+            let content = fs::read(&path).map_err(|e| {
+                format!(
+                    "Failed reading retired key file for trust-root check: {}: {}",
+                    path.display(),
+                    e
+                )
+            })?;
+            actual.insert(format!("retired/{}", file_name), sha256_hex(&content));
+        }
+    }
+
+    if trust_root.files != actual {
+        return Err(format!(
+            "Keyring TRUST_ROOT mismatch in {} (expected pins do not match active/retired files)",
+            keyring_dir.display()
+        ));
+    }
+
+    Ok(())
+}
+
+fn sha256_hex(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    format!("{:x}", hasher.finalize())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -440,7 +586,7 @@ mod tests {
     use guardian_core::{BudgetTier, Purpose};
     use receipt_core::{generate_keypair, public_key_to_hex, sign_receipt, BudgetUsageRecord};
     use std::io::Write;
-    use tempfile::NamedTempFile;
+    use tempfile::{NamedTempFile, TempDir};
 
     fn sample_unsigned_receipt() -> UnsignedReceipt {
         UnsignedReceipt {
@@ -495,6 +641,30 @@ mod tests {
         (receipt_file, pubkey_file, receipt)
     }
 
+    fn create_keyring_with_single_active_key(verifying_key_hex: &str) -> TempDir {
+        let dir = TempDir::new().unwrap();
+        let active_path = dir.path().join("active.json");
+        let active_json = serde_json::json!({
+            "key_id": "kid-test-active",
+            "verifying_key_hex": verifying_key_hex
+        });
+        fs::write(&active_path, serde_json::to_vec(&active_json).unwrap()).unwrap();
+
+        let active_hash = sha256_hex(&fs::read(&active_path).unwrap());
+        let trust_root = serde_json::json!({
+            "files": {
+                "active.json": active_hash
+            }
+        });
+        fs::write(
+            dir.path().join("TRUST_ROOT"),
+            serde_json::to_vec(&trust_root).unwrap(),
+        )
+        .unwrap();
+
+        dir
+    }
+
     #[test]
     fn test_verify_valid_receipt() {
         let (receipt_file, pubkey_file, _receipt) = create_test_files();
@@ -502,6 +672,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: false,
@@ -516,6 +687,62 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_valid_receipt_with_keyring() {
+        let (receipt_file, pubkey_file, _receipt) = create_test_files();
+        let verifying_key_hex = fs::read_to_string(pubkey_file.path()).unwrap();
+        let keyring = create_keyring_with_single_active_key(verifying_key_hex.trim());
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: Some(keyring.path().to_str().unwrap().to_string()),
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+        };
+
+        let details = verify(&args);
+        assert!(details.receipt.is_some());
+        assert_eq!(details.status, VerificationStatus::Ok);
+    }
+
+    #[test]
+    fn test_verify_fails_when_keyring_trust_root_mismatch() {
+        let (receipt_file, pubkey_file, _receipt) = create_test_files();
+        let verifying_key_hex = fs::read_to_string(pubkey_file.path()).unwrap();
+        let keyring = create_keyring_with_single_active_key(verifying_key_hex.trim());
+
+        let active_path = keyring.path().join("active.json");
+        let tampered = serde_json::json!({
+            "key_id": "kid-test-active",
+            "verifying_key_hex": "00".repeat(32)
+        });
+        fs::write(&active_path, serde_json::to_vec(&tampered).unwrap()).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: Some(keyring.path().to_str().unwrap().to_string()),
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::FailSignature);
+        assert!(details
+            .error
+            .unwrap_or_default()
+            .contains("TRUST_ROOT mismatch"));
+    }
+
+    #[test]
     fn test_verify_wrong_key() {
         let (receipt_file, _pubkey_file, _receipt) = create_test_files();
 
@@ -527,6 +754,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: wrong_pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: false,
@@ -561,6 +789,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: false,
@@ -585,6 +814,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: false,
@@ -603,6 +833,7 @@ mod tests {
         let args = Args {
             receipt: "/nonexistent/receipt.json".to_string(),
             pubkey: "/nonexistent/key.pub".to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: false,
@@ -626,6 +857,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: bad_pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: false,
@@ -674,6 +906,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: Some(schema_dir.to_str().unwrap().to_string()),
             skip_schema_validation: false,
             validate_output: false,
@@ -698,6 +931,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: false,
@@ -719,6 +953,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: true,
             validate_output: false,
@@ -822,6 +1057,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: true,
@@ -848,6 +1084,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: true,
@@ -924,6 +1161,7 @@ mod tests {
                         let args = Args {
                             receipt: receipt_file.path().to_str().unwrap().to_string(),
                             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+                            keyring_dir: None,
                             schema_dir: None,
                             skip_schema_validation: false,
                             validate_output: true,
@@ -983,6 +1221,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: true,
@@ -1025,6 +1264,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: true,
@@ -1046,6 +1286,7 @@ mod tests {
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: pubkey_file.path().to_str().unwrap().to_string(),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: false, // Not validating output
