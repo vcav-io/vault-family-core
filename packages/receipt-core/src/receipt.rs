@@ -65,6 +65,19 @@ pub struct BudgetUsageRecord {
     pub budget_tier: BudgetTier,
 }
 
+/// Receipt-chain linkage for budget integrity verification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BudgetChainRecord {
+    /// Stable chain identifier for a participant pair/window lineage.
+    pub chain_id: String,
+
+    /// Previous receipt hash in chain (null for first link).
+    pub prev_receipt_hash: Option<String>,
+
+    /// Canonical hash of this unsigned receipt.
+    pub receipt_hash: String,
+}
+
 // ============================================================================
 // Attestation
 // ============================================================================
@@ -146,6 +159,10 @@ pub struct Receipt {
 
     /// Privacy budget accounting
     pub budget_usage: BudgetUsageRecord,
+
+    /// Receipt hash-chain linkage for budget continuity verification (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_chain: Option<BudgetChainRecord>,
 
     /// Identity of the model used for vault execution (optional, Phase 3+)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -249,6 +266,10 @@ pub struct UnsignedReceipt {
     /// Privacy budget accounting
     pub budget_usage: BudgetUsageRecord,
 
+    /// Receipt hash-chain linkage for budget continuity verification (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_chain: Option<BudgetChainRecord>,
+
     /// Identity of the model used for vault execution (optional, Phase 3+)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_identity: Option<ModelIdentity>,
@@ -287,6 +308,7 @@ impl UnsignedReceipt {
             output: self.output,
             output_entropy_bits: self.output_entropy_bits,
             budget_usage: self.budget_usage,
+            budget_chain: self.budget_chain,
             model_identity: self.model_identity,
             agreement_hash: self.agreement_hash,
             receipt_key_id: self.receipt_key_id,
@@ -319,6 +341,7 @@ pub struct ReceiptBuilder {
     output: Option<serde_json::Value>,
     output_entropy_bits: Option<u32>,
     budget_usage: Option<BudgetUsageRecord>,
+    budget_chain: Option<BudgetChainRecord>,
     model_identity: Option<ModelIdentity>,
     agreement_hash: Option<String>,
     receipt_key_id: Option<String>,
@@ -428,6 +451,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the budget chain linkage record (optional).
+    pub fn budget_chain(mut self, chain: Option<BudgetChainRecord>) -> Self {
+        self.budget_chain = chain;
+        self
+    }
+
     /// Set the model identity (optional, Phase 3+)
     pub fn model_identity(mut self, identity: Option<ModelIdentity>) -> Self {
         self.model_identity = identity;
@@ -474,6 +503,7 @@ impl ReceiptBuilder {
             output: self.output,
             output_entropy_bits: self.output_entropy_bits?,
             budget_usage: self.budget_usage?,
+            budget_chain: self.budget_chain,
             model_identity: self.model_identity,
             agreement_hash: self.agreement_hash,
             receipt_key_id: self.receipt_key_id,
@@ -496,6 +526,14 @@ mod tests {
             bits_used_after: 11,
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
+        }
+    }
+
+    fn sample_budget_chain() -> BudgetChainRecord {
+        BudgetChainRecord {
+            chain_id: "b".repeat(64),
+            prev_receipt_hash: Some("c".repeat(64)),
+            receipt_hash: "d".repeat(64),
         }
     }
 
@@ -522,6 +560,7 @@ mod tests {
             })),
             output_entropy_bits: 8,
             budget_usage: sample_budget_usage(),
+            budget_chain: None,
             model_identity: None,
             agreement_hash: None,
             receipt_key_id: None,
@@ -556,6 +595,14 @@ mod tests {
         let record = sample_budget_usage();
         let json = serde_json::to_string(&record).unwrap();
         let parsed: BudgetUsageRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(record, parsed);
+    }
+
+    #[test]
+    fn test_budget_chain_record_serde() {
+        let record = sample_budget_chain();
+        let json = serde_json::to_string(&record).unwrap();
+        let parsed: BudgetChainRecord = serde_json::from_str(&json).unwrap();
         assert_eq!(record, parsed);
     }
 

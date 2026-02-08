@@ -154,6 +154,43 @@
       "additionalProperties": false,
       "description": "Privacy budget accounting"
     },
+    "budget_chain": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "properties": {
+            "chain_id": {
+              "type": "string",
+              "pattern": "^chain-[a-f0-9]{64}$",
+              "description": "Stable budget chain identifier"
+            },
+            "prev_receipt_hash": {
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              ],
+              "description": "Previous receipt hash in chain (null for first link)"
+            },
+            "receipt_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "Canonical hash of this unsigned receipt"
+            }
+          },
+          "required": [
+            "chain_id",
+            "prev_receipt_hash",
+            "receipt_hash"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Receipt hash-chain linkage for budget continuity verification"
+    },
     "handoff_id": {
       "type": "string",
       "minLength": 1,

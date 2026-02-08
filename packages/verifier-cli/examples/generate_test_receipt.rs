@@ -37,6 +37,7 @@ fn main() {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
         },
+        budget_chain: None,
         model_identity: None,
         agreement_hash: None,
         receipt_key_id: None,

@@ -94,6 +94,13 @@ pub struct UnsignedSessionHandoff {
 
     /// Capability tokens for session authorization
     pub capability_tokens: Vec<String>,
+
+    /// Prior receipt hash from budget chain continuity (optional for first session).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prior_receipt_hash: Option<String>,
+
+    /// Planned budget spend (bits) for this session.
+    pub intended_spend_bits: u32,
 }
 
 impl UnsignedSessionHandoff {
@@ -139,6 +146,13 @@ pub struct SessionHandoff {
     /// Capability tokens for session authorization
     pub capability_tokens: Vec<String>,
 
+    /// Prior receipt hash from budget chain continuity (optional for first session).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prior_receipt_hash: Option<String>,
+
+    /// Planned budget spend (bits) for this session.
+    pub intended_spend_bits: u32,
+
     /// 128-character hex-encoded Ed25519 signature from initiator
     pub initiator_signature: String,
 
@@ -159,6 +173,8 @@ impl SessionHandoff {
             ttl_seconds: self.ttl_seconds,
             operator_endpoint_id: self.operator_endpoint_id.clone(),
             capability_tokens: self.capability_tokens.clone(),
+            prior_receipt_hash: self.prior_receipt_hash.clone(),
+            intended_spend_bits: self.intended_spend_bits,
         }
     }
 }
@@ -179,6 +195,8 @@ pub struct UnsignedSessionHandoffBuilder {
     ttl_seconds: Option<u32>,
     operator_endpoint_id: Option<String>,
     capability_tokens: Option<Vec<String>>,
+    prior_receipt_hash: Option<String>,
+    intended_spend_bits: Option<u32>,
 }
 
 impl UnsignedSessionHandoffBuilder {
@@ -236,6 +254,18 @@ impl UnsignedSessionHandoffBuilder {
         self
     }
 
+    /// Set prior receipt hash for budget-chain continuity (optional).
+    pub fn prior_receipt_hash(mut self, hash: Option<String>) -> Self {
+        self.prior_receipt_hash = hash;
+        self
+    }
+
+    /// Set planned budget spend in bits.
+    pub fn intended_spend_bits(mut self, bits: u32) -> Self {
+        self.intended_spend_bits = Some(bits);
+        self
+    }
+
     /// Build the UnsignedSessionHandoff
     ///
     /// # Panics
@@ -253,6 +283,10 @@ impl UnsignedSessionHandoffBuilder {
                 .operator_endpoint_id
                 .expect("operator_endpoint_id is required"),
             capability_tokens: self.capability_tokens.unwrap_or_default(),
+            prior_receipt_hash: self.prior_receipt_hash,
+            intended_spend_bits: self
+                .intended_spend_bits
+                .expect("intended_spend_bits is required"),
         }
     }
 }
@@ -275,6 +309,8 @@ mod tests {
             .ttl_seconds(120)
             .operator_endpoint_id("operator-prod-001")
             .capability_tokens(vec![])
+            .prior_receipt_hash(None)
+            .intended_spend_bits(11)
             .build()
     }
 
@@ -368,6 +404,8 @@ mod tests {
             ttl_seconds: 120,
             operator_endpoint_id: "operator-001".to_string(),
             capability_tokens: vec![],
+            prior_receipt_hash: Some("c".repeat(64)),
+            intended_spend_bits: 11,
             initiator_signature: "a".repeat(128),
             acceptor_signature: "b".repeat(128),
         };

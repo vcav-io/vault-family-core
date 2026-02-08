@@ -24,6 +24,8 @@ pub const DOMAIN_PREFIX: &str = "VCAV-RECEIPT-V1:";
 
 /// Domain separation prefix for session handoff signatures
 pub const SESSION_HANDOFF_DOMAIN_PREFIX: &str = "VCAV-HANDOFF-V1:";
+const RECEIPT_HASH_PLACEHOLDER: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 
 // ============================================================================
 // SigningError
@@ -78,6 +80,21 @@ pub fn hash_message(message: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(message);
     hasher.finalize().into()
+}
+
+/// Compute canonical hash for unsigned receipt-chain linking.
+///
+/// To avoid self-referential recursion, `budget_chain.receipt_hash` is normalized
+/// to a fixed placeholder before hashing.
+pub fn compute_receipt_hash(receipt: &UnsignedReceipt) -> Result<String, SigningError> {
+    let mut normalized = receipt.clone();
+    if let Some(chain) = normalized.budget_chain.as_mut() {
+        chain.receipt_hash = RECEIPT_HASH_PLACEHOLDER.to_string();
+    }
+    let canonical = canonicalize_serializable(&normalized)?;
+    let mut hasher = Sha256::new();
+    hasher.update(canonical.as_bytes());
+    Ok(hex::encode(hasher.finalize()))
 }
 
 /// Sign an unsigned receipt with the given signing key.
@@ -256,6 +273,7 @@ mod tests {
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
             },
+            budget_chain: None,
             model_identity: None,
             agreement_hash: None,
             receipt_key_id: None,
@@ -353,6 +371,31 @@ mod tests {
         // Signature should be 128 hex characters (64 bytes)
         assert_eq!(signature.len(), 128);
         assert!(signature.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_compute_receipt_hash_deterministic() {
+        let receipt = sample_unsigned_receipt();
+        let hash_a = compute_receipt_hash(&receipt).unwrap();
+        let hash_b = compute_receipt_hash(&receipt).unwrap();
+        assert_eq!(hash_a, hash_b);
+        assert_eq!(hash_a.len(), 64);
+    }
+
+    #[test]
+    fn test_compute_receipt_hash_normalizes_self_hash_field() {
+        let mut a = sample_unsigned_receipt();
+        a.budget_chain = Some(crate::receipt::BudgetChainRecord {
+            chain_id: "a".repeat(64),
+            prev_receipt_hash: None,
+            receipt_hash: "1".repeat(64),
+        });
+        let mut b = a.clone();
+        b.budget_chain.as_mut().unwrap().receipt_hash = "2".repeat(64);
+        assert_eq!(
+            compute_receipt_hash(&a).unwrap(),
+            compute_receipt_hash(&b).unwrap()
+        );
     }
 
     #[test]
@@ -513,6 +556,8 @@ mod tests {
             ttl_seconds: 120,
             operator_endpoint_id: "operator-prod-001".to_string(),
             capability_tokens: vec![],
+            prior_receipt_hash: None,
+            intended_spend_bits: 11,
         }
     }
 
