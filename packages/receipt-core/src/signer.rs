@@ -24,6 +24,11 @@ pub const DOMAIN_PREFIX: &str = "VCAV-RECEIPT-V1:";
 
 /// Domain separation prefix for session handoff signatures
 pub const SESSION_HANDOFF_DOMAIN_PREFIX: &str = "VCAV-HANDOFF-V1:";
+/// Placeholder used during canonical hashing to break self-referential recursion.
+///
+/// The actual `budget_chain.receipt_hash` field is replaced with this value before
+/// canonicalization in `compute_receipt_hash`, then restored by callers with the
+/// computed digest.
 const RECEIPT_HASH_PLACEHOLDER: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -395,6 +400,21 @@ mod tests {
         assert_eq!(
             compute_receipt_hash(&a).unwrap(),
             compute_receipt_hash(&b).unwrap()
+        );
+
+        // Mutating chain linkage fields must change the computed hash.
+        let mut c = a.clone();
+        c.budget_chain.as_mut().unwrap().chain_id = "b".repeat(64);
+        assert_ne!(
+            compute_receipt_hash(&a).unwrap(),
+            compute_receipt_hash(&c).unwrap()
+        );
+
+        let mut d = a.clone();
+        d.budget_chain.as_mut().unwrap().prev_receipt_hash = Some("f".repeat(64));
+        assert_ne!(
+            compute_receipt_hash(&a).unwrap(),
+            compute_receipt_hash(&d).unwrap()
         );
     }
 
