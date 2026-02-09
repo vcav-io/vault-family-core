@@ -61,6 +61,10 @@ impl std::fmt::Display for ExecutionLane {
     }
 }
 
+fn default_execution_lane() -> ExecutionLane {
+    ExecutionLane::GlassLocal
+}
+
 // ============================================================================
 // BudgetUsageRecord
 // ============================================================================
@@ -174,6 +178,7 @@ pub struct Receipt {
     pub status: ReceiptStatus,
 
     /// Execution lane used for this session.
+    #[serde(default = "default_execution_lane")]
     pub execution_lane: ExecutionLane,
 
     /// Vault result (null if ABORTED)
@@ -286,6 +291,7 @@ pub struct UnsignedReceipt {
     pub status: ReceiptStatus,
 
     /// Execution lane used for this session.
+    #[serde(default = "default_execution_lane")]
     pub execution_lane: ExecutionLane,
 
     /// Vault result (null if ABORTED)
@@ -550,7 +556,7 @@ impl ReceiptBuilder {
             session_end: self.session_end?,
             fixed_window_duration_seconds: self.fixed_window_duration_seconds?,
             status: self.status?,
-            execution_lane: self.execution_lane?,
+            execution_lane: self.execution_lane.unwrap_or_else(default_execution_lane),
             output: self.output,
             output_entropy_bits: self.output_entropy_bits?,
             mitigations_applied: self.mitigations_applied,
@@ -671,6 +677,14 @@ mod tests {
     }
 
     #[test]
+    fn test_unsigned_receipt_deserialize_without_execution_lane_defaults_to_glass_local() {
+        let mut value = serde_json::to_value(sample_unsigned_receipt()).unwrap();
+        value.as_object_mut().unwrap().remove("execution_lane");
+        let parsed: UnsignedReceipt = serde_json::from_value(value).unwrap();
+        assert_eq!(parsed.execution_lane, ExecutionLane::GlassLocal);
+    }
+
+    #[test]
     fn test_unsigned_receipt_sign() {
         let unsigned = sample_unsigned_receipt();
         let signature = "e".repeat(128);
@@ -700,6 +714,15 @@ mod tests {
         let signed = unsigned.sign("e".repeat(128));
         assert!(signed.is_aborted());
         assert!(!signed.is_completed());
+    }
+
+    #[test]
+    fn test_receipt_deserialize_without_execution_lane_defaults_to_glass_local() {
+        let signed = sample_unsigned_receipt().sign("e".repeat(128));
+        let mut value = serde_json::to_value(signed).unwrap();
+        value.as_object_mut().unwrap().remove("execution_lane");
+        let parsed: Receipt = serde_json::from_value(value).unwrap();
+        assert_eq!(parsed.execution_lane, ExecutionLane::GlassLocal);
     }
 
     #[test]
