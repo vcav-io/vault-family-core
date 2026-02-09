@@ -816,6 +816,39 @@ mod tests {
         chain_check(&args)
     }
 
+    fn run_on_dir_with_keyring(dir: &TempDir, keyring_dir: &Path) -> Report {
+        let args = Args {
+            path: dir.path().to_str().unwrap().to_string(),
+            pubkey: None,
+            keyring_dir: Some(keyring_dir.to_str().unwrap().to_string()),
+            format: OutputFormat::Json,
+            quiet: true,
+        };
+        chain_check(&args)
+    }
+
+    fn write_keyring(keyring_dir: &Path, key_id: &str, verifying_key_hex: &str, trust_root: bool) {
+        fs::create_dir_all(keyring_dir.join("retired")).unwrap();
+
+        let active = serde_json::json!({
+            "key_id": key_id,
+            "verifying_key_hex": verifying_key_hex,
+        });
+        let active_bytes = serde_json::to_vec_pretty(&active).unwrap();
+        fs::write(keyring_dir.join("active.json"), &active_bytes).unwrap();
+
+        if trust_root {
+            let mut files = BTreeMap::new();
+            files.insert("active.json".to_string(), sha256_hex(&active_bytes));
+            let trust_root_doc = serde_json::json!({ "files": files });
+            fs::write(
+                keyring_dir.join("TRUST_ROOT"),
+                serde_json::to_vec_pretty(&trust_root_doc).unwrap(),
+            )
+            .unwrap();
+        }
+    }
+
     #[test]
     fn detects_valid_chain() {
         let (signing_key, verifying_key) = generate_keypair();
@@ -923,5 +956,58 @@ mod tests {
         assert_eq!(report.chains.len(), 1);
         assert_eq!(report.chains[0].status, "RESET_DETECTED");
         assert_eq!(report.chains[0].heads.len(), 2);
+    }
+
+    #[test]
+    fn detects_replay_receipts() {
+        let (signing_key, verifying_key) = generate_keypair();
+        let pubkey_file = create_pubkey_file(&public_key_to_hex(&verifying_key));
+
+        let dir = TempDir::new().unwrap();
+        let window_start = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+
+        let mut u1 = base_unsigned(None, "0".repeat(64), window_start);
+        let r1 = sign_with_correct_hash(&mut u1, &signing_key);
+        let r1_json = serde_json::to_vec(&r1).unwrap();
+        fs::write(dir.path().join("r1.json"), &r1_json).unwrap();
+        fs::write(dir.path().join("r1-replay.json"), &r1_json).unwrap();
+
+        let report = run_on_dir(&dir, pubkey_file.path().to_str().unwrap());
+        assert_eq!(report.chains.len(), 1);
+        assert_eq!(report.chains[0].replays.len(), 1);
+        assert_eq!(
+            report.chains[0].replays[0],
+            r1.budget_chain.as_ref().unwrap().receipt_hash
+        );
+    }
+
+    #[test]
+    fn keyring_trust_root_mode_validates_and_verifies() {
+        let (signing_key, verifying_key) = generate_keypair();
+        let key_id = "kid-test-active";
+
+        let receipts_dir = TempDir::new().unwrap();
+        let keyring_dir = TempDir::new().unwrap();
+
+        write_keyring(
+            keyring_dir.path(),
+            key_id,
+            &public_key_to_hex(&verifying_key),
+            true,
+        );
+
+        let window_start = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+        let mut u1 = base_unsigned(None, "0".repeat(64), window_start);
+        u1.receipt_key_id = Some(key_id.to_string());
+        let r1 = sign_with_correct_hash(&mut u1, &signing_key);
+        fs::write(
+            receipts_dir.path().join("r1.json"),
+            serde_json::to_vec(&r1).unwrap(),
+        )
+        .unwrap();
+
+        let report = run_on_dir_with_keyring(&receipts_dir, keyring_dir.path());
+        assert_eq!(report.status, "OK");
+        assert!(report.invalid_receipts.is_empty());
     }
 }

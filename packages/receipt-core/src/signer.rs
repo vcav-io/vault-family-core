@@ -6,11 +6,12 @@
 //! Message formats:
 //! - Receipts: "VCAV-RECEIPT-V1:" || canonical_json(receipt_without_signature)
 //! - Handoffs: "VCAV-HANDOFF-V1:" || canonical_json(handoff_without_signatures)
+//! - Receipt hash: sha256("vcav/receipt_hash/v1" || JCS(unsigned_receipt_with_placeholder))
+//! - Budget chain id: "chain-" + hex(sha256("vcav/budget_chain/v1" || JCS(chain_id_core)))
 
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
-use unicode_normalization::UnicodeNormalization;
 
 use crate::canonicalize::canonicalize_serializable;
 use crate::handoff::UnsignedSessionHandoff;
@@ -33,7 +34,9 @@ pub const RECEIPT_HASH_DOMAIN_PREFIX: &str = "vcav/receipt_hash/v1";
 
 /// Domain prefix for `chain_id` budget-chain identification.
 ///
-/// Spec: `chain_id = sha256("vcav/budget_chain/v1" || JCS({participant_ids, purpose_code, output_schema_id, lane_id}))`
+/// Spec:
+/// `chain_id = "chain-" + hex(sha256("vcav/budget_chain/v1" || JCS(core)))`
+/// where `core.participant_ids` are NFC-normalized and sorted lexicographically.
 pub const BUDGET_CHAIN_DOMAIN_PREFIX: &str = "vcav/budget_chain/v1";
 
 /// Stable identifier for a receipt verifying key.
@@ -48,7 +51,7 @@ pub fn compute_receipt_key_id(verifying_key_hex: &str) -> String {
 /// Placeholder used during canonical hashing to break self-referential recursion.
 ///
 /// The actual `budget_chain.receipt_hash` field is replaced with this value before
-/// canonicalization in `compute_receipt_hash`, then restored by callers with the
+/// canonicalization in `compute_receipt_hash`, then set by callers to the
 /// computed digest.
 pub const RECEIPT_HASH_PLACEHOLDER: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -83,7 +86,6 @@ pub enum SigningError {
     /// Invalid public key bytes
     #[error("Invalid public key bytes: {0}")]
     InvalidPublicKeyBytes(String),
-
 }
 
 // ============================================================================
@@ -109,11 +111,6 @@ pub fn hash_message(message: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-fn normalize_agent_id(id: &str) -> String {
-    // Pair and chain identifiers must apply identical normalization rules.
-    id.nfc().collect()
-}
-
 /// Compute deterministic `chain_id` for budget-chain continuity.
 ///
 /// This value is *not* signed directly; it is included in the receipt payload and
@@ -134,7 +131,7 @@ pub fn compute_budget_chain_id(
 
     let mut ids: Vec<String> = participant_ids
         .iter()
-        .map(|s| normalize_agent_id(s))
+        .map(|s| guardian_core::normalize_agent_id(s))
         .collect();
     ids.sort();
 
@@ -155,7 +152,8 @@ pub fn compute_budget_chain_id(
 /// Compute canonical hash for unsigned receipt-chain linking.
 ///
 /// To avoid self-referential recursion, `budget_chain.receipt_hash` is normalized
-/// to a fixed placeholder before hashing.
+/// to a fixed placeholder before hashing, then SHA-256 is computed over:
+/// `RECEIPT_HASH_DOMAIN_PREFIX || JCS(normalized_unsigned_receipt)`.
 pub fn compute_receipt_hash(receipt: &UnsignedReceipt) -> Result<String, SigningError> {
     let mut normalized = receipt.clone();
     if let Some(chain) = normalized.budget_chain.as_mut() {
@@ -454,6 +452,16 @@ mod tests {
     }
 
     #[test]
+    fn test_compute_receipt_hash_with_no_budget_chain() {
+        let mut receipt = sample_unsigned_receipt();
+        receipt.budget_chain = None;
+        let hash_a = compute_receipt_hash(&receipt).unwrap();
+        let hash_b = compute_receipt_hash(&receipt).unwrap();
+        assert_eq!(hash_a, hash_b);
+        assert_eq!(hash_a.len(), 64);
+    }
+
+    #[test]
     fn test_compute_receipt_hash_normalizes_self_hash_field() {
         let mut a = sample_unsigned_receipt();
         a.budget_chain = Some(crate::receipt::BudgetChainRecord {
@@ -518,10 +526,20 @@ mod tests {
     fn test_budget_chain_id_commutative_for_participant_order() {
         let a = vec!["agent-a".to_string(), "agent-b".to_string()];
         let b = vec!["agent-b".to_string(), "agent-a".to_string()];
-        let hash_a = compute_budget_chain_id(&a, Purpose::Compatibility, "vault_result_compatibility", "production")
-            .expect("compute_budget_chain_id");
-        let hash_b = compute_budget_chain_id(&b, Purpose::Compatibility, "vault_result_compatibility", "production")
-            .expect("compute_budget_chain_id");
+        let hash_a = compute_budget_chain_id(
+            &a,
+            Purpose::Compatibility,
+            "vault_result_compatibility",
+            "production",
+        )
+        .expect("compute_budget_chain_id");
+        let hash_b = compute_budget_chain_id(
+            &b,
+            Purpose::Compatibility,
+            "vault_result_compatibility",
+            "production",
+        )
+        .expect("compute_budget_chain_id");
         assert_eq!(hash_a, hash_b);
     }
 

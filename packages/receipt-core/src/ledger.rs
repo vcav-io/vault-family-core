@@ -321,4 +321,69 @@ mod tests {
             LedgerError::RetrogradeWindow
         );
     }
+
+    #[test]
+    fn rejects_budget_usage_mismatch() {
+        let (signing_key, _verifying_key) = generate_keypair();
+        let window_start = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+
+        let r1 = make_receipt(&"b".repeat(64), window_start, 0, 11, None, &signing_key);
+        let prev = r1.budget_chain.as_ref().unwrap().receipt_hash.clone();
+        let r2 = make_receipt(
+            &"c".repeat(64),
+            window_start,
+            10,
+            22,
+            Some(prev),
+            &signing_key,
+        );
+
+        let mut ledger = BudgetLedger::new();
+        ledger.apply_receipt(&r1).unwrap();
+        assert_eq!(
+            ledger.apply_receipt(&r2).unwrap_err(),
+            LedgerError::BudgetUsageMismatch {
+                expected: 11,
+                got: 10
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_budget_exceeded() {
+        let (signing_key, _verifying_key) = generate_keypair();
+        let window_start = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+
+        let mut r = make_receipt(&"b".repeat(64), window_start, 0, 11, None, &signing_key);
+        r.budget_usage.bits_used_after = 129;
+        r.budget_usage.budget_limit = 128;
+
+        let mut ledger = BudgetLedger::new();
+        assert_eq!(
+            ledger.apply_receipt(&r).unwrap_err(),
+            LedgerError::BudgetExceeded {
+                bits_used_after: 129,
+                budget_limit: 128
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_budget_non_monotonic() {
+        let (signing_key, _verifying_key) = generate_keypair();
+        let window_start = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+
+        let mut r = make_receipt(&"b".repeat(64), window_start, 0, 11, None, &signing_key);
+        r.budget_usage.bits_used_before = 12;
+        r.budget_usage.bits_used_after = 11;
+
+        let mut ledger = BudgetLedger::new();
+        assert_eq!(
+            ledger.apply_receipt(&r).unwrap_err(),
+            LedgerError::BudgetNonMonotonic {
+                before: 12,
+                after: 11
+            }
+        );
+    }
 }
