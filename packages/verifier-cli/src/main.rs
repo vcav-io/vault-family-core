@@ -93,6 +93,7 @@ struct VerificationResult {
 enum VerificationStatus {
     Ok,
     FailSignature,
+    FailReceiptHash,
     FailSchema,
     FailOutputSchema,
     SkippedSchema,
@@ -103,6 +104,7 @@ impl std::fmt::Display for VerificationStatus {
         match self {
             VerificationStatus::Ok => write!(f, "OK"),
             VerificationStatus::FailSignature => write!(f, "FAIL_SIGNATURE"),
+            VerificationStatus::FailReceiptHash => write!(f, "FAIL_RECEIPT_HASH"),
             VerificationStatus::FailSchema => write!(f, "FAIL_SCHEMA"),
             VerificationStatus::FailOutputSchema => write!(f, "FAIL_OUTPUT_SCHEMA"),
             VerificationStatus::SkippedSchema => write!(f, "SKIPPED_SCHEMA"),
@@ -251,8 +253,10 @@ fn verify(args: &Args) -> VerifyDetails {
     };
 
     let public_key = if let Some(keyring_dir) = &args.keyring_dir {
-        match load_public_key_from_keyring(Path::new(keyring_dir), receipt.receipt_key_id.as_deref())
-        {
+        match load_public_key_from_keyring(
+            Path::new(keyring_dir),
+            receipt.receipt_key_id.as_deref(),
+        ) {
             Ok(key) => key,
             Err(e) => {
                 return VerifyDetails {
@@ -303,6 +307,37 @@ fn verify(args: &Args) -> VerifyDetails {
             output_schema_id: None,
             error: Some(format!("Signature verification failed: {}", e)),
         };
+    }
+
+    // Verify budget-chain receipt_hash binding (Milestone 2) when present.
+    // Legacy receipts may not include budget_chain and remain valid.
+    if let Some(chain) = unsigned.budget_chain.as_ref() {
+        match receipt_core::compute_receipt_hash(&unsigned) {
+            Ok(recomputed) if recomputed == chain.receipt_hash => {}
+            Ok(recomputed) => {
+                return VerifyDetails {
+                    receipt: Some(receipt),
+                    status: VerificationStatus::FailReceiptHash,
+                    schema_skipped: false,
+                    output_schema_valid: None,
+                    output_schema_id: None,
+                    error: Some(format!(
+                        "budget_chain.receipt_hash mismatch: embedded={} recomputed={}",
+                        chain.receipt_hash, recomputed
+                    )),
+                };
+            }
+            Err(e) => {
+                return VerifyDetails {
+                    receipt: Some(receipt),
+                    status: VerificationStatus::FailReceiptHash,
+                    schema_skipped: false,
+                    output_schema_valid: None,
+                    output_schema_id: None,
+                    error: Some(format!("Failed to compute receipt_hash: {}", e)),
+                };
+            }
+        }
     }
 
     // Schema validation
@@ -508,8 +543,7 @@ fn load_public_key_from_keyring(
     parse_public_key_hex(selected.verifying_key_hex.trim()).map_err(|e| {
         format!(
             "Failed to parse keyring verifying key hex for key_id {}: {}",
-            selected.key_id,
-            e
+            selected.key_id, e
         )
     })
 }
@@ -661,12 +695,49 @@ mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
     use guardian_core::{BudgetTier, Purpose};
-    use receipt_core::{generate_keypair, public_key_to_hex, sign_receipt, BudgetUsageRecord};
+    use receipt_core::{
+        generate_keypair, public_key_to_hex, sign_receipt, BudgetChainRecord, BudgetUsageRecord,
+    };
     use std::io::Write;
     use tempfile::{NamedTempFile, TempDir};
 
+    fn chain_id() -> String {
+        format!("chain-{}", "1".repeat(64))
+    }
+
+    fn with_budget_chain(mut unsigned: UnsignedReceipt) -> UnsignedReceipt {
+        unsigned.budget_chain = Some(BudgetChainRecord {
+            chain_id: chain_id(),
+            prev_receipt_hash: None,
+            receipt_hash: "0".repeat(64),
+        });
+        let h = receipt_core::compute_receipt_hash(&unsigned).unwrap();
+        unsigned
+            .budget_chain
+            .as_mut()
+            .expect("budget_chain just set")
+            .receipt_hash = h;
+        unsigned
+    }
+
+    fn recompute_budget_chain_receipt_hash(unsigned: &mut UnsignedReceipt) {
+        if unsigned.budget_chain.is_none() {
+            unsigned.budget_chain = Some(BudgetChainRecord {
+                chain_id: chain_id(),
+                prev_receipt_hash: None,
+                receipt_hash: "0".repeat(64),
+            });
+        }
+        let h = receipt_core::compute_receipt_hash(unsigned).unwrap();
+        unsigned
+            .budget_chain
+            .as_mut()
+            .expect("budget_chain present")
+            .receipt_hash = h;
+    }
+
     fn sample_unsigned_receipt() -> UnsignedReceipt {
-        UnsignedReceipt {
+        with_budget_chain(UnsignedReceipt {
             schema_version: "1.0.0".to_string(),
             session_id: "b".repeat(64),
             purpose_code: Purpose::Compatibility,
@@ -695,12 +766,12 @@ mod tests {
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
             },
-            budget_chain: None,
+            budget_chain: None, // set by helper to ensure receipt_hash binding is test-covered
             model_identity: None,
             agreement_hash: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
-        }
+        })
     }
 
     fn create_test_files() -> (NamedTempFile, NamedTempFile, Receipt) {
@@ -829,6 +900,37 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_accepts_legacy_receipt_without_budget_chain() {
+        let (signing_key, verifying_key) = generate_keypair();
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.budget_chain = None;
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+        };
+
+        let details = verify(&args);
+        assert!(details.receipt.is_some());
+        assert_eq!(details.status, VerificationStatus::Ok);
+    }
+
+    #[test]
     fn test_verify_fails_when_keyring_trust_root_mismatch() {
         let (receipt_file, pubkey_file, _receipt) = create_test_files();
         let verifying_key_hex = fs::read_to_string(pubkey_file.path()).unwrap();
@@ -868,6 +970,7 @@ mod tests {
 
         let mut unsigned = sample_unsigned_receipt();
         unsigned.receipt_key_id = Some("kid-retired-1".to_string());
+        recompute_budget_chain_receipt_hash(&mut unsigned);
         let signature = sign_receipt(&unsigned, &retired_signing_key).unwrap();
         let receipt = unsigned.sign(signature);
 
@@ -961,6 +1064,39 @@ mod tests {
 
         let details = verify(&args);
         assert!(details.error.is_some());
+    }
+
+    #[test]
+    fn test_verify_fails_on_budget_chain_receipt_hash_mismatch() {
+        let (signing_key, verifying_key) = generate_keypair();
+        let mut unsigned = sample_unsigned_receipt();
+        if let Some(chain) = unsigned.budget_chain.as_mut() {
+            chain.receipt_hash = "f".repeat(64);
+        }
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::FailReceiptHash);
+        assert!(details.error.unwrap_or_default().contains("receipt_hash mismatch"));
     }
 
     #[test]
@@ -1150,7 +1286,7 @@ mod tests {
     // D2 Output validation tests
 
     fn sample_d2_unsigned_receipt() -> UnsignedReceipt {
-        UnsignedReceipt {
+        with_budget_chain(UnsignedReceipt {
             schema_version: "1.0.0".to_string(),
             session_id: "b".repeat(64),
             purpose_code: Purpose::Compatibility,
@@ -1188,12 +1324,12 @@ mod tests {
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
             },
-            budget_chain: None,
+            budget_chain: None, // set by helper to ensure receipt_hash binding is test-covered
             model_identity: None,
             agreement_hash: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
-        }
+        })
     }
 
     fn create_d2_test_files() -> (NamedTempFile, NamedTempFile, Receipt) {
@@ -1293,7 +1429,7 @@ mod tests {
             for confidence in &confidence_buckets {
                 for reason in &reason_codes {
                     for hint in &hints {
-                        let unsigned = UnsignedReceipt {
+                        let mut unsigned = UnsignedReceipt {
                             output: Some(serde_json::json!({
                                 "output_a": {
                                     "decision": decision,
@@ -1310,6 +1446,7 @@ mod tests {
                             })),
                             ..sample_d2_unsigned_receipt()
                         };
+                        recompute_budget_chain_receipt_hash(&mut unsigned);
 
                         let signature = sign_receipt(&unsigned, &signing_key).unwrap();
                         let receipt = unsigned.sign(signature);
@@ -1354,7 +1491,7 @@ mod tests {
     fn test_verify_d2_output_invalid_enum_value() {
         let (signing_key, verifying_key) = generate_keypair();
 
-        let unsigned = UnsignedReceipt {
+        let mut unsigned = UnsignedReceipt {
             output: Some(serde_json::json!({
                 "output_a": {
                     "decision": "INVALID_DECISION", // Invalid enum value
@@ -1371,6 +1508,7 @@ mod tests {
             })),
             ..sample_d2_unsigned_receipt()
         };
+        recompute_budget_chain_receipt_hash(&mut unsigned);
 
         let signature = sign_receipt(&unsigned, &signing_key).unwrap();
         let receipt = unsigned.sign(signature);
@@ -1402,7 +1540,7 @@ mod tests {
     fn test_verify_d2_output_missing_output_b() {
         let (signing_key, verifying_key) = generate_keypair();
 
-        let unsigned = UnsignedReceipt {
+        let mut unsigned = UnsignedReceipt {
             output: Some(serde_json::json!({
                 "output_a": {
                     "decision": "PROCEED",
@@ -1414,6 +1552,7 @@ mod tests {
             })),
             ..sample_d2_unsigned_receipt()
         };
+        recompute_budget_chain_receipt_hash(&mut unsigned);
 
         let signature = sign_receipt(&unsigned, &signing_key).unwrap();
         let receipt = unsigned.sign(signature);

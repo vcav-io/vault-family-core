@@ -6,6 +6,8 @@
 //! Message formats:
 //! - Receipts: "VCAV-RECEIPT-V1:" || canonical_json(receipt_without_signature)
 //! - Handoffs: "VCAV-HANDOFF-V1:" || canonical_json(handoff_without_signatures)
+//! - Receipt hash: sha256("vcav/receipt_hash/v1" || JCS(unsigned_receipt_with_placeholder))
+//! - Budget chain id: "chain-" + hex(sha256("vcav/budget_chain/v1" || JCS(chain_id_core)))
 
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
@@ -24,12 +26,34 @@ pub const DOMAIN_PREFIX: &str = "VCAV-RECEIPT-V1:";
 
 /// Domain separation prefix for session handoff signatures
 pub const SESSION_HANDOFF_DOMAIN_PREFIX: &str = "VCAV-HANDOFF-V1:";
+
+/// Domain prefix for `receipt_hash` budget-chain linking.
+///
+/// Spec: `receipt_hash = sha256("vcav/receipt_hash/v1" || JCS(UnsignedReceipt))`
+pub const RECEIPT_HASH_DOMAIN_PREFIX: &str = "vcav/receipt_hash/v1";
+
+/// Domain prefix for `chain_id` budget-chain identification.
+///
+/// Spec:
+/// `chain_id = "chain-" + hex(sha256("vcav/budget_chain/v1" || JCS(core)))`
+/// where `core.participant_ids` are NFC-normalized and sorted lexicographically.
+pub const BUDGET_CHAIN_DOMAIN_PREFIX: &str = "vcav/budget_chain/v1";
+
+/// Stable identifier for a receipt verifying key.
+///
+/// Format: `kid-` + 64 lowercase hex (sha256 of `verifying_key_hex` bytes).
+pub fn compute_receipt_key_id(verifying_key_hex: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(verifying_key_hex.as_bytes());
+    format!("kid-{}", hex::encode(hasher.finalize()))
+}
+
 /// Placeholder used during canonical hashing to break self-referential recursion.
 ///
 /// The actual `budget_chain.receipt_hash` field is replaced with this value before
-/// canonicalization in `compute_receipt_hash`, then restored by callers with the
+/// canonicalization in `compute_receipt_hash`, then set by callers to the
 /// computed digest.
-const RECEIPT_HASH_PLACEHOLDER: &str =
+pub const RECEIPT_HASH_PLACEHOLDER: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 
 // ============================================================================
@@ -87,10 +111,49 @@ pub fn hash_message(message: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
+/// Compute deterministic `chain_id` for budget-chain continuity.
+///
+/// This value is *not* signed directly; it is included in the receipt payload and
+/// therefore covered by the receipt signature.
+pub fn compute_budget_chain_id(
+    participant_ids: &[String],
+    purpose_code: guardian_core::Purpose,
+    output_schema_id: &str,
+    lane_id: &str,
+) -> Result<String, SigningError> {
+    #[derive(serde::Serialize)]
+    struct BudgetChainIdCore {
+        participant_ids: Vec<String>,
+        purpose_code: guardian_core::Purpose,
+        output_schema_id: String,
+        lane_id: String,
+    }
+
+    let mut ids: Vec<String> = participant_ids
+        .iter()
+        .map(|s| guardian_core::normalize_agent_id(s))
+        .collect();
+    ids.sort();
+
+    let core = BudgetChainIdCore {
+        participant_ids: ids,
+        purpose_code,
+        output_schema_id: output_schema_id.to_string(),
+        lane_id: lane_id.to_string(),
+    };
+
+    let canonical = canonicalize_serializable(&core)?;
+    let mut hasher = Sha256::new();
+    hasher.update(BUDGET_CHAIN_DOMAIN_PREFIX.as_bytes());
+    hasher.update(canonical.as_bytes());
+    Ok(format!("chain-{}", hex::encode(hasher.finalize())))
+}
+
 /// Compute canonical hash for unsigned receipt-chain linking.
 ///
 /// To avoid self-referential recursion, `budget_chain.receipt_hash` is normalized
-/// to a fixed placeholder before hashing.
+/// to a fixed placeholder before hashing, then SHA-256 is computed over:
+/// `RECEIPT_HASH_DOMAIN_PREFIX || JCS(normalized_unsigned_receipt)`.
 pub fn compute_receipt_hash(receipt: &UnsignedReceipt) -> Result<String, SigningError> {
     let mut normalized = receipt.clone();
     if let Some(chain) = normalized.budget_chain.as_mut() {
@@ -98,6 +161,7 @@ pub fn compute_receipt_hash(receipt: &UnsignedReceipt) -> Result<String, Signing
     }
     let canonical = canonicalize_serializable(&normalized)?;
     let mut hasher = Sha256::new();
+    hasher.update(RECEIPT_HASH_DOMAIN_PREFIX.as_bytes());
     hasher.update(canonical.as_bytes());
     Ok(hex::encode(hasher.finalize()))
 }
@@ -388,6 +452,16 @@ mod tests {
     }
 
     #[test]
+    fn test_compute_receipt_hash_with_no_budget_chain() {
+        let mut receipt = sample_unsigned_receipt();
+        receipt.budget_chain = None;
+        let hash_a = compute_receipt_hash(&receipt).unwrap();
+        let hash_b = compute_receipt_hash(&receipt).unwrap();
+        assert_eq!(hash_a, hash_b);
+        assert_eq!(hash_a.len(), 64);
+    }
+
+    #[test]
     fn test_compute_receipt_hash_normalizes_self_hash_field() {
         let mut a = sample_unsigned_receipt();
         a.budget_chain = Some(crate::receipt::BudgetChainRecord {
@@ -416,6 +490,57 @@ mod tests {
             compute_receipt_hash(&a).unwrap(),
             compute_receipt_hash(&d).unwrap()
         );
+    }
+
+    #[test]
+    fn test_receipt_hash_test_vector() {
+        // This is a protocol lock: changes to canonicalization or domain prefixes must
+        // update this vector deliberately.
+        const EXPECTED: &str = "3b11255395bcc2031a471726ba1df57a275455791076a664539ef93647741a13";
+
+        let json = include_str!("../testdata/unsigned_receipt_core.json");
+        let receipt: UnsignedReceipt =
+            serde_json::from_str(json).expect("test vector must parse as UnsignedReceipt");
+        let hash = compute_receipt_hash(&receipt).expect("compute_receipt_hash");
+        assert_eq!(hash, EXPECTED);
+    }
+
+    #[test]
+    fn test_budget_chain_id_test_vector() {
+        const EXPECTED: &str =
+            "chain-3f5b37d0678a786aa48c1e9ccc58623ce6f6045bad7f8b23c69d8a31b37f7bf3";
+
+        // Intentionally unsorted to ensure canonical sorting is applied.
+        let participant_ids = vec!["agent-b".to_string(), "agent-a".to_string()];
+        let chain_id = compute_budget_chain_id(
+            &participant_ids,
+            Purpose::Compatibility,
+            "vault_result_compatibility",
+            "production",
+        )
+        .expect("compute_budget_chain_id");
+        assert_eq!(chain_id, EXPECTED);
+    }
+
+    #[test]
+    fn test_budget_chain_id_commutative_for_participant_order() {
+        let a = vec!["agent-a".to_string(), "agent-b".to_string()];
+        let b = vec!["agent-b".to_string(), "agent-a".to_string()];
+        let hash_a = compute_budget_chain_id(
+            &a,
+            Purpose::Compatibility,
+            "vault_result_compatibility",
+            "production",
+        )
+        .expect("compute_budget_chain_id");
+        let hash_b = compute_budget_chain_id(
+            &b,
+            Purpose::Compatibility,
+            "vault_result_compatibility",
+            "production",
+        )
+        .expect("compute_budget_chain_id");
+        assert_eq!(hash_a, hash_b);
     }
 
     #[test]

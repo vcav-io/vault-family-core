@@ -9,6 +9,10 @@ license.workspace = true
 name = "vcav-verify"
 path = "src/main.rs"
 
+[[bin]]
+name = "vcav-verify-chain"
+path = "src/bin/vcav-verify-chain.rs"
+
 [dependencies]
 guardian-core = { path = "../guardian-core" }
 receipt-core = { path = "../receipt-core" }
