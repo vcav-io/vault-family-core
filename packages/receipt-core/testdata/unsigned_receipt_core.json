@@ -13,6 +13,7 @@
   "session_end": "2025-01-15T10:02:00Z",
   "fixed_window_duration_seconds": 120,
   "status": "COMPLETED",
+  "execution_lane": "GLASS_LOCAL",
   "output": {
     "decision": "PROCEED",
     "confidence_bucket": "HIGH",

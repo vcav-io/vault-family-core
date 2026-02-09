@@ -39,6 +39,28 @@ impl std::fmt::Display for ReceiptStatus {
     }
 }
 
+/// Execution lane for this session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ExecutionLane {
+    /// Sealed topology with local inference only.
+    SealedLocal,
+    /// Glass topology with local inference.
+    GlassLocal,
+    /// Glass topology with remote/network inference.
+    GlassRemote,
+}
+
+impl std::fmt::Display for ExecutionLane {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExecutionLane::SealedLocal => write!(f, "SEALED_LOCAL"),
+            ExecutionLane::GlassLocal => write!(f, "GLASS_LOCAL"),
+            ExecutionLane::GlassRemote => write!(f, "GLASS_REMOTE"),
+        }
+    }
+}
+
 // ============================================================================
 // BudgetUsageRecord
 // ============================================================================
@@ -151,6 +173,9 @@ pub struct Receipt {
     /// Session completion status
     pub status: ReceiptStatus,
 
+    /// Execution lane used for this session.
+    pub execution_lane: ExecutionLane,
+
     /// Vault result (null if ABORTED)
     pub output: Option<serde_json::Value>,
 
@@ -260,6 +285,9 @@ pub struct UnsignedReceipt {
     /// Session completion status
     pub status: ReceiptStatus,
 
+    /// Execution lane used for this session.
+    pub execution_lane: ExecutionLane,
+
     /// Vault result (null if ABORTED)
     pub output: Option<serde_json::Value>,
 
@@ -311,6 +339,7 @@ impl UnsignedReceipt {
             session_end: self.session_end,
             fixed_window_duration_seconds: self.fixed_window_duration_seconds,
             status: self.status,
+            execution_lane: self.execution_lane,
             output: self.output,
             output_entropy_bits: self.output_entropy_bits,
             mitigations_applied: self.mitigations_applied,
@@ -345,6 +374,7 @@ pub struct ReceiptBuilder {
     session_end: Option<DateTime<Utc>>,
     fixed_window_duration_seconds: Option<u32>,
     status: Option<ReceiptStatus>,
+    execution_lane: Option<ExecutionLane>,
     output: Option<serde_json::Value>,
     output_entropy_bits: Option<u32>,
     mitigations_applied: Vec<String>,
@@ -441,6 +471,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the execution lane
+    pub fn execution_lane(mut self, lane: ExecutionLane) -> Self {
+        self.execution_lane = Some(lane);
+        self
+    }
+
     /// Set the output (None for aborted sessions)
     pub fn output(mut self, output: Option<serde_json::Value>) -> Self {
         self.output = output;
@@ -514,6 +550,7 @@ impl ReceiptBuilder {
             session_end: self.session_end?,
             fixed_window_duration_seconds: self.fixed_window_duration_seconds?,
             status: self.status?,
+            execution_lane: self.execution_lane?,
             output: self.output,
             output_entropy_bits: self.output_entropy_bits?,
             mitigations_applied: self.mitigations_applied,
@@ -568,6 +605,7 @@ mod tests {
             session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
             fixed_window_duration_seconds: 120,
             status: ReceiptStatus::Completed,
+            execution_lane: ExecutionLane::GlassLocal,
             output: Some(serde_json::json!({
                 "decision": "PROCEED",
                 "confidence_bucket": "HIGH",
@@ -704,6 +742,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
+            .execution_lane(ExecutionLane::GlassLocal)
             .output(Some(serde_json::json!({"decision": "PROCEED"})))
             .output_entropy_bits(8)
             .budget_usage(usage)
@@ -747,6 +786,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
+            .execution_lane(ExecutionLane::GlassLocal)
             .output_entropy_bits(16)
             .budget_usage(usage)
             .build_unsigned()
@@ -768,6 +808,15 @@ mod tests {
         let json = serde_json::to_string(&attestation).unwrap();
         let parsed: Attestation = serde_json::from_str(&json).unwrap();
         assert_eq!(attestation, parsed);
+    }
+
+    #[test]
+    fn test_execution_lane_serde_and_display() {
+        let sealed = serde_json::to_string(&ExecutionLane::SealedLocal).unwrap();
+        assert_eq!(sealed, "\"SEALED_LOCAL\"");
+        let parsed: ExecutionLane = serde_json::from_str("\"GLASS_REMOTE\"").unwrap();
+        assert_eq!(parsed, ExecutionLane::GlassRemote);
+        assert_eq!(ExecutionLane::GlassLocal.to_string(), "GLASS_LOCAL");
     }
 
     #[test]

@@ -173,7 +173,9 @@ impl BudgetLedger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::receipt::{BudgetChainRecord, BudgetUsageRecord, ReceiptStatus, UnsignedReceipt};
+    use crate::receipt::{
+        BudgetChainRecord, BudgetUsageRecord, ExecutionLane, ReceiptStatus, UnsignedReceipt,
+    };
     use crate::signer::{compute_receipt_hash, generate_keypair, sign_receipt};
     use chrono::{TimeZone, Utc};
     use guardian_core::{BudgetTier, Purpose};
@@ -205,6 +207,7 @@ mod tests {
             session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
             fixed_window_duration_seconds: 120,
             status: ReceiptStatus::Completed,
+            execution_lane: ExecutionLane::GlassLocal,
             output: None,
             output_entropy_bits: 8,
             mitigations_applied: vec![],

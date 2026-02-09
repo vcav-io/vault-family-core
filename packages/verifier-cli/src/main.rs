@@ -483,6 +483,7 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         session_end: receipt.session_end,
         fixed_window_duration_seconds: receipt.fixed_window_duration_seconds,
         status: receipt.status,
+        execution_lane: receipt.execution_lane,
         output: receipt.output.clone(),
         output_entropy_bits: receipt.output_entropy_bits,
         mitigations_applied: receipt.mitigations_applied.clone(),
@@ -753,6 +754,7 @@ mod tests {
             session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
             fixed_window_duration_seconds: 120,
             status: receipt_core::ReceiptStatus::Completed,
+            execution_lane: receipt_core::ExecutionLane::GlassLocal,
             output: Some(serde_json::json!({
                 "decision": "PROCEED",
                 "confidence_bucket": "HIGH",
@@ -1306,6 +1308,7 @@ mod tests {
             session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
             fixed_window_duration_seconds: 120,
             status: receipt_core::ReceiptStatus::Completed,
+            execution_lane: receipt_core::ExecutionLane::GlassLocal,
             output: Some(serde_json::json!({
                 "output_a": {
                     "decision": "PROCEED",

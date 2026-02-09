@@ -203,6 +203,15 @@
       "pattern": "^[a-f0-9]{64}$",
       "description": "SHA-256 agreement hash binding session to negotiated contract terms"
     },
+    "execution_lane": {
+      "type": "string",
+      "enum": [
+        "SEALED_LOCAL",
+        "GLASS_LOCAL",
+        "GLASS_REMOTE"
+      ],
+      "description": "Execution lane used for this session"
+    },
     "receipt_key_id": {
       "type": "string",
       "pattern": "^[A-Za-z0-9._:-]{1,128}$",

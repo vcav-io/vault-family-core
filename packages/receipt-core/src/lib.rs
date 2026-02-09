@@ -34,8 +34,8 @@ pub use handoff::{
 };
 pub use ledger::{ApplyOutcome, BudgetLedger, LedgerError};
 pub use receipt::{
-    Attestation, BudgetChainRecord, BudgetUsageRecord, Receipt, ReceiptBuilder, ReceiptStatus,
-    UnsignedReceipt, SCHEMA_VERSION,
+    Attestation, BudgetChainRecord, BudgetUsageRecord, ExecutionLane, Receipt, ReceiptBuilder,
+    ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
 };
 pub use signer::{
     compute_budget_chain_id, compute_receipt_hash, compute_receipt_key_id,

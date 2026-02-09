@@ -308,7 +308,9 @@ pub fn verify_handoff(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::receipt::{BudgetUsageRecord, ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION};
+    use crate::receipt::{
+        BudgetUsageRecord, ExecutionLane, ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
+    };
     use chrono::{TimeZone, Utc};
     use guardian_core::{BudgetTier, Purpose};
 
@@ -328,6 +330,7 @@ mod tests {
             session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
             fixed_window_duration_seconds: 120,
             status: ReceiptStatus::Completed,
+            execution_lane: ExecutionLane::GlassLocal,
             output: Some(serde_json::json!({
                 "decision": "PROCEED",
                 "confidence_bucket": "HIGH",
@@ -497,7 +500,7 @@ mod tests {
     fn test_receipt_hash_test_vector() {
         // This is a protocol lock: changes to canonicalization or domain prefixes must
         // update this vector deliberately.
-        const EXPECTED: &str = "c3b481bfc2e08b841c1912916d04ffd25cfe5e926f72d2702c53f251a44e9ab4";
+        const EXPECTED: &str = "079d4400efb38432d6221856eb4f896b95300646b5c83bca0ff8c0def1da6528";
 
         let json = include_str!("../testdata/unsigned_receipt_core.json");
         let receipt: UnsignedReceipt =
