@@ -21,5 +21,9 @@ unicode-normalization.workspace = true
 name = "vcav-agreement-hash"
 path = "src/bin/vcav-agreement-hash.rs"
 
+[[bin]]
+name = "vcav-generate-vectors"
+path = "src/bin/vcav-generate-vectors.rs"
+
 [dev-dependencies]
 proptest.workspace = true
