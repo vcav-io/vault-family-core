@@ -9,7 +9,7 @@
 //! Output (JSON):
 //!   {"key_id":"kid-...","verifying_key_hex":"..."}
 
-use receipt_core::{public_key_to_hex, compute_receipt_key_id, SigningKey};
+use receipt_core::{compute_receipt_key_id, public_key_to_hex, SigningKey};
 use std::env;
 use std::fs;
 
@@ -84,4 +84,3 @@ fn main() {
         })
     );
 }
-

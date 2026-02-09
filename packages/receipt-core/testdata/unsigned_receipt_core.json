@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "session_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "purpose_code": "COMPATIBILITY",
+  "participant_ids": ["agent-a", "agent-b"],
+  "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "model_weights_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "llama_cpp_version": "0.1.0",
+  "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "output_schema_version": "1.0.0",
+  "session_start": "2025-01-15T10:00:00Z",
+  "session_end": "2025-01-15T10:02:00Z",
+  "fixed_window_duration_seconds": 120,
+  "status": "COMPLETED",
+  "output": {
+    "decision": "PROCEED",
+    "confidence_bucket": "HIGH",
+    "reason_code": "MUTUAL_INTEREST_UNCLEAR"
+  },
+  "output_entropy_bits": 8,
+  "budget_usage": {
+    "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "window_start": "2025-01-01T00:00:00Z",
+    "bits_used_before": 0,
+    "bits_used_after": 11,
+    "budget_limit": 128,
+    "budget_tier": "DEFAULT"
+  },
+  "budget_chain": {
+    "chain_id": "chain-1111111111111111111111111111111111111111111111111111111111111111",
+    "prev_receipt_hash": null,
+    "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}
+
