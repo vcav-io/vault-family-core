@@ -522,6 +522,7 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         status: receipt.status,
         output: receipt.output.clone(),
         output_entropy_bits: receipt.output_entropy_bits,
+        mitigations_applied: receipt.mitigations_applied.clone(),
         budget_usage: receipt.budget_usage.clone(),
         budget_chain: receipt.budget_chain.clone(),
         model_identity: receipt.model_identity.clone(),
@@ -768,6 +769,7 @@ mod tests {
                 "reason_code": "UNKNOWN"
             })),
             output_entropy_bits: 8,
+            mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),
                 window_start,

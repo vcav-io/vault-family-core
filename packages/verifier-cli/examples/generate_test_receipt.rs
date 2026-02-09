@@ -29,6 +29,7 @@ fn main() {
             "confidence_bucket": "HIGH"
         })),
         output_entropy_bits: 8,
+        mitigations_applied: vec![],
         budget_usage: BudgetUsageRecord {
             pair_id: "a".repeat(64),
             window_start: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),

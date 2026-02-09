@@ -207,6 +207,7 @@ mod tests {
             status: ReceiptStatus::Completed,
             output: None,
             output_entropy_bits: 8,
+            mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),
                 window_start,

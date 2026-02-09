@@ -19,6 +19,7 @@
     "reason_code": "MUTUAL_INTEREST_UNCLEAR"
   },
   "output_entropy_bits": 8,
+  "mitigations_applied": [],
   "budget_usage": {
     "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "window_start": "2025-01-01T00:00:00Z",
@@ -33,4 +34,3 @@
     "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000000"
   }
 }
-

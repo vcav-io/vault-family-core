@@ -185,6 +185,7 @@ mod tests {
                 "reason_code": "UNKNOWN"
             },
             "output_entropy_bits": 8,
+            "mitigations_applied": [],
             "budget_usage": {
                 "pair_id": "f".repeat(64),
                 "window_start": "2025-01-01T00:00:00Z",

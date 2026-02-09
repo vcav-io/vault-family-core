@@ -485,6 +485,7 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         status: receipt.status,
         output: receipt.output.clone(),
         output_entropy_bits: receipt.output_entropy_bits,
+        mitigations_applied: receipt.mitigations_applied.clone(),
         budget_usage: receipt.budget_usage.clone(),
         budget_chain: receipt.budget_chain.clone(),
         model_identity: receipt.model_identity.clone(),
@@ -758,6 +759,7 @@ mod tests {
                 "reason_code": "UNKNOWN"
             })),
             output_entropy_bits: 8,
+            mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),
                 window_start: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
@@ -1096,7 +1098,10 @@ mod tests {
 
         let details = verify(&args);
         assert_eq!(details.status, VerificationStatus::FailReceiptHash);
-        assert!(details.error.unwrap_or_default().contains("receipt_hash mismatch"));
+        assert!(details
+            .error
+            .unwrap_or_default()
+            .contains("receipt_hash mismatch"));
     }
 
     #[test]
@@ -1316,6 +1321,7 @@ mod tests {
                 }
             })),
             output_entropy_bits: 20,
+            mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),
                 window_start: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),

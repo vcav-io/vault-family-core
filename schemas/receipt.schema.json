@@ -104,6 +104,14 @@
       "maximum": 32,
       "description": "Calculated entropy of this output"
     },
+    "mitigations_applied": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Mitigation IDs applied by runtime policy enforcement"
+    },
     "budget_usage": {
       "type": "object",
       "properties": {
@@ -254,6 +262,7 @@
     "status",
     "output",
     "output_entropy_bits",
+    "mitigations_applied",
     "budget_usage",
     "signature"
   ],

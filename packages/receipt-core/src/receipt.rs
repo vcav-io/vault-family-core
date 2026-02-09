@@ -157,6 +157,9 @@ pub struct Receipt {
     /// Calculated entropy of this output
     pub output_entropy_bits: u32,
 
+    /// Mitigation IDs applied by runtime policy enforcement
+    pub mitigations_applied: Vec<String>,
+
     /// Privacy budget accounting
     pub budget_usage: BudgetUsageRecord,
 
@@ -263,6 +266,9 @@ pub struct UnsignedReceipt {
     /// Calculated entropy of this output
     pub output_entropy_bits: u32,
 
+    /// Mitigation IDs applied by runtime policy enforcement
+    pub mitigations_applied: Vec<String>,
+
     /// Privacy budget accounting
     pub budget_usage: BudgetUsageRecord,
 
@@ -307,6 +313,7 @@ impl UnsignedReceipt {
             status: self.status,
             output: self.output,
             output_entropy_bits: self.output_entropy_bits,
+            mitigations_applied: self.mitigations_applied,
             budget_usage: self.budget_usage,
             budget_chain: self.budget_chain,
             model_identity: self.model_identity,
@@ -340,6 +347,7 @@ pub struct ReceiptBuilder {
     status: Option<ReceiptStatus>,
     output: Option<serde_json::Value>,
     output_entropy_bits: Option<u32>,
+    mitigations_applied: Vec<String>,
     budget_usage: Option<BudgetUsageRecord>,
     budget_chain: Option<BudgetChainRecord>,
     model_identity: Option<ModelIdentity>,
@@ -445,6 +453,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set applied mitigation IDs (empty means no mitigations fired)
+    pub fn mitigations_applied(mut self, mitigations: Vec<String>) -> Self {
+        self.mitigations_applied = mitigations;
+        self
+    }
+
     /// Set the budget usage record
     pub fn budget_usage(mut self, usage: BudgetUsageRecord) -> Self {
         self.budget_usage = Some(usage);
@@ -502,6 +516,7 @@ impl ReceiptBuilder {
             status: self.status?,
             output: self.output,
             output_entropy_bits: self.output_entropy_bits?,
+            mitigations_applied: self.mitigations_applied,
             budget_usage: self.budget_usage?,
             budget_chain: self.budget_chain,
             model_identity: self.model_identity,
@@ -559,6 +574,7 @@ mod tests {
                 "reason_code": "MUTUAL_INTEREST_UNCLEAR"
             })),
             output_entropy_bits: 8,
+            mitigations_applied: vec![],
             budget_usage: sample_budget_usage(),
             budget_chain: None,
             model_identity: None,

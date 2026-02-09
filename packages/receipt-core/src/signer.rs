@@ -334,6 +334,7 @@ mod tests {
                 "reason_code": "MUTUAL_INTEREST_UNCLEAR"
             })),
             output_entropy_bits: 8,
+            mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),
                 window_start: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
@@ -496,7 +497,7 @@ mod tests {
     fn test_receipt_hash_test_vector() {
         // This is a protocol lock: changes to canonicalization or domain prefixes must
         // update this vector deliberately.
-        const EXPECTED: &str = "3b11255395bcc2031a471726ba1df57a275455791076a664539ef93647741a13";
+        const EXPECTED: &str = "c3b481bfc2e08b841c1912916d04ffd25cfe5e926f72d2702c53f251a44e9ab4";
 
         let json = include_str!("../testdata/unsigned_receipt_core.json");
         let receipt: UnsignedReceipt =
