@@ -93,7 +93,6 @@ struct VerificationResult {
 enum VerificationStatus {
     Ok,
     FailSignature,
-    FailBudgetChainMissing,
     FailReceiptHash,
     FailSchema,
     FailOutputSchema,
@@ -105,7 +104,6 @@ impl std::fmt::Display for VerificationStatus {
         match self {
             VerificationStatus::Ok => write!(f, "OK"),
             VerificationStatus::FailSignature => write!(f, "FAIL_SIGNATURE"),
-            VerificationStatus::FailBudgetChainMissing => write!(f, "FAIL_BUDGET_CHAIN_MISSING"),
             VerificationStatus::FailReceiptHash => write!(f, "FAIL_RECEIPT_HASH"),
             VerificationStatus::FailSchema => write!(f, "FAIL_SCHEMA"),
             VerificationStatus::FailOutputSchema => write!(f, "FAIL_OUTPUT_SCHEMA"),
@@ -311,41 +309,34 @@ fn verify(args: &Args) -> VerifyDetails {
         };
     }
 
-    // Verify budget-chain receipt_hash binding (Milestone 2).
-    let Some(chain) = unsigned.budget_chain.as_ref() else {
-        return VerifyDetails {
-            receipt: Some(receipt),
-            status: VerificationStatus::FailBudgetChainMissing,
-            schema_skipped: false,
-            output_schema_valid: None,
-            output_schema_id: None,
-            error: Some("Receipt missing budget_chain (required for budget integrity)".to_string()),
-        };
-    };
-    match receipt_core::compute_receipt_hash(&unsigned) {
-        Ok(recomputed) if recomputed == chain.receipt_hash => {}
-        Ok(recomputed) => {
-            return VerifyDetails {
-                receipt: Some(receipt),
-                status: VerificationStatus::FailReceiptHash,
-                schema_skipped: false,
-                output_schema_valid: None,
-                output_schema_id: None,
-                error: Some(format!(
-                    "budget_chain.receipt_hash mismatch: embedded={} recomputed={}",
-                    chain.receipt_hash, recomputed
-                )),
-            };
-        }
-        Err(e) => {
-            return VerifyDetails {
-                receipt: Some(receipt),
-                status: VerificationStatus::FailReceiptHash,
-                schema_skipped: false,
-                output_schema_valid: None,
-                output_schema_id: None,
-                error: Some(format!("Failed to compute receipt_hash: {}", e)),
-            };
+    // Verify budget-chain receipt_hash binding (Milestone 2) when present.
+    // Legacy receipts may not include budget_chain and remain valid.
+    if let Some(chain) = unsigned.budget_chain.as_ref() {
+        match receipt_core::compute_receipt_hash(&unsigned) {
+            Ok(recomputed) if recomputed == chain.receipt_hash => {}
+            Ok(recomputed) => {
+                return VerifyDetails {
+                    receipt: Some(receipt),
+                    status: VerificationStatus::FailReceiptHash,
+                    schema_skipped: false,
+                    output_schema_valid: None,
+                    output_schema_id: None,
+                    error: Some(format!(
+                        "budget_chain.receipt_hash mismatch: embedded={} recomputed={}",
+                        chain.receipt_hash, recomputed
+                    )),
+                };
+            }
+            Err(e) => {
+                return VerifyDetails {
+                    receipt: Some(receipt),
+                    status: VerificationStatus::FailReceiptHash,
+                    schema_skipped: false,
+                    output_schema_valid: None,
+                    output_schema_id: None,
+                    error: Some(format!("Failed to compute receipt_hash: {}", e)),
+                };
+            }
         }
     }
 
@@ -895,6 +886,37 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
             keyring_dir: Some(keyring.path().to_str().unwrap().to_string()),
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+        };
+
+        let details = verify(&args);
+        assert!(details.receipt.is_some());
+        assert_eq!(details.status, VerificationStatus::Ok);
+    }
+
+    #[test]
+    fn test_verify_accepts_legacy_receipt_without_budget_chain() {
+        let (signing_key, verifying_key) = generate_keypair();
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.budget_chain = None;
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
             schema_dir: None,
             skip_schema_validation: false,
             validate_output: false,
