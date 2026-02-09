@@ -19,6 +19,7 @@
 pub mod agreement;
 pub mod canonicalize;
 pub mod handoff;
+pub mod ledger;
 pub mod receipt;
 pub mod signer;
 
@@ -31,6 +32,7 @@ pub use canonicalize::{canonicalize, canonicalize_serializable};
 pub use handoff::{
     BudgetTierV2, HashRef, SessionHandoff, UnsignedSessionHandoff, UnsignedSessionHandoffBuilder,
 };
+pub use ledger::{ApplyOutcome, BudgetLedger, LedgerError};
 pub use receipt::{
     Attestation, BudgetChainRecord, BudgetUsageRecord, Receipt, ReceiptBuilder, ReceiptStatus,
     UnsignedReceipt, SCHEMA_VERSION,
