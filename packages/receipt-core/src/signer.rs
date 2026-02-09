@@ -24,6 +24,15 @@ pub const DOMAIN_PREFIX: &str = "VCAV-RECEIPT-V1:";
 
 /// Domain separation prefix for session handoff signatures
 pub const SESSION_HANDOFF_DOMAIN_PREFIX: &str = "VCAV-HANDOFF-V1:";
+
+/// Stable identifier for a receipt verifying key.
+///
+/// Format: `kid-` + 64 lowercase hex (sha256 of `verifying_key_hex` bytes).
+pub fn compute_receipt_key_id(verifying_key_hex: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(verifying_key_hex.as_bytes());
+    format!("kid-{}", hex::encode(hasher.finalize()))
+}
 /// Placeholder used during canonical hashing to break self-referential recursion.
 ///
 /// The actual `budget_chain.receipt_hash` field is replaced with this value before
