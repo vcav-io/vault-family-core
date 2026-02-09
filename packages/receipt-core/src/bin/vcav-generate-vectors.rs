@@ -249,10 +249,22 @@ fn generate_receipt_vectors(dir: &Path) {
         fill_receipt_hash(&mut receipt);
         let signature = sign_receipt(&receipt, &vault_key).expect("sign receipt");
         let signed = receipt.sign(signature);
-        let content = serde_json::to_string_pretty(&signed).expect("serialize signed receipt");
-        let path = dir.join("receipt_v2_vector_01.json");
-        std::fs::write(&path, format!("{content}\n")).expect("write signed receipt");
-        eprintln!("  wrote receipt_v2_vector_01.json (standalone signed receipt for verifier-cli)");
+        write_vector(
+            dir,
+            "receipt_v2_vector_01.json",
+            &json!({
+                "description": "Standalone signed receipt for verifier-cli integration testing (COMPLETED, Ed25519)",
+                "input": {
+                    "signed_receipt": signed,
+                    "verifying_key_hex": vault_pub,
+                },
+                "expected": {
+                    "verification_result": "PASS",
+                    "signature_hex": &signature,
+                },
+                "schemas": ["https://vcav.io/schemas/receipt.v2.schema.json"]
+            }),
+        );
     }
 
     // --- Negative 01: wrong domain prefix ---
