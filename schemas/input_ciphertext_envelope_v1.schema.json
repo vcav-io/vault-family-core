@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/input_ciphertext_envelope_v1.schema.json",
+  "title": "InputCiphertextEnvelopeV1",
+  "description": "Version 1 encrypted input envelope submitted to vault runtime in sealed mode",
+  "type": "object",
+  "properties": {
+    "enc_v": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Encryption envelope version"
+    },
+    "kid": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Vault key identifier used to select decryption key"
+    },
+    "epk": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "32-byte X25519 ephemeral public key (hex)"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{48}$",
+      "description": "24-byte XChaCha20 nonce (hex)"
+    },
+    "ciphertext": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+      "description": "Base64-encoded XChaCha20-Poly1305 ciphertext + tag"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Session identifier bound into AAD"
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Submitting agent identifier bound into AAD"
+    },
+    "input_idx": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Input index bound into AAD"
+    },
+    "purpose_code": {
+      "type": "string",
+      "enum": [
+        "COMPATIBILITY",
+        "SCHEDULING",
+        "MEDIATION",
+        "NEGOTIATION",
+        "SCHEDULING_COMPAT_V1"
+      ],
+      "description": "Session purpose code bound into AAD"
+    },
+    "input_provenance": {
+      "type": "string",
+      "enum": [
+        "ORCHESTRATOR_GENERATED",
+        "SYMMETRIC_CONSTRUCTION",
+        "PUBLIC_REGISTRY"
+      ],
+      "description": "Input provenance bound into AAD"
+    }
+  },
+  "required": [
+    "enc_v",
+    "kid",
+    "epk",
+    "nonce",
+    "ciphertext",
+    "session_id",
+    "agent_id",
+    "input_idx",
+    "purpose_code",
+    "input_provenance"
+  ],
+  "additionalProperties": false
+}

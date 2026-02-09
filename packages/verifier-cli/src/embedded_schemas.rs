@@ -9,8 +9,9 @@ use tempfile::TempDir;
 
 // Embed all schema files at compile time
 pub const RECEIPT_SCHEMA: &str = include_str!("../../../schemas/receipt.schema.json");
-pub const ENCRYPTED_INPUT_SCHEMA: &str =
-    include_str!("../../../schemas/encrypted_input.schema.json");
+pub const SIGNED_INPUT_SCHEMA: &str = include_str!("../../../schemas/signed_input.schema.json");
+pub const INPUT_CIPHERTEXT_ENVELOPE_V1_SCHEMA: &str =
+    include_str!("../../../schemas/input_ciphertext_envelope_v1.schema.json");
 pub const CONTEXT_DELTA_SCHEMA: &str = include_str!("../../../schemas/context_delta.schema.json");
 pub const RELATIONSHIP_TOKEN_SCHEMA: &str =
     include_str!("../../../schemas/relationship_token.schema.json");
@@ -45,8 +46,12 @@ const SCHEMAS: &[SchemaEntry] = &[
         content: RECEIPT_SCHEMA,
     },
     SchemaEntry {
-        filename: "encrypted_input.schema.json",
-        content: ENCRYPTED_INPUT_SCHEMA,
+        filename: "signed_input.schema.json",
+        content: SIGNED_INPUT_SCHEMA,
+    },
+    SchemaEntry {
+        filename: "input_ciphertext_envelope_v1.schema.json",
+        content: INPUT_CIPHERTEXT_ENVELOPE_V1_SCHEMA,
     },
     SchemaEntry {
         filename: "context_delta.schema.json",

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/signed_input.schema.json",
+  "title": "SignedInput",
+  "description": "Signed plaintext input payload submitted by a participant agent to a VCAV session",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Schema version for forward compatibility"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "32-byte hex-encoded session identifier"
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Unique identifier for the submitting agent"
+    },
+    "purpose_code": {
+      "type": "string",
+      "enum": [
+        "COMPATIBILITY",
+        "SCHEDULING",
+        "MEDIATION",
+        "NEGOTIATION",
+        "SCHEDULING_COMPAT_V1"
+      ],
+      "description": "Purpose code determining which output schema applies"
+    },
+    "input_provenance": {
+      "type": "string",
+      "enum": [
+        "ORCHESTRATOR_GENERATED",
+        "SYMMETRIC_CONSTRUCTION",
+        "PUBLIC_REGISTRY"
+      ],
+      "description": "How the option set was constructed (for neutrality validation)"
+    },
+    "relationship_token": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "relationship_token.schema.json" }
+      ],
+      "description": "Optional relationship token for ongoing relationships"
+    },
+    "context_delta": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "context_delta.schema.json" }
+      ],
+      "description": "Optional context delta referencing prior session"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Purpose-specific payload (see purpose-specific schemas)"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of submission"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{128}$",
+      "description": "64-byte hex-encoded Ed25519 signature over canonical payload"
+    }
+  },
+  "required": [
+    "schema_version",
+    "session_id",
+    "agent_id",
+    "purpose_code",
+    "input_provenance",
+    "payload",
+    "submitted_at",
+    "signature"
+  ],
+  "additionalProperties": false
+}
