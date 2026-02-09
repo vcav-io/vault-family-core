@@ -28,7 +28,7 @@ pub const SESSION_HANDOFF_DOMAIN_PREFIX: &str = "VCAV-HANDOFF-V1:";
 
 /// Domain prefix for `receipt_hash` budget-chain linking.
 ///
-/// Spec: `receipt_hash = sha256("vcav/receipt_hash/v1" || JCS(UnsignedReceiptCore))`
+/// Spec: `receipt_hash = sha256("vcav/receipt_hash/v1" || JCS(UnsignedReceipt))`
 pub const RECEIPT_HASH_DOMAIN_PREFIX: &str = "vcav/receipt_hash/v1";
 
 /// Domain prefix for `chain_id` budget-chain identification.
@@ -50,7 +50,7 @@ pub fn compute_receipt_key_id(verifying_key_hex: &str) -> String {
 /// The actual `budget_chain.receipt_hash` field is replaced with this value before
 /// canonicalization in `compute_receipt_hash`, then restored by callers with the
 /// computed digest.
-const RECEIPT_HASH_PLACEHOLDER: &str =
+pub const RECEIPT_HASH_PLACEHOLDER: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 
 // ============================================================================
@@ -84,9 +84,6 @@ pub enum SigningError {
     #[error("Invalid public key bytes: {0}")]
     InvalidPublicKeyBytes(String),
 
-    /// Invalid agent ID (used in budget-chain hashing)
-    #[error("Invalid agent id: {0}")]
-    InvalidAgentId(String),
 }
 
 // ============================================================================
@@ -112,14 +109,9 @@ pub fn hash_message(message: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-fn normalize_agent_id(id: &str) -> Result<String, SigningError> {
-    // Reject control characters to avoid ambiguous hashing / display mismatches.
-    if id.chars().any(|c| c.is_control()) {
-        return Err(SigningError::InvalidAgentId(
-            "agent id contains control characters".to_string(),
-        ));
-    }
-    Ok(id.nfc().collect())
+fn normalize_agent_id(id: &str) -> String {
+    // Pair and chain identifiers must apply identical normalization rules.
+    id.nfc().collect()
 }
 
 /// Compute deterministic `chain_id` for budget-chain continuity.
@@ -143,7 +135,7 @@ pub fn compute_budget_chain_id(
     let mut ids: Vec<String> = participant_ids
         .iter()
         .map(|s| normalize_agent_id(s))
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect();
     ids.sort();
 
     let core = BudgetChainIdCore {
@@ -520,6 +512,17 @@ mod tests {
         )
         .expect("compute_budget_chain_id");
         assert_eq!(chain_id, EXPECTED);
+    }
+
+    #[test]
+    fn test_budget_chain_id_commutative_for_participant_order() {
+        let a = vec!["agent-a".to_string(), "agent-b".to_string()];
+        let b = vec!["agent-b".to_string(), "agent-a".to_string()];
+        let hash_a = compute_budget_chain_id(&a, Purpose::Compatibility, "vault_result_compatibility", "production")
+            .expect("compute_budget_chain_id");
+        let hash_b = compute_budget_chain_id(&b, Purpose::Compatibility, "vault_result_compatibility", "production")
+            .expect("compute_budget_chain_id");
+        assert_eq!(hash_a, hash_b);
     }
 
     #[test]

@@ -1067,6 +1067,39 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_fails_on_budget_chain_receipt_hash_mismatch() {
+        let (signing_key, verifying_key) = generate_keypair();
+        let mut unsigned = sample_unsigned_receipt();
+        if let Some(chain) = unsigned.budget_chain.as_mut() {
+            chain.receipt_hash = "f".repeat(64);
+        }
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::FailReceiptHash);
+        assert!(details.error.unwrap_or_default().contains("receipt_hash mismatch"));
+    }
+
+    #[test]
     fn test_verify_invalid_receipt_json() {
         let mut receipt_file = NamedTempFile::new().unwrap();
         writeln!(receipt_file, "{{ invalid json }}").unwrap();
