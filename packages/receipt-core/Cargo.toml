@@ -25,5 +25,9 @@ path = "src/bin/vcav-agreement-hash.rs"
 name = "vcav-generate-vectors"
 path = "src/bin/vcav-generate-vectors.rs"
 
+[[bin]]
+name = "vcav-sign-manifest"
+path = "src/bin/vcav-sign-manifest.rs"
+
 [dev-dependencies]
 proptest.workspace = true

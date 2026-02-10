@@ -15,11 +15,13 @@
 //! - [`handoff`] - SessionHandoff types matching `session_handoff.schema.json`
 //! - [`canonicalize`] - RFC 8785 JSON Canonicalization Scheme
 //! - [`signer`] - Ed25519 signing with domain separation
+//! - [`manifest`] - Signed publication manifest for operator artefact bundles
 
 pub mod agreement;
 pub mod canonicalize;
 pub mod handoff;
 pub mod ledger;
+pub mod manifest;
 pub mod receipt;
 pub mod signer;
 
@@ -36,6 +38,10 @@ pub use ledger::{ApplyOutcome, BudgetLedger, LedgerError};
 pub use receipt::{
     Attestation, BudgetChainRecord, BudgetUsageRecord, ExecutionLane, Receipt, ReceiptBuilder,
     ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
+};
+pub use manifest::{
+    create_manifest_signing_message, sign_manifest, verify_manifest, ArtefactEntry,
+    ManifestArtefacts, PublicationManifest, UnsignedManifest, MANIFEST_DOMAIN_PREFIX,
 };
 pub use signer::{
     compute_budget_chain_id, compute_receipt_hash, compute_receipt_key_id,
