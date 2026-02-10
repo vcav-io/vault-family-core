@@ -29,5 +29,9 @@ path = "src/bin/vcav-generate-vectors.rs"
 name = "vcav-sign-manifest"
 path = "src/bin/vcav-sign-manifest.rs"
 
+[[bin]]
+name = "vcav-keyring"
+path = "src/bin/vcav-keyring.rs"
+
 [dev-dependencies]
 proptest.workspace = true
