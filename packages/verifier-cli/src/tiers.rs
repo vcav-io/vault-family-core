@@ -2,12 +2,15 @@
 //!
 //! Tier 1 (Receipt-only): Signature, schema, budget-chain hash, agreement hash recomputation
 //! Tier 2 (Receipt + artefacts): Tier 1 + profile/policy/contract hash verification
+//! Tier 3 (Manifest): Tier 1/2 + manifest signature verification and artefact coverage
 
 use receipt_core::{
-    compute_agreement_hash, canonicalize::canonicalize_serializable, SessionAgreementFields,
+    compute_agreement_hash, canonicalize::canonicalize_serializable,
+    parse_public_key_hex, verify_manifest, PublicationManifest, SessionAgreementFields,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
@@ -198,10 +201,21 @@ pub fn build_policy_digest(bundle: &PolicyBundle) -> PolicyDigestV1 {
 // Tier Result
 // ============================================================================
 
+/// Results from manifest (Tier 3) verification checks.
+#[derive(Debug, Clone, Default)]
+pub struct ManifestResult {
+    /// Whether the manifest signature is valid
+    pub signature_valid: Option<bool>,
+    /// Whether the receipt's model_profile_hash is covered by the manifest
+    pub profile_covered: Option<bool>,
+    /// Whether the receipt's policy_bundle_hash is covered by the manifest
+    pub policy_covered: Option<bool>,
+}
+
 /// Results from tier verification checks.
 #[derive(Debug, Clone, Default)]
 pub struct TierResult {
-    /// Which tier was achieved (1 = receipt-only, 2 = receipt + artefacts)
+    /// Which tier was achieved (1 = receipt-only, 2 = receipt + artefacts, 3 = manifest)
     pub tier: u8,
     /// Agreement hash verification result (None = not checked)
     pub agreement_hash_valid: Option<bool>,
@@ -211,6 +225,8 @@ pub struct TierResult {
     pub policy_hash_valid: Option<bool>,
     /// Contract hash verification result (None = not checked)
     pub contract_hash_valid: Option<bool>,
+    /// Manifest verification result (None = not checked)
+    pub manifest: Option<ManifestResult>,
     /// Error message for the first failing check
     pub error: Option<String>,
 }
@@ -286,6 +302,89 @@ pub fn verify_contract_hash(
     let recomputed = hex::encode(hasher.finalize());
 
     Ok(recomputed == declared_hash)
+}
+
+/// Verify a signed publication manifest (Tier 3).
+///
+/// 1. Parse and verify the manifest signature using the embedded operator public key.
+/// 2. Check if the receipt's `model_profile_hash` appears in the manifest's profile artefacts.
+/// 3. Check if the receipt's `policy_bundle_hash` appears in the manifest's policy artefacts.
+///
+/// The `receipt_guardian_hash` is also checked against both policy and contract artefact
+/// hashes in the manifest for coverage.
+pub fn verify_manifest_tier(
+    manifest_path: &Path,
+    receipt_profile_hash: Option<&str>,
+    receipt_policy_hash: Option<&str>,
+    receipt_guardian_hash: &str,
+) -> Result<ManifestResult, String> {
+    let content = fs::read_to_string(manifest_path)
+        .map_err(|e| format!("Failed to read manifest file: {}", e))?;
+
+    let manifest: PublicationManifest = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse manifest JSON: {}", e))?;
+
+    // Parse operator public key from the manifest
+    let public_key = parse_public_key_hex(&manifest.operator_public_key_hex)
+        .map_err(|e| format!("Invalid operator public key in manifest: {}", e))?;
+
+    // Verify manifest signature
+    let signature_valid = verify_manifest(&manifest, &public_key).is_ok();
+
+    if !signature_valid {
+        return Ok(ManifestResult {
+            signature_valid: Some(false),
+            profile_covered: None,
+            policy_covered: None,
+        });
+    }
+
+    // Collect artefact hashes from manifest
+    let profile_hashes: HashSet<&str> = manifest
+        .artefacts
+        .profiles
+        .iter()
+        .map(|e| e.content_hash.as_str())
+        .collect();
+
+    let policy_hashes: HashSet<&str> = manifest
+        .artefacts
+        .policies
+        .iter()
+        .map(|e| e.content_hash.as_str())
+        .collect();
+
+    let contract_hashes: HashSet<&str> = manifest
+        .artefacts
+        .contracts
+        .iter()
+        .map(|e| e.content_hash.as_str())
+        .collect();
+
+    // Check profile coverage
+    let profile_covered = receipt_profile_hash.map(|h| profile_hashes.contains(h));
+
+    // Check policy coverage: receipt's policy_bundle_hash in policy hashes,
+    // or guardian_policy_hash in policy OR contract hashes
+    let policy_covered = if let Some(h) = receipt_policy_hash {
+        Some(
+            policy_hashes.contains(h)
+                || policy_hashes.contains(receipt_guardian_hash)
+                || contract_hashes.contains(receipt_guardian_hash),
+        )
+    } else {
+        // No policy_bundle_hash in receipt — check guardian_policy_hash only
+        Some(
+            policy_hashes.contains(receipt_guardian_hash)
+                || contract_hashes.contains(receipt_guardian_hash),
+        )
+    };
+
+    Ok(ManifestResult {
+        signature_valid: Some(true),
+        profile_covered,
+        policy_covered,
+    })
 }
 
 #[cfg(test)]

@@ -82,6 +82,10 @@ struct Args {
     /// Path to contract JSON file for contract hash verification (Tier 2)
     #[arg(long)]
     contract: Option<String>,
+
+    /// Path to signed publication manifest JSON for manifest verification (Tier 3)
+    #[arg(long)]
+    manifest: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -107,6 +111,9 @@ struct VerificationResult {
     profile_hash_valid: Option<bool>,
     policy_hash_valid: Option<bool>,
     contract_hash_valid: Option<bool>,
+    manifest_signature_valid: Option<bool>,
+    manifest_profile_covered: Option<bool>,
+    manifest_policy_covered: Option<bool>,
     errors: Vec<String>,
 }
 
@@ -123,6 +130,9 @@ enum VerificationStatus {
     FailSchema,
     FailOutputSchema,
     SkippedSchema,
+    FailManifestSignature,
+    FailManifestProfileNotCovered,
+    FailManifestPolicyNotCovered,
 }
 
 impl std::fmt::Display for VerificationStatus {
@@ -138,6 +148,13 @@ impl std::fmt::Display for VerificationStatus {
             VerificationStatus::FailSchema => write!(f, "FAIL_SCHEMA"),
             VerificationStatus::FailOutputSchema => write!(f, "FAIL_OUTPUT_SCHEMA"),
             VerificationStatus::SkippedSchema => write!(f, "SKIPPED_SCHEMA"),
+            VerificationStatus::FailManifestSignature => write!(f, "FAIL_MANIFEST_SIGNATURE"),
+            VerificationStatus::FailManifestProfileNotCovered => {
+                write!(f, "FAIL_MANIFEST_PROFILE_NOT_COVERED")
+            }
+            VerificationStatus::FailManifestPolicyNotCovered => {
+                write!(f, "FAIL_MANIFEST_POLICY_NOT_COVERED")
+            }
         }
     }
 }
@@ -210,6 +227,19 @@ fn main() -> Result<()> {
                         println!("Contract hash valid: {}", valid);
                     }
 
+                    // Manifest (Tier 3) results
+                    if let Some(ref manifest) = details.tier_result.manifest {
+                        if let Some(valid) = manifest.signature_valid {
+                            println!("Manifest signature valid: {}", valid);
+                        }
+                        if let Some(covered) = manifest.profile_covered {
+                            println!("Manifest profile covered: {}", covered);
+                        }
+                        if let Some(covered) = manifest.policy_covered {
+                            println!("Manifest policy covered: {}", covered);
+                        }
+                    }
+
                     if let Some(schema_id) = &details.output_schema_id {
                         println!("Output schema: {}", schema_id);
                         if let Some(valid) = details.output_schema_valid {
@@ -255,6 +285,21 @@ fn main() -> Result<()> {
                 profile_hash_valid: details.tier_result.profile_hash_valid,
                 policy_hash_valid: details.tier_result.policy_hash_valid,
                 contract_hash_valid: details.tier_result.contract_hash_valid,
+                manifest_signature_valid: details
+                    .tier_result
+                    .manifest
+                    .as_ref()
+                    .and_then(|m| m.signature_valid),
+                manifest_profile_covered: details
+                    .tier_result
+                    .manifest
+                    .as_ref()
+                    .and_then(|m| m.profile_covered),
+                manifest_policy_covered: details
+                    .tier_result
+                    .manifest
+                    .as_ref()
+                    .and_then(|m| m.policy_covered),
                 errors: details.error.map(|e| vec![e]).unwrap_or_default(),
             };
             println!("{}", serde_json::to_string_pretty(&json_result)?);
@@ -570,6 +615,92 @@ fn verify(args: &Args) -> VerifyDetails {
                         error: err,
                     };
                 }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Tier 3: Manifest verification (when --manifest provided)
+    // ---------------------------------------------------------------
+    if let Some(ref manifest_path) = args.manifest {
+        tier.tier = 3;
+
+        match tiers::verify_manifest_tier(
+            Path::new(manifest_path),
+            receipt.model_profile_hash.as_deref(),
+            receipt.policy_bundle_hash.as_deref(),
+            &receipt.guardian_policy_hash,
+        ) {
+            Ok(result) => {
+                if result.signature_valid == Some(false) {
+                    tier.manifest = Some(result);
+                    tier.error =
+                        Some("Manifest signature verification failed".to_string());
+                    let err = tier.error.clone();
+                    return VerifyDetails {
+                        receipt: Some(receipt),
+                        status: VerificationStatus::FailManifestSignature,
+                        schema_skipped: false,
+                        output_schema_valid: None,
+                        output_schema_id: None,
+                        tier_result: tier,
+                        error: err,
+                    };
+                }
+
+                if result.profile_covered == Some(false) {
+                    tier.manifest = Some(result);
+                    tier.error = Some(
+                        "Receipt model_profile_hash not covered by manifest".to_string(),
+                    );
+                    let err = tier.error.clone();
+                    return VerifyDetails {
+                        receipt: Some(receipt),
+                        status: VerificationStatus::FailManifestProfileNotCovered,
+                        schema_skipped: false,
+                        output_schema_valid: None,
+                        output_schema_id: None,
+                        tier_result: tier,
+                        error: err,
+                    };
+                }
+
+                if result.policy_covered == Some(false) {
+                    tier.manifest = Some(result);
+                    tier.error = Some(
+                        "Receipt policy/guardian hash not covered by manifest".to_string(),
+                    );
+                    let err = tier.error.clone();
+                    return VerifyDetails {
+                        receipt: Some(receipt),
+                        status: VerificationStatus::FailManifestPolicyNotCovered,
+                        schema_skipped: false,
+                        output_schema_valid: None,
+                        output_schema_id: None,
+                        tier_result: tier,
+                        error: err,
+                    };
+                }
+
+                tier.manifest = Some(result);
+            }
+            Err(e) => {
+                tier.manifest = Some(tiers::ManifestResult {
+                    signature_valid: Some(false),
+                    profile_covered: None,
+                    policy_covered: None,
+                });
+                tier.error = Some(format!("Manifest verification error: {}", e));
+                let err = tier.error.clone();
+                return VerifyDetails {
+                    receipt: Some(receipt),
+                    status: VerificationStatus::FailManifestSignature,
+                    schema_skipped: false,
+                    output_schema_valid: None,
+                    output_schema_id: None,
+                    tier_result: tier,
+                    error: err,
+                };
             }
         }
     }
@@ -1122,6 +1253,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1149,6 +1281,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1184,6 +1317,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1218,6 +1352,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1262,6 +1397,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1298,6 +1434,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1337,6 +1474,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1373,6 +1511,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1406,6 +1545,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1429,6 +1569,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1457,6 +1598,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1510,6 +1652,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1539,6 +1682,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1565,6 +1709,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1699,6 +1844,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1731,6 +1877,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1812,6 +1959,7 @@ mod tests {
                             profile: None,
                             policy: None,
                             contract: None,
+                            manifest: None,
                         };
 
                         let details = verify(&args);
@@ -1877,6 +2025,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1925,6 +2074,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -1951,6 +2101,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -2140,6 +2291,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -2180,6 +2332,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -2258,6 +2411,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -2329,6 +2483,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -2354,6 +2509,7 @@ mod tests {
             profile: None,
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -2417,6 +2573,7 @@ mod tests {
             profile: Some(profile_file.path().to_str().unwrap().to_string()),
             policy: None,
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
@@ -2467,11 +2624,514 @@ mod tests {
             profile: None,
             policy: Some(policy_file.path().to_str().unwrap().to_string()),
             contract: None,
+            manifest: None,
         };
 
         let details = verify(&args);
         assert_eq!(details.status, VerificationStatus::FailPolicyHash);
         assert_eq!(details.tier_result.policy_hash_valid, Some(false));
         assert_eq!(details.tier_result.tier, 2);
+    }
+
+    // ========================================================================
+    // Tier 3: Manifest verification tests (#307)
+    // ========================================================================
+
+    use receipt_core::{
+        sign_manifest, ArtefactEntry, ManifestArtefacts, PublicationManifest, UnsignedManifest,
+    };
+
+    /// Create a receipt with known artefact hashes and a matching signed manifest.
+    fn create_manifest_test_files(
+        profile_hash: &str,
+        policy_hash: &str,
+        guardian_hash: &str,
+    ) -> (NamedTempFile, NamedTempFile, NamedTempFile) {
+        let (signing_key, verifying_key) = generate_keypair();
+        let (manifest_sk, manifest_vk) = generate_keypair();
+
+        // Create receipt with known hashes
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.model_profile_hash = Some(profile_hash.to_string());
+        unsigned.policy_bundle_hash = Some(policy_hash.to_string());
+        unsigned.guardian_policy_hash = guardian_hash.to_string();
+        recompute_budget_chain_receipt_hash(&mut unsigned);
+
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        // Create manifest that covers these hashes
+        let unsigned_manifest = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-test-001".to_string(),
+            operator_public_key_hex: public_key_to_hex(&manifest_vk),
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-02-10T00:00:00Z".to_string(),
+            artefacts: ManifestArtefacts {
+                contracts: vec![ArtefactEntry {
+                    filename: "contracts/test.json".to_string(),
+                    content_hash: guardian_hash.to_string(),
+                }],
+                profiles: vec![ArtefactEntry {
+                    filename: "profiles/test.json".to_string(),
+                    content_hash: profile_hash.to_string(),
+                }],
+                policies: vec![ArtefactEntry {
+                    filename: "policies/test.json".to_string(),
+                    content_hash: policy_hash.to_string(),
+                }],
+            },
+        };
+
+        let manifest_sig = sign_manifest(&unsigned_manifest, &manifest_sk).unwrap();
+        let manifest = PublicationManifest {
+            manifest_version: unsigned_manifest.manifest_version,
+            operator_id: unsigned_manifest.operator_id,
+            operator_public_key_hex: unsigned_manifest.operator_public_key_hex,
+            protocol_version: unsigned_manifest.protocol_version,
+            published_at: unsigned_manifest.published_at,
+            artefacts: unsigned_manifest.artefacts,
+            signature: manifest_sig,
+        };
+
+        let mut manifest_file = NamedTempFile::new().unwrap();
+        writeln!(
+            manifest_file,
+            "{}",
+            serde_json::to_string_pretty(&manifest).unwrap()
+        )
+        .unwrap();
+
+        (receipt_file, pubkey_file, manifest_file)
+    }
+
+    #[test]
+    fn test_tier3_manifest_valid() {
+        let profile_hash = "a".repeat(64);
+        let policy_hash = "b".repeat(64);
+        let guardian_hash = "c".repeat(64);
+
+        let (receipt_file, pubkey_file, manifest_file) =
+            create_manifest_test_files(&profile_hash, &policy_hash, &guardian_hash);
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
+            manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::SkippedSchema);
+        assert_eq!(details.tier_result.tier, 3);
+
+        let manifest_result = details.tier_result.manifest.unwrap();
+        assert_eq!(manifest_result.signature_valid, Some(true));
+        assert_eq!(manifest_result.profile_covered, Some(true));
+        assert_eq!(manifest_result.policy_covered, Some(true));
+    }
+
+    #[test]
+    fn test_tier3_manifest_signature_invalid() {
+        let profile_hash = "a".repeat(64);
+        let policy_hash = "b".repeat(64);
+        let guardian_hash = "c".repeat(64);
+
+        let (receipt_file, pubkey_file, manifest_file) =
+            create_manifest_test_files(&profile_hash, &policy_hash, &guardian_hash);
+
+        // Tamper with the manifest file — change operator_id to invalidate signature
+        let manifest_content = fs::read_to_string(manifest_file.path()).unwrap();
+        let mut manifest: serde_json::Value = serde_json::from_str(&manifest_content).unwrap();
+        manifest["operator_id"] = serde_json::json!("operator-evil-001");
+
+        let mut tampered_file = NamedTempFile::new().unwrap();
+        writeln!(
+            tampered_file,
+            "{}",
+            serde_json::to_string_pretty(&manifest).unwrap()
+        )
+        .unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
+            manifest: Some(tampered_file.path().to_str().unwrap().to_string()),
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::FailManifestSignature);
+        assert_eq!(details.tier_result.tier, 3);
+
+        let manifest_result = details.tier_result.manifest.unwrap();
+        assert_eq!(manifest_result.signature_valid, Some(false));
+    }
+
+    #[test]
+    fn test_tier3_manifest_profile_not_covered() {
+        let profile_hash = "a".repeat(64);
+        let policy_hash = "b".repeat(64);
+        let guardian_hash = "c".repeat(64);
+
+        // Create a manifest that has DIFFERENT profile hashes
+        let (signing_key, verifying_key) = generate_keypair();
+        let (manifest_sk, manifest_vk) = generate_keypair();
+
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.model_profile_hash = Some(profile_hash.clone());
+        unsigned.policy_bundle_hash = Some(policy_hash.clone());
+        unsigned.guardian_policy_hash = guardian_hash.clone();
+        recompute_budget_chain_receipt_hash(&mut unsigned);
+
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        // Manifest with different profile hash
+        let unsigned_manifest = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-test-001".to_string(),
+            operator_public_key_hex: public_key_to_hex(&manifest_vk),
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-02-10T00:00:00Z".to_string(),
+            artefacts: ManifestArtefacts {
+                contracts: vec![ArtefactEntry {
+                    filename: "contracts/test.json".to_string(),
+                    content_hash: guardian_hash,
+                }],
+                profiles: vec![ArtefactEntry {
+                    filename: "profiles/other.json".to_string(),
+                    content_hash: "f".repeat(64), // Different hash
+                }],
+                policies: vec![ArtefactEntry {
+                    filename: "policies/test.json".to_string(),
+                    content_hash: policy_hash,
+                }],
+            },
+        };
+
+        let manifest_sig = sign_manifest(&unsigned_manifest, &manifest_sk).unwrap();
+        let manifest = PublicationManifest {
+            manifest_version: unsigned_manifest.manifest_version,
+            operator_id: unsigned_manifest.operator_id,
+            operator_public_key_hex: unsigned_manifest.operator_public_key_hex,
+            protocol_version: unsigned_manifest.protocol_version,
+            published_at: unsigned_manifest.published_at,
+            artefacts: unsigned_manifest.artefacts,
+            signature: manifest_sig,
+        };
+
+        let mut manifest_file = NamedTempFile::new().unwrap();
+        writeln!(
+            manifest_file,
+            "{}",
+            serde_json::to_string_pretty(&manifest).unwrap()
+        )
+        .unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
+            manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
+        };
+
+        let details = verify(&args);
+        assert_eq!(
+            details.status,
+            VerificationStatus::FailManifestProfileNotCovered
+        );
+        assert_eq!(details.tier_result.tier, 3);
+
+        let manifest_result = details.tier_result.manifest.unwrap();
+        assert_eq!(manifest_result.signature_valid, Some(true));
+        assert_eq!(manifest_result.profile_covered, Some(false));
+    }
+
+    #[test]
+    fn test_tier3_manifest_policy_not_covered() {
+        let profile_hash = "a".repeat(64);
+        let policy_hash = "b".repeat(64);
+        let guardian_hash = "c".repeat(64);
+
+        let (signing_key, verifying_key) = generate_keypair();
+        let (manifest_sk, manifest_vk) = generate_keypair();
+
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.model_profile_hash = Some(profile_hash.clone());
+        unsigned.policy_bundle_hash = Some(policy_hash.clone());
+        unsigned.guardian_policy_hash = guardian_hash.clone();
+        recompute_budget_chain_receipt_hash(&mut unsigned);
+
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        // Manifest with profile covered but different policy AND contract hashes
+        let unsigned_manifest = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-test-001".to_string(),
+            operator_public_key_hex: public_key_to_hex(&manifest_vk),
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-02-10T00:00:00Z".to_string(),
+            artefacts: ManifestArtefacts {
+                contracts: vec![ArtefactEntry {
+                    filename: "contracts/test.json".to_string(),
+                    content_hash: "f".repeat(64), // Different from guardian_hash
+                }],
+                profiles: vec![ArtefactEntry {
+                    filename: "profiles/test.json".to_string(),
+                    content_hash: profile_hash,
+                }],
+                policies: vec![ArtefactEntry {
+                    filename: "policies/other.json".to_string(),
+                    content_hash: "e".repeat(64), // Different from policy_hash
+                }],
+            },
+        };
+
+        let manifest_sig = sign_manifest(&unsigned_manifest, &manifest_sk).unwrap();
+        let manifest = PublicationManifest {
+            manifest_version: unsigned_manifest.manifest_version,
+            operator_id: unsigned_manifest.operator_id,
+            operator_public_key_hex: unsigned_manifest.operator_public_key_hex,
+            protocol_version: unsigned_manifest.protocol_version,
+            published_at: unsigned_manifest.published_at,
+            artefacts: unsigned_manifest.artefacts,
+            signature: manifest_sig,
+        };
+
+        let mut manifest_file = NamedTempFile::new().unwrap();
+        writeln!(
+            manifest_file,
+            "{}",
+            serde_json::to_string_pretty(&manifest).unwrap()
+        )
+        .unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
+            manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
+        };
+
+        let details = verify(&args);
+        assert_eq!(
+            details.status,
+            VerificationStatus::FailManifestPolicyNotCovered
+        );
+        assert_eq!(details.tier_result.tier, 3);
+
+        let manifest_result = details.tier_result.manifest.unwrap();
+        assert_eq!(manifest_result.signature_valid, Some(true));
+        assert_eq!(manifest_result.profile_covered, Some(true));
+        assert_eq!(manifest_result.policy_covered, Some(false));
+    }
+
+    #[test]
+    fn test_tier3_combined_with_tier1_and_tier2() {
+        // Use the known-good verification vector which has agreement fields + artefact hashes
+        let path = vectors_dir().join("receipt-verification-v1.json");
+        let content = std::fs::read_to_string(&path).unwrap();
+        let vector: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        let mut unsigned: UnsignedReceipt =
+            serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
+
+        // Set known hashes on the receipt for manifest coverage
+        let profile_hash = unsigned.model_profile_hash.clone().unwrap_or_else(|| "a".repeat(64));
+        let policy_hash = unsigned.policy_bundle_hash.clone().unwrap_or_else(|| "b".repeat(64));
+        let guardian_hash = unsigned.guardian_policy_hash.clone();
+
+        // Re-sign with known hashes if they weren't set
+        let (re_signing_key, re_verifying_key) = generate_keypair();
+        if unsigned.model_profile_hash.is_none() {
+            unsigned.model_profile_hash = Some(profile_hash.clone());
+        }
+        if unsigned.policy_bundle_hash.is_none() {
+            unsigned.policy_bundle_hash = Some(policy_hash.clone());
+        }
+        recompute_budget_chain_receipt_hash(&mut unsigned);
+        let re_signature = sign_receipt(&unsigned, &re_signing_key).unwrap();
+        let receipt = unsigned.sign(re_signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&re_verifying_key)).unwrap();
+
+        // Write agreement fields
+        let agreement_fields = &vector["input"]["agreement_fields"]["session_agreement_fields"];
+
+        // We need to recompute agreement hash from the vector's fields
+        let fields: receipt_core::SessionAgreementFields =
+            serde_json::from_value(agreement_fields.clone()).unwrap();
+        let agreement_hash = receipt_core::compute_agreement_hash(&fields).unwrap();
+
+        // Re-create receipt with correct agreement_hash
+        let mut unsigned2: UnsignedReceipt =
+            serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
+        unsigned2.agreement_hash = Some(agreement_hash);
+        unsigned2.model_profile_hash = Some(profile_hash.clone());
+        unsigned2.policy_bundle_hash = Some(policy_hash.clone());
+        recompute_budget_chain_receipt_hash(&mut unsigned2);
+        let sig2 = sign_receipt(&unsigned2, &re_signing_key).unwrap();
+        let receipt2 = unsigned2.sign(sig2);
+
+        let mut receipt_file2 = NamedTempFile::new().unwrap();
+        writeln!(receipt_file2, "{}", serde_json::to_string(&receipt2).unwrap()).unwrap();
+
+        let mut agreement_file = NamedTempFile::new().unwrap();
+        writeln!(
+            agreement_file,
+            "{}",
+            serde_json::to_string(&agreement_fields).unwrap()
+        )
+        .unwrap();
+
+        // Create signed manifest
+        let (manifest_sk, manifest_vk) = generate_keypair();
+        let unsigned_manifest = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-combined-001".to_string(),
+            operator_public_key_hex: public_key_to_hex(&manifest_vk),
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-02-10T00:00:00Z".to_string(),
+            artefacts: ManifestArtefacts {
+                contracts: vec![ArtefactEntry {
+                    filename: "contracts/test.json".to_string(),
+                    content_hash: guardian_hash,
+                }],
+                profiles: vec![ArtefactEntry {
+                    filename: "profiles/test.json".to_string(),
+                    content_hash: profile_hash,
+                }],
+                policies: vec![ArtefactEntry {
+                    filename: "policies/test.json".to_string(),
+                    content_hash: policy_hash,
+                }],
+            },
+        };
+        let manifest_sig = sign_manifest(&unsigned_manifest, &manifest_sk).unwrap();
+        let manifest = PublicationManifest {
+            manifest_version: unsigned_manifest.manifest_version,
+            operator_id: unsigned_manifest.operator_id,
+            operator_public_key_hex: unsigned_manifest.operator_public_key_hex,
+            protocol_version: unsigned_manifest.protocol_version,
+            published_at: unsigned_manifest.published_at,
+            artefacts: unsigned_manifest.artefacts,
+            signature: manifest_sig,
+        };
+
+        let mut manifest_file = NamedTempFile::new().unwrap();
+        writeln!(
+            manifest_file,
+            "{}",
+            serde_json::to_string_pretty(&manifest).unwrap()
+        )
+        .unwrap();
+
+        let args = Args {
+            receipt: receipt_file2.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: Some(agreement_file.path().to_str().unwrap().to_string()),
+            profile: None,
+            policy: None,
+            contract: None,
+            manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
+        };
+
+        let details = verify(&args);
+        // Schema skipped so status is SkippedSchema, but all tier checks should pass
+        assert_eq!(details.status, VerificationStatus::SkippedSchema);
+        assert_eq!(details.tier_result.tier, 3);
+        assert_eq!(details.tier_result.agreement_hash_valid, Some(true));
+
+        let manifest_result = details.tier_result.manifest.unwrap();
+        assert_eq!(manifest_result.signature_valid, Some(true));
+        assert_eq!(manifest_result.profile_covered, Some(true));
+        assert_eq!(manifest_result.policy_covered, Some(true));
+    }
+
+    #[test]
+    fn test_verification_status_display_manifest() {
+        assert_eq!(
+            VerificationStatus::FailManifestSignature.to_string(),
+            "FAIL_MANIFEST_SIGNATURE"
+        );
+        assert_eq!(
+            VerificationStatus::FailManifestProfileNotCovered.to_string(),
+            "FAIL_MANIFEST_PROFILE_NOT_COVERED"
+        );
+        assert_eq!(
+            VerificationStatus::FailManifestPolicyNotCovered.to_string(),
+            "FAIL_MANIFEST_POLICY_NOT_COVERED"
+        );
     }
 }
