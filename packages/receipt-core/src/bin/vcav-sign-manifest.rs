@@ -15,7 +15,8 @@ use ed25519_dalek::SigningKey;
 use sha2::{Digest, Sha256};
 
 use receipt_core::manifest::{
-    ArtefactEntry, ManifestArtefacts, PublicationManifest, UnsignedManifest,
+    compute_operator_key_id, ArtefactEntry, ManifestArtefacts, PublicationManifest,
+    UnsignedManifest,
 };
 use receipt_core::signer::public_key_to_hex;
 use receipt_core::sign_manifest;
@@ -194,11 +195,14 @@ fn run() -> Result<(), String> {
     }
 
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let pub_hex = public_key_to_hex(&verifying_key);
+    let key_id = compute_operator_key_id(&pub_hex);
 
     let unsigned = UnsignedManifest {
         manifest_version: "1.0.0".to_string(),
         operator_id: args.operator_id,
-        operator_public_key_hex: public_key_to_hex(&verifying_key),
+        operator_key_id: key_id,
+        operator_public_key_hex: pub_hex,
         protocol_version: args.protocol_version,
         published_at: now,
         artefacts: ManifestArtefacts {
@@ -214,6 +218,7 @@ fn run() -> Result<(), String> {
     let manifest = PublicationManifest {
         manifest_version: unsigned.manifest_version,
         operator_id: unsigned.operator_id,
+        operator_key_id: unsigned.operator_key_id,
         operator_public_key_hex: unsigned.operator_public_key_hex,
         protocol_version: unsigned.protocol_version,
         published_at: unsigned.published_at,

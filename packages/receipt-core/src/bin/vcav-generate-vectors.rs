@@ -12,12 +12,15 @@ use chrono::{TimeZone, Utc};
 use ed25519_dalek::Signer;
 use guardian_core::{BudgetTier, Purpose};
 use receipt_core::{
-    canonicalize, compute_agreement_hash, compute_pre_agreement_hash, compute_receipt_hash,
-    compute_receipt_key_id, create_handoff_signing_message, create_signing_message, hash_message,
-    public_key_to_hex, sign_handoff, sign_receipt, verify_handoff, verify_receipt,
-    BudgetChainRecord, BudgetUsageRecord, ExecutionLane, HashRef, ModelIdentity,
-    PreAgreementFields, ReceiptStatus, SessionAgreementFields, SigningKey, UnsignedReceipt,
-    UnsignedSessionHandoff, DOMAIN_PREFIX, SCHEMA_VERSION, SESSION_HANDOFF_DOMAIN_PREFIX,
+    canonicalize, compute_agreement_hash, compute_operator_key_id, compute_pre_agreement_hash,
+    compute_receipt_hash, compute_receipt_key_id, create_handoff_signing_message,
+    create_manifest_signing_message, create_signing_message, hash_message, public_key_to_hex,
+    sign_handoff, sign_manifest, sign_receipt, verify_handoff, verify_manifest, verify_receipt,
+    ArtefactEntry, BudgetChainRecord, BudgetUsageRecord, ExecutionLane, HashRef,
+    ManifestArtefacts, ModelIdentity, PreAgreementFields, PublicationManifest, ReceiptStatus,
+    SessionAgreementFields, SigningKey, UnsignedManifest, UnsignedReceipt,
+    UnsignedSessionHandoff, DOMAIN_PREFIX, MANIFEST_DOMAIN_PREFIX, SCHEMA_VERSION,
+    SESSION_HANDOFF_DOMAIN_PREFIX,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -35,6 +38,11 @@ fn vault_signing_key() -> SigningKey {
 /// Agent signing key: 0x02 repeated 32 times.
 fn agent_signing_key() -> SigningKey {
     SigningKey::from_bytes(&[0x02u8; 32])
+}
+
+/// Operator signing key: 0x03 repeated 32 times.
+fn operator_signing_key() -> SigningKey {
+    SigningKey::from_bytes(&[0x03u8; 32])
 }
 
 // ============================================================================
@@ -1012,6 +1020,142 @@ fn generate_verification_vectors(dir: &Path) {
 }
 
 // ============================================================================
+// Manifest test vector generators (Seq 21, Issue #395)
+// ============================================================================
+
+fn generate_manifest_vectors(dir: &Path) {
+    let operator_key = operator_signing_key();
+    let operator_pub = public_key_to_hex(&operator_key.verifying_key());
+    let operator_key_id = compute_operator_key_id(&operator_pub);
+
+    let artefacts = ManifestArtefacts {
+        contracts: vec![ArtefactEntry {
+            filename: "contracts/dating-compat.json".to_string(),
+            content_hash: "a".repeat(64),
+        }],
+        profiles: vec![ArtefactEntry {
+            filename: "profiles/llama-3.1-8b.json".to_string(),
+            content_hash: "b".repeat(64),
+        }],
+        policies: vec![ArtefactEntry {
+            filename: "policies/default-guardrails.json".to_string(),
+            content_hash: "c".repeat(64),
+        }],
+    };
+
+    // --- Positive 01: valid signed manifest ---
+    {
+        let unsigned = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-test-001".to_string(),
+            operator_key_id: operator_key_id.clone(),
+            operator_public_key_hex: operator_pub.clone(),
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-01-01T00:00:00Z".to_string(),
+            artefacts: artefacts.clone(),
+        };
+
+        let canonical =
+            receipt_core::canonicalize_serializable(&unsigned).expect("canonicalize manifest");
+        let signing_msg =
+            create_manifest_signing_message(&unsigned).expect("manifest signing msg");
+        let digest = hash_message(&signing_msg);
+        let signature = sign_manifest(&unsigned, &operator_key).expect("sign manifest");
+
+        let signed = PublicationManifest {
+            manifest_version: unsigned.manifest_version.clone(),
+            operator_id: unsigned.operator_id.clone(),
+            operator_key_id: unsigned.operator_key_id.clone(),
+            operator_public_key_hex: unsigned.operator_public_key_hex.clone(),
+            protocol_version: unsigned.protocol_version.clone(),
+            published_at: unsigned.published_at.clone(),
+            artefacts: unsigned.artefacts.clone(),
+            signature: signature.clone(),
+        };
+
+        // Self-verify
+        verify_manifest(&signed, &operator_key.verifying_key())
+            .expect("self-verify manifest failed");
+
+        write_vector(
+            dir,
+            "manifest_positive_01.json",
+            &json!({
+                "description": "Valid signed publication manifest with Ed25519 signature and operator_key_id",
+                "input": {
+                    "artefacts": serde_json::to_value(&unsigned.artefacts).unwrap(),
+                    "operator_id": unsigned.operator_id,
+                    "operator_key_id": unsigned.operator_key_id,
+                    "operator_public_key_hex": unsigned.operator_public_key_hex,
+                    "protocol_version": unsigned.protocol_version,
+                    "published_at": unsigned.published_at,
+                    "signing_key_seed_hex": "03".repeat(32),
+                    "domain_prefix": MANIFEST_DOMAIN_PREFIX
+                },
+                "expected": {
+                    "canonical_json": canonical,
+                    "signing_message_hash": hex::encode(digest),
+                    "signature": signature,
+                    "signed_manifest": serde_json::to_value(&signed).unwrap()
+                }
+            }),
+        );
+    }
+
+    // --- Negative 01: tampered manifest (operator_id changed after signing) ---
+    {
+        let unsigned = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-test-001".to_string(),
+            operator_key_id: operator_key_id.clone(),
+            operator_public_key_hex: operator_pub.clone(),
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-01-01T00:00:00Z".to_string(),
+            artefacts: artefacts.clone(),
+        };
+
+        let signature = sign_manifest(&unsigned, &operator_key).expect("sign manifest");
+
+        // Tamper: change operator_id after signing
+        let tampered = PublicationManifest {
+            manifest_version: unsigned.manifest_version,
+            operator_id: "operator-evil-001".to_string(),
+            operator_key_id: unsigned.operator_key_id,
+            operator_public_key_hex: unsigned.operator_public_key_hex,
+            protocol_version: unsigned.protocol_version,
+            published_at: unsigned.published_at,
+            artefacts: unsigned.artefacts,
+            signature: signature.clone(),
+        };
+
+        // Confirm it fails verification
+        assert!(
+            verify_manifest(&tampered, &operator_key.verifying_key()).is_err(),
+            "tampered manifest should fail verification"
+        );
+
+        write_vector(
+            dir,
+            "manifest_negative_01.json",
+            &json!({
+                "description": "Tampered manifest: operator_id changed after signing -- verifier MUST reject",
+                "input": {
+                    "signed_manifest": serde_json::to_value(&tampered).unwrap(),
+                    "verifying_key_hex": operator_pub,
+                    "tampered_field": "operator_id",
+                    "original_value": "operator-test-001",
+                    "tampered_value": "operator-evil-001"
+                },
+                "expected": {
+                    "verification_result": "FAIL",
+                    "error_class": "SIGNATURE_MISMATCH"
+                }
+            }),
+        );
+    }
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -1039,6 +1183,7 @@ fn main() {
     // Write deterministic key files
     let vault_key = vault_signing_key();
     let agent_key = agent_signing_key();
+    let operator_key = operator_signing_key();
     std::fs::write(
         output_dir.join("keys/vault.pub"),
         format!("{}\n", public_key_to_hex(&vault_key.verifying_key())),
@@ -1049,6 +1194,11 @@ fn main() {
         format!("{}\n", public_key_to_hex(&agent_key.verifying_key())),
     )
     .expect("write agent.pub");
+    std::fs::write(
+        output_dir.join("keys/operator.pub"),
+        format!("{}\n", public_key_to_hex(&operator_key.verifying_key())),
+    )
+    .expect("write operator.pub");
 
     eprintln!("\nReceipt signing vectors:");
     generate_receipt_vectors(&output_dir);
@@ -1067,6 +1217,9 @@ fn main() {
 
     eprintln!("\nVerification vectors:");
     generate_verification_vectors(&output_dir);
+
+    eprintln!("\nManifest vectors:");
+    generate_manifest_vectors(&output_dir);
 
     eprintln!("\nDone. Generated vectors in {}", output_dir.display());
 }
