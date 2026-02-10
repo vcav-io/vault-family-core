@@ -18,7 +18,7 @@ use receipt_core::{
     sign_handoff, sign_manifest, sign_receipt, verify_handoff, verify_manifest, verify_receipt,
     ArtefactEntry, BudgetChainRecord, BudgetUsageRecord, ExecutionLane, HashRef,
     ManifestArtefacts, ModelIdentity, PreAgreementFields, PublicationManifest, ReceiptStatus,
-    SessionAgreementFields, SigningKey, UnsignedManifest, UnsignedReceipt,
+    RuntimeHashes, SessionAgreementFields, SigningKey, UnsignedManifest, UnsignedReceipt,
     UnsignedSessionHandoff, DOMAIN_PREFIX, MANIFEST_DOMAIN_PREFIX, SCHEMA_VERSION,
     SESSION_HANDOFF_DOMAIN_PREFIX,
 };
@@ -1160,6 +1160,442 @@ fn generate_manifest_vectors(dir: &Path) {
 }
 
 // ============================================================================
+// Tier verification test vector generators (Seq 22, Issue #403)
+// ============================================================================
+
+/// Sample profile JSON for Tier 2 vectors (matches profile-digest-v1.json golden vector).
+fn sample_profile_json() -> Value {
+    json!({
+        "profile_id": "sealed-demo-v1",
+        "profile_version": 1,
+        "execution_lane": "sealed-local",
+        "provider": "local-gguf",
+        "model_id": "phi-3-mini-4k-instruct",
+        "model_version": "1.0.0",
+        "model_weights_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        "tokenizer_hash": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+        "engine_version": "llama.cpp-b2901",
+        "inference_params": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "max_tokens": 1024,
+            "seed": 42
+        },
+        "prompt_template_hash": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+        "system_prompt_hash": "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+        "grammar_constraint_hash": "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6"
+    })
+}
+
+/// Sample policy JSON for Tier 2 vectors (matches policy-digest-v1.json golden vector).
+fn sample_policy_json() -> Value {
+    json!({
+        "policy_id": "golden-test-policy-v1",
+        "policy_version": "1.0.0",
+        "entropy_budget_bits": 16,
+        "allowed_lanes": ["sealed-local", "api-mediated"],
+        "asymmetry_rule": "SYMMETRIC",
+        "allowed_provenance": ["SYMMETRIC_CONSTRUCTION", "ORCHESTRATOR_GENERATED", "PUBLIC_REGISTRY"],
+        "ttl_bounds": { "min_seconds": 30, "max_seconds": 300 }
+    })
+}
+
+fn generate_tier_verification_vectors(dir: &Path) {
+    let vault_key = vault_signing_key();
+    let vault_pub = public_key_to_hex(&vault_key.verifying_key());
+    let operator_key = operator_signing_key();
+    let operator_pub = public_key_to_hex(&operator_key.verifying_key());
+    let operator_key_id = compute_operator_key_id(&operator_pub);
+
+    // Compute profile hash from the golden vector profile
+    // Uses same algorithm as verifier-core: SHA-256("vcav/model_profile/v1" || canonical(digest))
+    let profile_json = sample_profile_json();
+    let profile_hash = {
+        let p = &profile_json;
+        let ip = &p["inference_params"];
+        // Build the digest struct as JSON (basis-point conversion for floats)
+        let digest = json!({
+            "execution_lane": p["execution_lane"],
+            "provider": p["provider"],
+            "model_id": p["model_id"],
+            "model_version": p["model_version"],
+            "inference_params": {
+                "temperature_bp": (ip["temperature"].as_f64().unwrap() * 1000.0).round() as u32,
+                "top_p_bp": (ip["top_p"].as_f64().unwrap() * 1000.0).round() as u32,
+                "top_k": ip["top_k"].as_u64().unwrap(),
+                "max_tokens": ip["max_tokens"].as_u64().unwrap(),
+                "seed": ip["seed"].as_u64().unwrap()
+            },
+            "prompt_template_hash": p["prompt_template_hash"],
+            "system_prompt_hash": p["system_prompt_hash"],
+            "model_weights_hash": p["model_weights_hash"],
+            "tokenizer_hash": p["tokenizer_hash"],
+            "engine_version": p["engine_version"],
+            "grammar_constraint_hash": p["grammar_constraint_hash"]
+        });
+        let canonical = canonicalize(&digest);
+        let prefixed = format!("vcav/model_profile/v1{}", canonical);
+        let mut hasher = Sha256::new();
+        hasher.update(prefixed.as_bytes());
+        hex::encode(hasher.finalize())
+    };
+
+    // Compute policy hash from the golden vector policy
+    // Uses same algorithm as verifier-core: SHA-256("vcav/policy_bundle/v1" || canonical(digest))
+    let policy_json = sample_policy_json();
+    let policy_hash = {
+        let p = &policy_json;
+        let mut allowed_lanes: Vec<String> = p["allowed_lanes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect();
+        allowed_lanes.sort();
+        let mut allowed_provenance: Vec<String> = p["allowed_provenance"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect();
+        allowed_provenance.sort();
+
+        let digest = json!({
+            "allowed_lanes": allowed_lanes,
+            "allowed_provenance": allowed_provenance,
+            "asymmetry_rule": p["asymmetry_rule"],
+            "entropy_budget_bits": p["entropy_budget_bits"],
+            "ttl_bounds": p["ttl_bounds"]
+        });
+        let canonical = canonicalize(&digest);
+        let prefixed = format!("vcav/policy_bundle/v1{}", canonical);
+        let mut hasher = Sha256::new();
+        hasher.update(prefixed.as_bytes());
+        hex::encode(hasher.finalize())
+    };
+
+    // =========================================================================
+    // Tier 1 Positive: valid receipt signature
+    // =========================================================================
+    {
+        let mut receipt = sample_unsigned_receipt();
+        fill_receipt_hash(&mut receipt);
+        let signature = sign_receipt(&receipt, &vault_key).expect("sign receipt");
+        verify_receipt(&receipt, &signature, &vault_key.verifying_key())
+            .expect("self-verify failed");
+
+        let signed = receipt.sign(signature.clone());
+
+        write_vector(
+            dir,
+            "verification_tier1_positive_01.json",
+            &json!({
+                "description": "Tier 1 positive: valid receipt signature verification",
+                "tier": 1,
+                "input": {
+                    "receipt": signed,
+                    "public_key_hex": vault_pub,
+                    "profile": null,
+                    "policy": null,
+                    "manifest": null
+                },
+                "expected": {
+                    "tier_achieved": 1,
+                    "signature_valid": true,
+                    "schema_valid": true,
+                    "error": null
+                }
+            }),
+        );
+    }
+
+    // =========================================================================
+    // Tier 1 Negative: tampered receipt (entropy_bits changed after signing)
+    // =========================================================================
+    {
+        let mut receipt = sample_unsigned_receipt();
+        fill_receipt_hash(&mut receipt);
+        let signature = sign_receipt(&receipt, &vault_key).expect("sign receipt");
+
+        // Tamper after signing
+        receipt.output_entropy_bits = 999;
+        let tampered_signed = receipt.sign(signature.clone());
+
+        write_vector(
+            dir,
+            "verification_tier1_negative_01.json",
+            &json!({
+                "description": "Tier 1 negative: tampered receipt (output_entropy_bits changed after signing)",
+                "tier": 1,
+                "input": {
+                    "receipt": tampered_signed,
+                    "public_key_hex": vault_pub,
+                    "profile": null,
+                    "policy": null,
+                    "manifest": null
+                },
+                "expected": {
+                    "tier_achieved": 0,
+                    "signature_valid": false,
+                    "schema_valid": true,
+                    "error": "SIGNATURE_MISMATCH"
+                }
+            }),
+        );
+    }
+
+    // =========================================================================
+    // Tier 2 Positive: receipt + profile + policy with matching hashes
+    // =========================================================================
+    {
+        let mut receipt = sample_full_receipt(&vault_pub);
+        // Override with real computed hashes from golden vector artefacts
+        receipt.model_profile_hash = Some(profile_hash.clone());
+        receipt.policy_bundle_hash = Some(policy_hash.clone());
+        fill_receipt_hash(&mut receipt);
+
+        let signature = sign_receipt(&receipt, &vault_key).expect("sign receipt");
+        verify_receipt(&receipt, &signature, &vault_key.verifying_key())
+            .expect("self-verify failed");
+
+        let signed = receipt.sign(signature.clone());
+
+        write_vector(
+            dir,
+            "verification_tier2_positive_01.json",
+            &json!({
+                "description": "Tier 2 positive: receipt + key + profile + policy with matching hashes",
+                "tier": 2,
+                "input": {
+                    "receipt": signed,
+                    "public_key_hex": vault_pub,
+                    "profile": profile_json,
+                    "policy": policy_json,
+                    "manifest": null
+                },
+                "expected": {
+                    "tier_achieved": 2,
+                    "signature_valid": true,
+                    "schema_valid": true,
+                    "profile_hash_valid": true,
+                    "policy_hash_valid": true,
+                    "computed_profile_hash": profile_hash,
+                    "computed_policy_hash": policy_hash,
+                    "error": null
+                }
+            }),
+        );
+    }
+
+    // =========================================================================
+    // Tier 3 Positive: receipt + manifest (with runtime_hashes)
+    // =========================================================================
+    {
+        let runtime_hash = "c".repeat(64); // same as sample_unsigned_receipt
+        let guardian_hash = "d".repeat(64); // same as sample_unsigned_receipt
+
+        // Build a manifest that covers profile and policy artefacts,
+        // and includes matching runtime_hashes
+        let artefacts = ManifestArtefacts {
+            contracts: vec![ArtefactEntry {
+                filename: "contracts/dating-compat.json".to_string(),
+                content_hash: "a".repeat(64),
+            }],
+            profiles: vec![ArtefactEntry {
+                filename: "profiles/sealed-demo-v1.json".to_string(),
+                content_hash: profile_hash.clone(),
+            }],
+            policies: vec![ArtefactEntry {
+                filename: "policies/golden-test-policy-v1.json".to_string(),
+                content_hash: policy_hash.clone(),
+            }],
+        };
+
+        let unsigned_manifest = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-test-001".to_string(),
+            operator_key_id: operator_key_id.clone(),
+            operator_public_key_hex: operator_pub.clone(),
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-01-15T00:00:00Z".to_string(),
+            artefacts: artefacts.clone(),
+            runtime_hashes: Some(RuntimeHashes {
+                runtime_hash: runtime_hash.clone(),
+                guardian_policy_hash: guardian_hash.clone(),
+            }),
+        };
+
+        let manifest_sig =
+            sign_manifest(&unsigned_manifest, &operator_key).expect("sign manifest");
+
+        let signed_manifest = PublicationManifest {
+            manifest_version: unsigned_manifest.manifest_version.clone(),
+            operator_id: unsigned_manifest.operator_id.clone(),
+            operator_key_id: unsigned_manifest.operator_key_id.clone(),
+            operator_public_key_hex: unsigned_manifest.operator_public_key_hex.clone(),
+            protocol_version: unsigned_manifest.protocol_version.clone(),
+            published_at: unsigned_manifest.published_at.clone(),
+            artefacts: unsigned_manifest.artefacts.clone(),
+            runtime_hashes: unsigned_manifest.runtime_hashes.clone(),
+            signature: manifest_sig.clone(),
+        };
+
+        // Verify manifest
+        verify_manifest(&signed_manifest, &operator_key.verifying_key())
+            .expect("self-verify manifest failed");
+
+        // Build receipt with matching hashes
+        let mut receipt = sample_full_receipt(&vault_pub);
+        receipt.model_profile_hash = Some(profile_hash.clone());
+        receipt.policy_bundle_hash = Some(policy_hash.clone());
+        receipt.runtime_hash = runtime_hash.clone();
+        receipt.guardian_policy_hash = guardian_hash.clone();
+        fill_receipt_hash(&mut receipt);
+
+        let receipt_sig = sign_receipt(&receipt, &vault_key).expect("sign receipt");
+        verify_receipt(&receipt, &receipt_sig, &vault_key.verifying_key())
+            .expect("self-verify receipt failed");
+
+        let signed_receipt = receipt.sign(receipt_sig.clone());
+
+        let manifest_value = serde_json::to_value(&signed_manifest).unwrap();
+
+        write_vector(
+            dir,
+            "verification_tier3_positive_01.json",
+            &json!({
+                "description": "Tier 3 positive: receipt + key + manifest (with runtime hashes matching)",
+                "tier": 3,
+                "input": {
+                    "receipt": signed_receipt,
+                    "public_key_hex": vault_pub,
+                    "profile": profile_json,
+                    "policy": policy_json,
+                    "manifest": manifest_value
+                },
+                "expected": {
+                    "tier_achieved": 3,
+                    "signature_valid": true,
+                    "schema_valid": true,
+                    "profile_hash_valid": true,
+                    "policy_hash_valid": true,
+                    "manifest_signature_valid": true,
+                    "profile_covered": true,
+                    "policy_covered": true,
+                    "runtime_hash_match": true,
+                    "guardian_hash_match": true,
+                    "error": null
+                }
+            }),
+        );
+    }
+
+    // =========================================================================
+    // Tier 3 Negative: manifest with wrong runtime hash (warning, not error)
+    // =========================================================================
+    {
+        let runtime_hash = "c".repeat(64);
+        let guardian_hash = "d".repeat(64);
+
+        // Build manifest with DIFFERENT runtime hash
+        let wrong_runtime_hash = "f".repeat(64);
+
+        let artefacts = ManifestArtefacts {
+            contracts: vec![ArtefactEntry {
+                filename: "contracts/dating-compat.json".to_string(),
+                content_hash: "a".repeat(64),
+            }],
+            profiles: vec![ArtefactEntry {
+                filename: "profiles/sealed-demo-v1.json".to_string(),
+                content_hash: profile_hash.clone(),
+            }],
+            policies: vec![ArtefactEntry {
+                filename: "policies/golden-test-policy-v1.json".to_string(),
+                content_hash: policy_hash.clone(),
+            }],
+        };
+
+        let unsigned_manifest = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-test-001".to_string(),
+            operator_key_id: operator_key_id.clone(),
+            operator_public_key_hex: operator_pub.clone(),
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-01-15T00:00:00Z".to_string(),
+            artefacts: artefacts.clone(),
+            runtime_hashes: Some(RuntimeHashes {
+                runtime_hash: wrong_runtime_hash.clone(),
+                guardian_policy_hash: guardian_hash.clone(),
+            }),
+        };
+
+        let manifest_sig =
+            sign_manifest(&unsigned_manifest, &operator_key).expect("sign manifest");
+
+        let signed_manifest = PublicationManifest {
+            manifest_version: unsigned_manifest.manifest_version.clone(),
+            operator_id: unsigned_manifest.operator_id.clone(),
+            operator_key_id: unsigned_manifest.operator_key_id.clone(),
+            operator_public_key_hex: unsigned_manifest.operator_public_key_hex.clone(),
+            protocol_version: unsigned_manifest.protocol_version.clone(),
+            published_at: unsigned_manifest.published_at.clone(),
+            artefacts: unsigned_manifest.artefacts.clone(),
+            runtime_hashes: unsigned_manifest.runtime_hashes.clone(),
+            signature: manifest_sig.clone(),
+        };
+
+        verify_manifest(&signed_manifest, &operator_key.verifying_key())
+            .expect("self-verify manifest failed");
+
+        // Build receipt with the original runtime_hash (different from manifest)
+        let mut receipt = sample_full_receipt(&vault_pub);
+        receipt.model_profile_hash = Some(profile_hash.clone());
+        receipt.policy_bundle_hash = Some(policy_hash.clone());
+        receipt.runtime_hash = runtime_hash.clone();
+        receipt.guardian_policy_hash = guardian_hash.clone();
+        fill_receipt_hash(&mut receipt);
+
+        let receipt_sig = sign_receipt(&receipt, &vault_key).expect("sign receipt");
+        verify_receipt(&receipt, &receipt_sig, &vault_key.verifying_key())
+            .expect("self-verify receipt failed");
+
+        let signed_receipt = receipt.sign(receipt_sig.clone());
+
+        let manifest_value = serde_json::to_value(&signed_manifest).unwrap();
+
+        write_vector(
+            dir,
+            "verification_tier3_negative_01.json",
+            &json!({
+                "description": "Tier 3 negative: manifest with wrong runtime hash (warning, not error since strict_runtime=false)",
+                "tier": 3,
+                "input": {
+                    "receipt": signed_receipt,
+                    "public_key_hex": vault_pub,
+                    "profile": profile_json,
+                    "policy": policy_json,
+                    "manifest": manifest_value,
+                    "strict_runtime": false
+                },
+                "expected": {
+                    "tier_achieved": 3,
+                    "signature_valid": true,
+                    "schema_valid": true,
+                    "manifest_signature_valid": true,
+                    "profile_covered": true,
+                    "policy_covered": true,
+                    "runtime_hash_match": false,
+                    "guardian_hash_match": true,
+                    "error": null,
+                    "note": "runtime_hash_match=false is a warning, not a failure, because strict_runtime=false"
+                }
+            }),
+        );
+    }
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -1224,6 +1660,9 @@ fn main() {
 
     eprintln!("\nManifest vectors:");
     generate_manifest_vectors(&output_dir);
+
+    eprintln!("\nTier verification vectors:");
+    generate_tier_verification_vectors(&output_dir);
 
     eprintln!("\nDone. Generated vectors in {}", output_dir.display());
 }

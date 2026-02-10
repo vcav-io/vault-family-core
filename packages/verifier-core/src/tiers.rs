@@ -931,6 +931,203 @@ mod tests {
         assert_eq!(result.guardian_hash_match, Some(true));
     }
 
+    // =========================================================================
+    // Vector conformance tests (Seq 22, Issue #403)
+    // =========================================================================
+
+    /// Helper: load a verification vector JSON file from the test-vectors directory.
+    fn load_vector(filename: &str) -> serde_json::Value {
+        let path = format!(
+            "{}/../../test-vectors/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            filename
+        );
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
+        serde_json::from_str(&content)
+            .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
+    }
+
+    /// Helper: extract the unsigned receipt fields from a signed receipt JSON value,
+    /// and return the signature separately.
+    fn extract_receipt_parts(
+        signed_receipt: &serde_json::Value,
+    ) -> (receipt_core::UnsignedReceipt, String) {
+        let sig = signed_receipt["signature"]
+            .as_str()
+            .expect("missing signature")
+            .to_string();
+
+        // Parse the full signed receipt, then extract unsigned fields
+        let receipt: receipt_core::Receipt =
+            serde_json::from_value(signed_receipt.clone()).expect("parse signed receipt");
+
+        // Build UnsignedReceipt from Receipt fields
+        let unsigned = receipt_core::UnsignedReceipt {
+            schema_version: receipt.schema_version,
+            session_id: receipt.session_id,
+            purpose_code: receipt.purpose_code,
+            participant_ids: receipt.participant_ids,
+            runtime_hash: receipt.runtime_hash,
+            guardian_policy_hash: receipt.guardian_policy_hash,
+            model_weights_hash: receipt.model_weights_hash,
+            llama_cpp_version: receipt.llama_cpp_version,
+            inference_config_hash: receipt.inference_config_hash,
+            output_schema_version: receipt.output_schema_version,
+            session_start: receipt.session_start,
+            session_end: receipt.session_end,
+            fixed_window_duration_seconds: receipt.fixed_window_duration_seconds,
+            status: receipt.status,
+            execution_lane: receipt.execution_lane,
+            output: receipt.output,
+            output_entropy_bits: receipt.output_entropy_bits,
+            mitigations_applied: receipt.mitigations_applied,
+            budget_usage: receipt.budget_usage,
+            budget_chain: receipt.budget_chain,
+            model_identity: receipt.model_identity,
+            agreement_hash: receipt.agreement_hash,
+            receipt_key_id: receipt.receipt_key_id,
+            model_profile_hash: receipt.model_profile_hash,
+            policy_bundle_hash: receipt.policy_bundle_hash,
+            attestation: receipt.attestation,
+        };
+        (unsigned, sig)
+    }
+
+    #[test]
+    fn test_vector_tier1_positive() {
+        let v = load_vector("verification_tier1_positive_01.json");
+        let (unsigned, sig) = extract_receipt_parts(&v["input"]["receipt"]);
+        let pub_hex = v["input"]["public_key_hex"].as_str().unwrap();
+        let pubkey = receipt_core::parse_public_key_hex(pub_hex).unwrap();
+
+        // Tier 1: signature verification should pass
+        let result = receipt_core::verify_receipt(&unsigned, &sig, &pubkey);
+        assert!(result.is_ok(), "Tier 1 positive: signature should verify");
+
+        // Check expected fields
+        assert_eq!(v["expected"]["signature_valid"].as_bool(), Some(true));
+        assert_eq!(v["expected"]["tier_achieved"].as_u64(), Some(1));
+    }
+
+    #[test]
+    fn test_vector_tier1_negative() {
+        let v = load_vector("verification_tier1_negative_01.json");
+        let (unsigned, sig) = extract_receipt_parts(&v["input"]["receipt"]);
+        let pub_hex = v["input"]["public_key_hex"].as_str().unwrap();
+        let pubkey = receipt_core::parse_public_key_hex(pub_hex).unwrap();
+
+        // Tier 1 negative: signature verification should fail
+        let result = receipt_core::verify_receipt(&unsigned, &sig, &pubkey);
+        assert!(result.is_err(), "Tier 1 negative: tampered receipt should fail signature verification");
+
+        assert_eq!(v["expected"]["signature_valid"].as_bool(), Some(false));
+        assert_eq!(
+            v["expected"]["error"].as_str(),
+            Some("SIGNATURE_MISMATCH")
+        );
+    }
+
+    #[test]
+    fn test_vector_tier2_positive() {
+        let v = load_vector("verification_tier2_positive_01.json");
+        let (unsigned, sig) = extract_receipt_parts(&v["input"]["receipt"]);
+        let pub_hex = v["input"]["public_key_hex"].as_str().unwrap();
+        let pubkey = receipt_core::parse_public_key_hex(pub_hex).unwrap();
+
+        // Tier 1: signature should pass
+        receipt_core::verify_receipt(&unsigned, &sig, &pubkey)
+            .expect("Tier 2: receipt signature must pass");
+
+        // Tier 2: profile hash verification
+        let profile_json_str = serde_json::to_string(&v["input"]["profile"]).unwrap();
+        let declared_profile_hash = unsigned.model_profile_hash.as_ref().expect("receipt must have profile hash");
+        let profile_valid = verify_profile_hash_from_str(&profile_json_str, declared_profile_hash).unwrap();
+        assert!(profile_valid, "Tier 2: profile hash should match");
+
+        // Tier 2: policy hash verification
+        let policy_json_str = serde_json::to_string(&v["input"]["policy"]).unwrap();
+        let declared_policy_hash = unsigned.policy_bundle_hash.as_ref().expect("receipt must have policy hash");
+        let policy_valid = verify_policy_hash_from_str(&policy_json_str, declared_policy_hash).unwrap();
+        assert!(policy_valid, "Tier 2: policy hash should match");
+
+        // Check expected fields
+        assert_eq!(v["expected"]["profile_hash_valid"].as_bool(), Some(true));
+        assert_eq!(v["expected"]["policy_hash_valid"].as_bool(), Some(true));
+        assert_eq!(v["expected"]["tier_achieved"].as_u64(), Some(2));
+    }
+
+    #[test]
+    fn test_vector_tier3_positive() {
+        let v = load_vector("verification_tier3_positive_01.json");
+        let (unsigned, sig) = extract_receipt_parts(&v["input"]["receipt"]);
+        let pub_hex = v["input"]["public_key_hex"].as_str().unwrap();
+        let pubkey = receipt_core::parse_public_key_hex(pub_hex).unwrap();
+
+        // Tier 1: signature should pass
+        receipt_core::verify_receipt(&unsigned, &sig, &pubkey)
+            .expect("Tier 3: receipt signature must pass");
+
+        // Tier 2: profile + policy hash verification
+        let profile_json_str = serde_json::to_string(&v["input"]["profile"]).unwrap();
+        let declared_profile_hash = unsigned.model_profile_hash.as_ref().unwrap();
+        assert!(verify_profile_hash_from_str(&profile_json_str, declared_profile_hash).unwrap());
+
+        let policy_json_str = serde_json::to_string(&v["input"]["policy"]).unwrap();
+        let declared_policy_hash = unsigned.policy_bundle_hash.as_ref().unwrap();
+        assert!(verify_policy_hash_from_str(&policy_json_str, declared_policy_hash).unwrap());
+
+        // Tier 3: manifest verification
+        let manifest_json_str = serde_json::to_string(&v["input"]["manifest"]).unwrap();
+        let result = verify_manifest_from_str(
+            &manifest_json_str,
+            unsigned.model_profile_hash.as_deref(),
+            unsigned.policy_bundle_hash.as_deref(),
+            &unsigned.guardian_policy_hash,
+            Some(&unsigned.runtime_hash),
+            false,
+        )
+        .expect("Tier 3: manifest verification should succeed");
+
+        assert_eq!(result.signature_valid, Some(true), "manifest sig valid");
+        assert_eq!(result.profile_covered, Some(true), "profile covered");
+        assert_eq!(result.policy_covered, Some(true), "policy covered");
+        assert_eq!(result.runtime_hash_match, Some(true), "runtime hash match");
+        assert_eq!(result.guardian_hash_match, Some(true), "guardian hash match");
+
+        assert_eq!(v["expected"]["tier_achieved"].as_u64(), Some(3));
+    }
+
+    #[test]
+    fn test_vector_tier3_negative_runtime_mismatch() {
+        let v = load_vector("verification_tier3_negative_01.json");
+        let (unsigned, sig) = extract_receipt_parts(&v["input"]["receipt"]);
+        let pub_hex = v["input"]["public_key_hex"].as_str().unwrap();
+        let pubkey = receipt_core::parse_public_key_hex(pub_hex).unwrap();
+
+        // Tier 1: signature should still pass
+        receipt_core::verify_receipt(&unsigned, &sig, &pubkey)
+            .expect("Tier 3 negative: receipt signature must pass");
+
+        // Tier 3: manifest verification (non-strict mode)
+        let manifest_json_str = serde_json::to_string(&v["input"]["manifest"]).unwrap();
+        let result = verify_manifest_from_str(
+            &manifest_json_str,
+            unsigned.model_profile_hash.as_deref(),
+            unsigned.policy_bundle_hash.as_deref(),
+            &unsigned.guardian_policy_hash,
+            Some(&unsigned.runtime_hash),
+            false, // non-strict: mismatch is a warning, not an error
+        )
+        .expect("Tier 3 negative: should succeed with warning (non-strict)");
+
+        assert_eq!(result.signature_valid, Some(true), "manifest sig valid");
+        assert_eq!(result.runtime_hash_match, Some(false), "runtime hash should NOT match");
+        assert_eq!(result.guardian_hash_match, Some(true), "guardian hash should match");
+
+        assert_eq!(v["expected"]["runtime_hash_match"].as_bool(), Some(false));
+    }
+
     #[test]
     fn test_manifest_runtime_hashes_included_in_signature() {
         // Verify that runtime_hashes are part of the signed manifest data
