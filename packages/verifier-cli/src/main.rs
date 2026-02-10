@@ -487,7 +487,9 @@ fn verify(args: &Args) -> VerifyDetails {
                 }
                 Ok(false) => {
                     tier.agreement_hash_valid = Some(false);
-                    tier.error = Some("Agreement hash mismatch: recomputed hash differs from receipt".to_string());
+                    tier.error = Some(
+                        "Agreement hash mismatch: recomputed hash differs from receipt".to_string(),
+                    );
                     let err = tier.error.clone();
                     return VerifyDetails {
                         receipt: Some(receipt),
@@ -535,7 +537,10 @@ fn verify(args: &Args) -> VerifyDetails {
                     }
                     Ok(false) => {
                         tier.profile_hash_valid = Some(false);
-                        tier.error = Some("Profile hash mismatch: recomputed hash differs from receipt".to_string());
+                        tier.error = Some(
+                            "Profile hash mismatch: recomputed hash differs from receipt"
+                                .to_string(),
+                        );
                         let err = tier.error.clone();
                         return VerifyDetails {
                             receipt: Some(receipt),
@@ -574,7 +579,10 @@ fn verify(args: &Args) -> VerifyDetails {
                     }
                     Ok(false) => {
                         tier.policy_hash_valid = Some(false);
-                        tier.error = Some("Policy hash mismatch: recomputed hash differs from receipt".to_string());
+                        tier.error = Some(
+                            "Policy hash mismatch: recomputed hash differs from receipt"
+                                .to_string(),
+                        );
                         let err = tier.error.clone();
                         return VerifyDetails {
                             receipt: Some(receipt),
@@ -616,7 +624,9 @@ fn verify(args: &Args) -> VerifyDetails {
                 }
                 Ok(false) => {
                     tier.contract_hash_valid = Some(false);
-                    tier.error = Some("Contract hash mismatch: recomputed hash differs from receipt".to_string());
+                    tier.error = Some(
+                        "Contract hash mismatch: recomputed hash differs from receipt".to_string(),
+                    );
                     let err = tier.error.clone();
                     return VerifyDetails {
                         receipt: Some(receipt),
@@ -2172,7 +2182,12 @@ mod tests {
 
     fn vectors_dir() -> std::path::PathBuf {
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        manifest.parent().unwrap().parent().unwrap().join("test-vectors")
+        manifest
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("test-vectors")
     }
 
     #[test]
@@ -2192,7 +2207,11 @@ mod tests {
 
         // Verify signature
         let result = receipt_core::verify_receipt(&unsigned, expected_sig, &vk);
-        assert!(result.is_ok(), "Known-good vector MUST verify: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Known-good vector MUST verify: {:?}",
+            result.err()
+        );
 
         // Verify expected result
         assert_eq!(
@@ -2201,11 +2220,26 @@ mod tests {
         );
 
         // Verify all Seq 14/15 fields are populated
-        assert!(unsigned.agreement_hash.is_some(), "agreement_hash must be present");
-        assert!(unsigned.model_profile_hash.is_some(), "model_profile_hash must be present");
-        assert!(unsigned.policy_bundle_hash.is_some(), "policy_bundle_hash must be present");
-        assert!(unsigned.receipt_key_id.is_some(), "receipt_key_id must be present");
-        assert!(unsigned.model_identity.is_some(), "model_identity must be present");
+        assert!(
+            unsigned.agreement_hash.is_some(),
+            "agreement_hash must be present"
+        );
+        assert!(
+            unsigned.model_profile_hash.is_some(),
+            "model_profile_hash must be present"
+        );
+        assert!(
+            unsigned.policy_bundle_hash.is_some(),
+            "policy_bundle_hash must be present"
+        );
+        assert!(
+            unsigned.receipt_key_id.is_some(),
+            "receipt_key_id must be present"
+        );
+        assert!(
+            unsigned.model_identity.is_some(),
+            "model_identity must be present"
+        );
     }
 
     #[test]
@@ -2228,7 +2262,10 @@ mod tests {
         assert!(result.is_err(), "Tampered vector MUST fail verification");
 
         // Verify the tampered field
-        assert_eq!(unsigned.output_entropy_bits, 16, "output_entropy_bits should be tampered to 16");
+        assert_eq!(
+            unsigned.output_entropy_bits, 16,
+            "output_entropy_bits should be tampered to 16"
+        );
 
         // Verify expected result
         assert_eq!(
@@ -2266,7 +2303,10 @@ mod tests {
 
         // Agreement hash recomputation MUST FAIL
         // The receipt's agreement_hash was computed with agent-bob but receipt declares agent-charlie
-        let declared_hash = unsigned.agreement_hash.as_ref().expect("agreement_hash must be present");
+        let declared_hash = unsigned
+            .agreement_hash
+            .as_ref()
+            .expect("agreement_hash must be present");
 
         // Recompute using the original agreement fields from the vector
         let agreement_fields: receipt_core::SessionAgreementFields = serde_json::from_value(
@@ -2276,11 +2316,16 @@ mod tests {
 
         let recomputed_original = receipt_core::compute_agreement_hash(&agreement_fields).unwrap();
         // The declared hash matches the original agreement (agent-bob)
-        assert_eq!(declared_hash, &recomputed_original, "declared hash should match original agreement fields");
+        assert_eq!(
+            declared_hash, &recomputed_original,
+            "declared hash should match original agreement fields"
+        );
 
         // But the receipt's participant_ids are different (agent-charlie instead of agent-bob)
         assert!(
-            unsigned.participant_ids.contains(&"agent-charlie".to_string()),
+            unsigned
+                .participant_ids
+                .contains(&"agent-charlie".to_string()),
             "Receipt must contain tampered participant agent-charlie"
         );
         assert!(
@@ -2300,11 +2345,15 @@ mod tests {
 
         // Verify expected results
         assert_eq!(
-            vector["expected"]["signature_verification_result"].as_str().unwrap(),
+            vector["expected"]["signature_verification_result"]
+                .as_str()
+                .unwrap(),
             "PASS"
         );
         assert_eq!(
-            vector["expected"]["agreement_hash_verification_result"].as_str().unwrap(),
+            vector["expected"]["agreement_hash_verification_result"]
+                .as_str()
+                .unwrap(),
             "FAIL"
         );
         assert_eq!(
@@ -2453,7 +2502,12 @@ mod tests {
         // Write agreement fields to temp file
         let agreement_fields = &vector["input"]["agreement_fields"]["session_agreement_fields"];
         let mut agreement_file = NamedTempFile::new().unwrap();
-        writeln!(agreement_file, "{}", serde_json::to_string(&agreement_fields).unwrap()).unwrap();
+        writeln!(
+            agreement_file,
+            "{}",
+            serde_json::to_string(&agreement_fields).unwrap()
+        )
+        .unwrap();
 
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
@@ -2526,7 +2580,12 @@ mod tests {
         };
 
         let mut agreement_file = NamedTempFile::new().unwrap();
-        writeln!(agreement_file, "{}", serde_json::to_string(&tampered_fields).unwrap()).unwrap();
+        writeln!(
+            agreement_file,
+            "{}",
+            serde_json::to_string(&tampered_fields).unwrap()
+        )
+        .unwrap();
 
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
@@ -2618,7 +2677,12 @@ mod tests {
             "system_prompt_hash": "c".repeat(64)
         });
         let mut profile_file = NamedTempFile::new().unwrap();
-        writeln!(profile_file, "{}", serde_json::to_string(&profile_json).unwrap()).unwrap();
+        writeln!(
+            profile_file,
+            "{}",
+            serde_json::to_string(&profile_json).unwrap()
+        )
+        .unwrap();
 
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
@@ -2670,7 +2734,12 @@ mod tests {
             "ttl_bounds": { "min_seconds": 60, "max_seconds": 300 }
         });
         let mut policy_file = NamedTempFile::new().unwrap();
-        writeln!(policy_file, "{}", serde_json::to_string(&policy_json).unwrap()).unwrap();
+        writeln!(
+            policy_file,
+            "{}",
+            serde_json::to_string(&policy_json).unwrap()
+        )
+        .unwrap();
 
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
