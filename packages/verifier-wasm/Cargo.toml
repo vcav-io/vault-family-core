@@ -1,0 +1,27 @@
+[package]
+name = "verifier-wasm"
+description = "VCAV verifier compiled to WebAssembly via wasm-bindgen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+verifier-core = { path = "../verifier-core" }
+receipt-core = { path = "../receipt-core" }
+wasm-bindgen = "0.2"
+serde.workspace = true
+serde_json.workspace = true
+ed25519-dalek.workspace = true
+console_error_panic_hook = "0.1"
+getrandom = { version = "0.2", features = ["js"] }
+
+# getrandom v0.3 (transitive via ahash) requires both the cfg flag (in .cargo/config.toml)
+# and the wasm_js feature to compile for wasm32 targets.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
