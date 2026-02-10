@@ -13,11 +13,11 @@ use ed25519_dalek::Signer;
 use guardian_core::{BudgetTier, Purpose};
 use receipt_core::{
     canonicalize, compute_agreement_hash, compute_pre_agreement_hash, compute_receipt_hash,
-    create_handoff_signing_message, create_signing_message, hash_message, public_key_to_hex,
-    sign_handoff, sign_receipt, verify_handoff, verify_receipt, BudgetChainRecord,
-    BudgetUsageRecord, HashRef, ModelIdentity, PreAgreementFields, ReceiptStatus,
-    SessionAgreementFields, SigningKey, UnsignedReceipt, UnsignedSessionHandoff, DOMAIN_PREFIX,
-    SCHEMA_VERSION, SESSION_HANDOFF_DOMAIN_PREFIX,
+    compute_receipt_key_id, create_handoff_signing_message, create_signing_message, hash_message,
+    public_key_to_hex, sign_handoff, sign_receipt, verify_handoff, verify_receipt,
+    BudgetChainRecord, BudgetUsageRecord, ExecutionLane, HashRef, ModelIdentity,
+    PreAgreementFields, ReceiptStatus, SessionAgreementFields, SigningKey, UnsignedReceipt,
+    UnsignedSessionHandoff, DOMAIN_PREFIX, SCHEMA_VERSION, SESSION_HANDOFF_DOMAIN_PREFIX,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -759,6 +759,259 @@ fn generate_canonicalization_vectors(dir: &Path) {
 }
 
 // ============================================================================
+// Verification test vector generators (Seq 16, Issue #303)
+// ============================================================================
+
+/// Build a receipt with all Seq 14/15 fields populated, including agreement_hash,
+/// model_profile_hash, policy_bundle_hash, and receipt_key_id.
+fn sample_full_receipt(vault_pub_hex: &str) -> UnsignedReceipt {
+    // Compute a real agreement hash from concrete fields
+    let pre_fields = PreAgreementFields {
+        participants: vec!["agent-alice".to_string(), "agent-bob".to_string()],
+        contract_id: "COMPATIBILITY".to_string(),
+        purpose_code: "COMPATIBILITY".to_string(),
+        model_identity: ModelIdentity {
+            provider: "LOCAL".to_string(),
+            model_id: "llama-3.2-3b".to_string(),
+            model_version: Some("2025-06-01".to_string()),
+        },
+        output_budget: 8,
+        symmetry_rule: "SYMMETRIC".to_string(),
+        input_schema_hashes: vec!["b".repeat(64), "c".repeat(64)],
+        expiry: "2025-12-31T23:59:59Z".to_string(),
+        model_profile_hash: Some("1".repeat(64)),
+        policy_bundle_hash: Some("2".repeat(64)),
+    };
+    let pre_hash = compute_pre_agreement_hash(&pre_fields).expect("pre-agreement hash");
+
+    let agreement_fields = SessionAgreementFields {
+        session_id: "b".repeat(64),
+        pre_agreement_hash: pre_hash,
+        participants: vec!["agent-alice".to_string(), "agent-bob".to_string()],
+        contract_id: "COMPATIBILITY".to_string(),
+        purpose_code: "COMPATIBILITY".to_string(),
+        model_identity: ModelIdentity {
+            provider: "LOCAL".to_string(),
+            model_id: "llama-3.2-3b".to_string(),
+            model_version: Some("2025-06-01".to_string()),
+        },
+        output_budget: 8,
+        symmetry_rule: "SYMMETRIC".to_string(),
+        input_schema_hashes: vec!["b".repeat(64), "c".repeat(64)],
+        expiry: "2025-12-31T23:59:59Z".to_string(),
+        model_profile_hash: Some("1".repeat(64)),
+        policy_bundle_hash: Some("2".repeat(64)),
+    };
+    let agreement_hash = compute_agreement_hash(&agreement_fields).expect("agreement hash");
+
+    let key_id = compute_receipt_key_id(vault_pub_hex);
+
+    UnsignedReceipt {
+        schema_version: SCHEMA_VERSION.to_string(),
+        session_id: "b".repeat(64),
+        purpose_code: Purpose::Compatibility,
+        participant_ids: vec!["agent-alice".to_string(), "agent-bob".to_string()],
+        runtime_hash: "c".repeat(64),
+        guardian_policy_hash: "d".repeat(64),
+        model_weights_hash: "e".repeat(64),
+        llama_cpp_version: "0.1.0".to_string(),
+        inference_config_hash: "f".repeat(64),
+        output_schema_version: "1.0.0".to_string(),
+        session_start: Utc.with_ymd_and_hms(2025, 6, 1, 12, 0, 0).unwrap(),
+        session_end: Utc.with_ymd_and_hms(2025, 6, 1, 12, 2, 0).unwrap(),
+        fixed_window_duration_seconds: 120,
+        status: ReceiptStatus::Completed,
+        execution_lane: ExecutionLane::SealedLocal,
+        output: Some(json!({
+            "decision": "PROCEED",
+            "confidence_bucket": "HIGH",
+            "reason_code": "MUTUAL_INTEREST_UNCLEAR"
+        })),
+        output_entropy_bits: 8,
+        mitigations_applied: vec![],
+        budget_usage: BudgetUsageRecord {
+            pair_id: "a".repeat(64),
+            window_start: Utc.with_ymd_and_hms(2025, 5, 1, 0, 0, 0).unwrap(),
+            bits_used_before: 0,
+            bits_used_after: 8,
+            budget_limit: 128,
+            budget_tier: BudgetTier::Default,
+        },
+        budget_chain: Some(BudgetChainRecord {
+            chain_id: format!("chain-{}", "1".repeat(64)),
+            prev_receipt_hash: None,
+            receipt_hash: "0".repeat(64), // placeholder, will be filled
+        }),
+        model_identity: Some(ModelIdentity {
+            provider: "LOCAL".to_string(),
+            model_id: "llama-3.2-3b".to_string(),
+            model_version: Some("2025-06-01".to_string()),
+        }),
+        agreement_hash: Some(agreement_hash),
+        model_profile_hash: Some("1".repeat(64)),
+        policy_bundle_hash: Some("2".repeat(64)),
+        receipt_key_id: Some(key_id),
+        attestation: None,
+    }
+}
+
+fn generate_verification_vectors(dir: &Path) {
+    let vault_key = vault_signing_key();
+    let vault_pub = public_key_to_hex(&vault_key.verifying_key());
+
+    // --- Known-good: receipt with all Seq 14/15 fields ---
+    let mut receipt = sample_full_receipt(&vault_pub);
+    fill_receipt_hash(&mut receipt);
+
+    let canonical = receipt_core::canonicalize_serializable(&receipt).expect("canonicalize");
+    let signing_msg = create_signing_message(&receipt).expect("signing message");
+    let digest = hash_message(&signing_msg);
+    let signature = sign_receipt(&receipt, &vault_key).expect("sign receipt");
+
+    // Self-verify
+    verify_receipt(&receipt, &signature, &vault_key.verifying_key())
+        .expect("self-verify failed for verification vector");
+
+    // Include the agreement fields used to compute agreement_hash so verifiers
+    // can recompute it independently.
+    let pre_fields = PreAgreementFields {
+        participants: vec!["agent-alice".to_string(), "agent-bob".to_string()],
+        contract_id: "COMPATIBILITY".to_string(),
+        purpose_code: "COMPATIBILITY".to_string(),
+        model_identity: ModelIdentity {
+            provider: "LOCAL".to_string(),
+            model_id: "llama-3.2-3b".to_string(),
+            model_version: Some("2025-06-01".to_string()),
+        },
+        output_budget: 8,
+        symmetry_rule: "SYMMETRIC".to_string(),
+        input_schema_hashes: vec!["b".repeat(64), "c".repeat(64)],
+        expiry: "2025-12-31T23:59:59Z".to_string(),
+        model_profile_hash: Some("1".repeat(64)),
+        policy_bundle_hash: Some("2".repeat(64)),
+    };
+    let pre_hash = compute_pre_agreement_hash(&pre_fields).expect("pre-agreement hash");
+
+    let agreement_fields = SessionAgreementFields {
+        session_id: "b".repeat(64),
+        pre_agreement_hash: pre_hash.clone(),
+        participants: vec!["agent-alice".to_string(), "agent-bob".to_string()],
+        contract_id: "COMPATIBILITY".to_string(),
+        purpose_code: "COMPATIBILITY".to_string(),
+        model_identity: ModelIdentity {
+            provider: "LOCAL".to_string(),
+            model_id: "llama-3.2-3b".to_string(),
+            model_version: Some("2025-06-01".to_string()),
+        },
+        output_budget: 8,
+        symmetry_rule: "SYMMETRIC".to_string(),
+        input_schema_hashes: vec!["b".repeat(64), "c".repeat(64)],
+        expiry: "2025-12-31T23:59:59Z".to_string(),
+        model_profile_hash: Some("1".repeat(64)),
+        policy_bundle_hash: Some("2".repeat(64)),
+    };
+
+    write_vector(
+        dir,
+        "receipt-verification-v1.json",
+        &json!({
+            "description": "Known-good receipt with all Seq 14/15 fields: agreement_hash, model_profile_hash, policy_bundle_hash, receipt_key_id, execution_lane=SEALED_LOCAL. Verifier MUST accept.",
+            "input": {
+                "unsigned_receipt": serde_json::to_value(&receipt).unwrap(),
+                "signing_key_seed_hex": "01".repeat(32),
+                "verifying_key_hex": vault_pub,
+                "domain_prefix": DOMAIN_PREFIX,
+                "canonical_json": canonical,
+                "sha256_digest_hex": hex::encode(digest),
+                "agreement_fields": {
+                    "pre_agreement_fields": serde_json::to_value(&pre_fields).unwrap(),
+                    "session_agreement_fields": serde_json::to_value(&agreement_fields).unwrap(),
+                    "pre_agreement_hash": pre_hash,
+                    "note": "Verifiers can recompute agreement_hash from these fields to confirm internal consistency"
+                }
+            },
+            "expected": {
+                "signature_hex": signature,
+                "verification_result": "PASS",
+                "agreement_hash": receipt.agreement_hash.as_ref().unwrap(),
+                "receipt_key_id": receipt.receipt_key_id.as_ref().unwrap()
+            },
+            "schemas": ["https://vcav.io/schemas/receipt.v2.schema.json"]
+        }),
+    );
+
+    // --- Tampered: output_entropy_bits changed, original signature preserved ---
+    {
+        let mut tampered = receipt.clone();
+        tampered.output_entropy_bits = 16; // was 8
+
+        write_vector(
+            dir,
+            "receipt-verification-tampered-v1.json",
+            &json!({
+                "description": "Receipt with output_entropy_bits tampered (8→16) after signing. Original signature preserved. Verifier MUST reject with FAIL_SIGNATURE.",
+                "input": {
+                    "unsigned_receipt": serde_json::to_value(&tampered).unwrap(),
+                    "signature_hex": &signature,
+                    "verifying_key_hex": &vault_pub,
+                    "tampered_field": "output_entropy_bits",
+                    "original_value": 8,
+                    "tampered_value": 16
+                },
+                "expected": {
+                    "verification_result": "FAIL",
+                    "error_class": "FAIL_SIGNATURE"
+                },
+                "schemas": ["https://vcav.io/schemas/receipt.v2.schema.json"]
+            }),
+        );
+    }
+
+    // --- Agreement hash mismatch: valid signature but stale agreement_hash ---
+    {
+        // Take the known-good receipt but change participant_ids.
+        // Re-sign the receipt so the Ed25519 signature is valid for the *receipt content*.
+        // But the agreement_hash was computed from the original fields, so it no longer
+        // matches what a verifier would recompute from the declared receipt fields.
+        let mut mismatched = receipt.clone();
+        // Change a field that affects agreement hash computation
+        mismatched.participant_ids = vec!["agent-alice".to_string(), "agent-charlie".to_string()];
+        // Keep the original agreement_hash (now stale — it was computed for alice+bob)
+        // Re-sign so the Ed25519 signature is valid for this receipt content
+        let mismatch_sig = sign_receipt(&mismatched, &vault_key).expect("sign mismatched receipt");
+        verify_receipt(&mismatched, &mismatch_sig, &vault_key.verifying_key())
+            .expect("self-verify mismatched receipt");
+
+        write_vector(
+            dir,
+            "receipt-verification-agreement-mismatch-v1.json",
+            &json!({
+                "description": "Receipt with valid Ed25519 signature but stale agreement_hash. participant_ids changed (bob→charlie) after agreement was computed. Signature verification passes but agreement hash recomputation MUST fail.",
+                "input": {
+                    "unsigned_receipt": serde_json::to_value(&mismatched).unwrap(),
+                    "signature_hex": &mismatch_sig,
+                    "verifying_key_hex": &vault_pub,
+                    "original_participant_ids": ["agent-alice", "agent-bob"],
+                    "tampered_participant_ids": ["agent-alice", "agent-charlie"],
+                    "stale_agreement_hash": receipt.agreement_hash.as_ref().unwrap(),
+                    "agreement_fields": {
+                        "pre_agreement_fields": serde_json::to_value(&pre_fields).unwrap(),
+                        "session_agreement_fields": serde_json::to_value(&agreement_fields).unwrap(),
+                        "note": "Agreement was computed with agent-bob but receipt declares agent-charlie. Re-computation with the receipt's declared fields will produce a different hash."
+                    }
+                },
+                "expected": {
+                    "signature_verification_result": "PASS",
+                    "agreement_hash_verification_result": "FAIL",
+                    "error_class": "FAIL_AGREEMENT_HASH"
+                },
+                "schemas": ["https://vcav.io/schemas/receipt.v2.schema.json"]
+            }),
+        );
+    }
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -811,6 +1064,9 @@ fn main() {
 
     eprintln!("\nCanonicalization vectors:");
     generate_canonicalization_vectors(&output_dir);
+
+    eprintln!("\nVerification vectors:");
+    generate_verification_vectors(&output_dir);
 
     eprintln!("\nDone. Generated vectors in {}", output_dir.display());
 }

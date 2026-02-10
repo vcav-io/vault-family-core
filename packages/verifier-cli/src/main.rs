@@ -1617,4 +1617,253 @@ mod tests {
         assert_eq!(details.status, VerificationStatus::Ok);
         assert_eq!(details.output_schema_valid, None); // Not validated
     }
+
+    // ========================================================================
+    // Seq 16 verification vector tests (#303)
+    // ========================================================================
+
+    fn vectors_dir() -> std::path::PathBuf {
+        let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        manifest.parent().unwrap().parent().unwrap().join("test-vectors")
+    }
+
+    #[test]
+    fn test_verification_vector_known_good() {
+        let path = vectors_dir().join("receipt-verification-v1.json");
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+        let vector: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        let unsigned: UnsignedReceipt =
+            serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
+        let vk_hex = vector["input"]["verifying_key_hex"].as_str().unwrap();
+        let expected_sig = vector["expected"]["signature_hex"].as_str().unwrap();
+
+        // Parse verifying key
+        let vk = receipt_core::parse_public_key_hex(vk_hex).unwrap();
+
+        // Verify signature
+        let result = receipt_core::verify_receipt(&unsigned, expected_sig, &vk);
+        assert!(result.is_ok(), "Known-good vector MUST verify: {:?}", result.err());
+
+        // Verify expected result
+        assert_eq!(
+            vector["expected"]["verification_result"].as_str().unwrap(),
+            "PASS"
+        );
+
+        // Verify all Seq 14/15 fields are populated
+        assert!(unsigned.agreement_hash.is_some(), "agreement_hash must be present");
+        assert!(unsigned.model_profile_hash.is_some(), "model_profile_hash must be present");
+        assert!(unsigned.policy_bundle_hash.is_some(), "policy_bundle_hash must be present");
+        assert!(unsigned.receipt_key_id.is_some(), "receipt_key_id must be present");
+        assert!(unsigned.model_identity.is_some(), "model_identity must be present");
+    }
+
+    #[test]
+    fn test_verification_vector_tampered() {
+        let path = vectors_dir().join("receipt-verification-tampered-v1.json");
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+        let vector: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        let unsigned: UnsignedReceipt =
+            serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
+        let sig_hex = vector["input"]["signature_hex"].as_str().unwrap();
+        let vk_hex = vector["input"]["verifying_key_hex"].as_str().unwrap();
+
+        // Parse verifying key
+        let vk = receipt_core::parse_public_key_hex(vk_hex).unwrap();
+
+        // Signature verification MUST fail
+        let result = receipt_core::verify_receipt(&unsigned, sig_hex, &vk);
+        assert!(result.is_err(), "Tampered vector MUST fail verification");
+
+        // Verify the tampered field
+        assert_eq!(unsigned.output_entropy_bits, 16, "output_entropy_bits should be tampered to 16");
+
+        // Verify expected result
+        assert_eq!(
+            vector["expected"]["verification_result"].as_str().unwrap(),
+            "FAIL"
+        );
+        assert_eq!(
+            vector["expected"]["error_class"].as_str().unwrap(),
+            "FAIL_SIGNATURE"
+        );
+    }
+
+    #[test]
+    fn test_verification_vector_agreement_mismatch() {
+        let path = vectors_dir().join("receipt-verification-agreement-mismatch-v1.json");
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+        let vector: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        let unsigned: UnsignedReceipt =
+            serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
+        let sig_hex = vector["input"]["signature_hex"].as_str().unwrap();
+        let vk_hex = vector["input"]["verifying_key_hex"].as_str().unwrap();
+
+        // Parse verifying key
+        let vk = receipt_core::parse_public_key_hex(vk_hex).unwrap();
+
+        // Signature verification MUST PASS (receipt was re-signed after field change)
+        let sig_result = receipt_core::verify_receipt(&unsigned, sig_hex, &vk);
+        assert!(
+            sig_result.is_ok(),
+            "Agreement mismatch vector: signature MUST be valid (re-signed): {:?}",
+            sig_result.err()
+        );
+
+        // Agreement hash recomputation MUST FAIL
+        // The receipt's agreement_hash was computed with agent-bob but receipt declares agent-charlie
+        let declared_hash = unsigned.agreement_hash.as_ref().expect("agreement_hash must be present");
+
+        // Recompute using the original agreement fields from the vector
+        let agreement_fields: receipt_core::SessionAgreementFields = serde_json::from_value(
+            vector["input"]["agreement_fields"]["session_agreement_fields"].clone(),
+        )
+        .unwrap();
+
+        let recomputed_original = receipt_core::compute_agreement_hash(&agreement_fields).unwrap();
+        // The declared hash matches the original agreement (agent-bob)
+        assert_eq!(declared_hash, &recomputed_original, "declared hash should match original agreement fields");
+
+        // But the receipt's participant_ids are different (agent-charlie instead of agent-bob)
+        assert!(
+            unsigned.participant_ids.contains(&"agent-charlie".to_string()),
+            "Receipt must contain tampered participant agent-charlie"
+        );
+        assert!(
+            !unsigned.participant_ids.contains(&"agent-bob".to_string()),
+            "Receipt must NOT contain original participant agent-bob"
+        );
+
+        // Prove the mismatch: recompute agreement hash from the receipt's actual fields
+        let mut receipt_agreement_fields = agreement_fields.clone();
+        receipt_agreement_fields.participants = unsigned.participant_ids.clone();
+        let recomputed_from_receipt =
+            receipt_core::compute_agreement_hash(&receipt_agreement_fields).unwrap();
+        assert_ne!(
+            declared_hash, &recomputed_from_receipt,
+            "Agreement hash recomputed from receipt's actual participant_ids must differ from declared hash"
+        );
+
+        // Verify expected results
+        assert_eq!(
+            vector["expected"]["signature_verification_result"].as_str().unwrap(),
+            "PASS"
+        );
+        assert_eq!(
+            vector["expected"]["agreement_hash_verification_result"].as_str().unwrap(),
+            "FAIL"
+        );
+        assert_eq!(
+            vector["expected"]["error_class"].as_str().unwrap(),
+            "FAIL_AGREEMENT_HASH"
+        );
+    }
+
+    #[test]
+    fn test_verification_vector_known_good_via_cli() {
+        // End-to-end: load the vector, write receipt+key to temp files, run verify()
+        let path = vectors_dir().join("receipt-verification-v1.json");
+        let content = std::fs::read_to_string(&path).unwrap();
+        let vector: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        let unsigned: UnsignedReceipt =
+            serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
+        let sig_hex = vector["expected"]["signature_hex"].as_str().unwrap();
+        let vk_hex = vector["input"]["verifying_key_hex"].as_str().unwrap();
+
+        let receipt = unsigned.sign(sig_hex.to_string());
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", vk_hex).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Json,
+            quiet: false,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::Ok);
+    }
+
+    #[test]
+    fn test_verification_vector_tampered_via_cli() {
+        // End-to-end: tampered vector must fail CLI verification
+        let path = vectors_dir().join("receipt-verification-tampered-v1.json");
+        let content = std::fs::read_to_string(&path).unwrap();
+        let vector: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        let unsigned: UnsignedReceipt =
+            serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
+        let sig_hex = vector["input"]["signature_hex"].as_str().unwrap();
+        let vk_hex = vector["input"]["verifying_key_hex"].as_str().unwrap();
+
+        let receipt = unsigned.sign(sig_hex.to_string());
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", vk_hex).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Json,
+            quiet: false,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::FailSignature);
+    }
+
+    #[test]
+    fn test_verification_vectors_internally_consistent() {
+        // Verify that the known-good vector's declared signature, digest, and
+        // canonical JSON are internally consistent with each other.
+        let path = vectors_dir().join("receipt-verification-v1.json");
+        let content = std::fs::read_to_string(&path).unwrap();
+        let vector: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        let unsigned: UnsignedReceipt =
+            serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
+
+        // Recompute canonical JSON and verify it matches the vector's declared value
+        let canonical = receipt_core::canonicalize_serializable(&unsigned).unwrap();
+        let declared_canonical = vector["input"]["canonical_json"].as_str().unwrap();
+        assert_eq!(
+            canonical, declared_canonical,
+            "Recomputed canonical JSON must match vector's declared canonical_json"
+        );
+
+        // Recompute SHA-256 digest and verify it matches
+        let signing_msg = receipt_core::create_signing_message(&unsigned).unwrap();
+        let digest = receipt_core::hash_message(&signing_msg);
+        let declared_digest = vector["input"]["sha256_digest_hex"].as_str().unwrap();
+        assert_eq!(
+            hex::encode(digest),
+            declared_digest,
+            "Recomputed SHA-256 digest must match vector's declared digest"
+        );
+    }
 }

@@ -217,6 +217,36 @@
       "pattern": "^[A-Za-z0-9._:-]{1,128}$",
       "description": "Stable identifier for verifying key used to validate this receipt signature"
     },
+    "model_identity": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Model provider identifier"
+        },
+        "model_id": {
+          "type": "string",
+          "description": "Model identifier"
+        },
+        "model_version": {
+          "type": "string",
+          "description": "Model version (optional)"
+        }
+      },
+      "required": ["provider", "model_id"],
+      "additionalProperties": false,
+      "description": "Identity of the model used for session execution"
+    },
+    "model_profile_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Content-addressed SHA-256 hash of the model execution profile"
+    },
+    "policy_bundle_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Content-addressed SHA-256 hash of the policy bundle bound to this session"
+    },
     "attestation": {
       "oneOf": [
         { "type": "null" },
