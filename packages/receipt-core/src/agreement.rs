@@ -71,6 +71,9 @@ pub struct PreAgreementFields {
     /// Content-addressed hash of the model profile (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_profile_hash: Option<String>,
+    /// Content-addressed hash of the policy bundle (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_bundle_hash: Option<String>,
 }
 
 /// Fields included in the session agreement hash.
@@ -107,6 +110,9 @@ pub struct SessionAgreementFields {
     /// Content-addressed hash of the model profile (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_profile_hash: Option<String>,
+    /// Content-addressed hash of the policy bundle (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_bundle_hash: Option<String>,
 }
 
 // ============================================================================
@@ -172,6 +178,7 @@ mod tests {
             input_schema_hashes: vec!["b".repeat(64), "c".repeat(64)],
             expiry: "2025-06-01T00:00:00Z".to_string(),
             model_profile_hash: None,
+            policy_bundle_hash: None,
         }
     }
 
@@ -193,6 +200,7 @@ mod tests {
             input_schema_hashes: vec!["b".repeat(64), "c".repeat(64)],
             expiry: "2025-06-01T00:00:00Z".to_string(),
             model_profile_hash: None,
+            policy_bundle_hash: None,
         }
     }
 
@@ -294,6 +302,28 @@ mod tests {
         let fields_without = sample_pre_agreement_fields();
         let mut fields_with = sample_pre_agreement_fields();
         fields_with.model_profile_hash = Some("a".repeat(64));
+
+        let hash_without = compute_pre_agreement_hash(&fields_without).unwrap();
+        let hash_with = compute_pre_agreement_hash(&fields_with).unwrap();
+        assert_ne!(hash_without, hash_with);
+    }
+
+    #[test]
+    fn test_agreement_hash_changes_with_policy_bundle_hash() {
+        let fields_without = sample_fields();
+        let mut fields_with = sample_fields();
+        fields_with.policy_bundle_hash = Some("b".repeat(64));
+
+        let hash_without = compute_agreement_hash(&fields_without).unwrap();
+        let hash_with = compute_agreement_hash(&fields_with).unwrap();
+        assert_ne!(hash_without, hash_with);
+    }
+
+    #[test]
+    fn test_pre_agreement_hash_changes_with_policy_bundle_hash() {
+        let fields_without = sample_pre_agreement_fields();
+        let mut fields_with = sample_pre_agreement_fields();
+        fields_with.policy_bundle_hash = Some("b".repeat(64));
 
         let hash_without = compute_pre_agreement_hash(&fields_without).unwrap();
         let hash_with = compute_pre_agreement_hash(&fields_with).unwrap();

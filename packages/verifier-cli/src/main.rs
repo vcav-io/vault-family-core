@@ -491,6 +491,8 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         budget_chain: receipt.budget_chain.clone(),
         model_identity: receipt.model_identity.clone(),
         agreement_hash: receipt.agreement_hash.clone(),
+        model_profile_hash: receipt.model_profile_hash.clone(),
+        policy_bundle_hash: receipt.policy_bundle_hash.clone(),
         receipt_key_id: receipt.receipt_key_id.clone(),
         attestation: receipt.attestation.clone(),
     }
@@ -773,6 +775,8 @@ mod tests {
             budget_chain: None, // set by helper to ensure receipt_hash binding is test-covered
             model_identity: None,
             agreement_hash: None,
+            model_profile_hash: None,
+            policy_bundle_hash: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         })
@@ -1336,6 +1340,8 @@ mod tests {
             budget_chain: None, // set by helper to ensure receipt_hash binding is test-covered
             model_identity: None,
             agreement_hash: None,
+            model_profile_hash: None,
+            policy_bundle_hash: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         })

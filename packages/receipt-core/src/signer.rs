@@ -349,6 +349,8 @@ mod tests {
             budget_chain: None,
             model_identity: None,
             agreement_hash: None,
+            model_profile_hash: None,
+            policy_bundle_hash: None,
             receipt_key_id: None,
             attestation: None,
         }
@@ -707,6 +709,8 @@ mod tests {
             capability_tokens: vec![],
             prior_receipt_hash: None,
             intended_spend_bits: 11,
+            model_profile_hash: None,
+            policy_bundle_hash: None,
         }
     }
 

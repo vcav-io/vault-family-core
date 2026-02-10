@@ -77,8 +77,11 @@ fn sample_unsigned_receipt() -> UnsignedReceipt {
             prev_receipt_hash: None,
             receipt_hash: "0".repeat(64), // placeholder, will be filled
         }),
+        execution_lane: receipt_core::ExecutionLane::GlassLocal,
         model_identity: None,
         agreement_hash: None,
+        model_profile_hash: None,
+        policy_bundle_hash: None,
         receipt_key_id: None,
         attestation: None,
     }
@@ -112,8 +115,11 @@ fn sample_aborted_receipt() -> UnsignedReceipt {
             budget_tier: BudgetTier::Default,
         },
         budget_chain: None,
+        execution_lane: receipt_core::ExecutionLane::GlassLocal,
         model_identity: None,
         agreement_hash: None,
+        model_profile_hash: None,
+        policy_bundle_hash: None,
         receipt_key_id: None,
         attestation: None,
     }
@@ -132,6 +138,8 @@ fn sample_unsigned_handoff() -> UnsignedSessionHandoff {
         capability_tokens: vec![],
         prior_receipt_hash: None,
         intended_spend_bits: 11,
+        model_profile_hash: None,
+        policy_bundle_hash: None,
     }
 }
 
@@ -248,7 +256,7 @@ fn generate_receipt_vectors(dir: &Path) {
         let mut receipt = sample_unsigned_receipt();
         fill_receipt_hash(&mut receipt);
         let signature = sign_receipt(&receipt, &vault_key).expect("sign receipt");
-        let signed = receipt.sign(signature);
+        let signed = receipt.sign(signature.clone());
         write_vector(
             dir,
             "receipt_v2_vector_01.json",
@@ -433,6 +441,8 @@ fn generate_agreement_hash_vectors(dir: &Path) {
             symmetry_rule: "SYMMETRIC".to_string(),
             input_schema_hashes: vec!["b".repeat(64), "c".repeat(64)],
             expiry: "2025-06-01T00:00:00Z".to_string(),
+            model_profile_hash: None,
+            policy_bundle_hash: None,
         };
 
         let pre_hash = compute_pre_agreement_hash(&pre_fields).expect("pre-agreement hash");
@@ -452,6 +462,8 @@ fn generate_agreement_hash_vectors(dir: &Path) {
             symmetry_rule: "SYMMETRIC".to_string(),
             input_schema_hashes: vec!["b".repeat(64), "c".repeat(64)],
             expiry: "2025-06-01T00:00:00Z".to_string(),
+            model_profile_hash: None,
+            policy_bundle_hash: None,
         };
 
         let agreement_hash = compute_agreement_hash(&fields).expect("agreement hash");
@@ -489,6 +501,8 @@ fn generate_agreement_hash_vectors(dir: &Path) {
             symmetry_rule: "SYMMETRIC".to_string(),
             input_schema_hashes: vec!["d".repeat(64), "e".repeat(64)],
             expiry: "2025-12-31T23:59:59Z".to_string(),
+            model_profile_hash: None,
+            policy_bundle_hash: None,
         };
 
         let pre_hash = compute_pre_agreement_hash(&pre_fields).expect("pre-agreement hash");
@@ -508,6 +522,8 @@ fn generate_agreement_hash_vectors(dir: &Path) {
             symmetry_rule: "SYMMETRIC".to_string(),
             input_schema_hashes: vec!["d".repeat(64), "e".repeat(64)],
             expiry: "2025-12-31T23:59:59Z".to_string(),
+            model_profile_hash: None,
+            policy_bundle_hash: None,
         };
 
         let agreement_hash = compute_agreement_hash(&fields).expect("agreement hash");
@@ -548,6 +564,8 @@ fn generate_agreement_hash_vectors(dir: &Path) {
             symmetry_rule: "SYMMETRIC".to_string(),
             input_schema_hashes: vec![],
             expiry: "2025-12-31T23:59:59Z".to_string(),
+            model_profile_hash: None,
+            policy_bundle_hash: None,
         };
 
         let fields_unsorted = SessionAgreementFields {
