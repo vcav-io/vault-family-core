@@ -105,6 +105,10 @@ pub struct UnsignedSessionHandoff {
     /// Content-addressed hash of the model profile bound to this session (optional).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_profile_hash: Option<HashRef>,
+
+    /// Content-addressed hash of the policy bundle bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_bundle_hash: Option<HashRef>,
 }
 
 impl UnsignedSessionHandoff {
@@ -160,6 +164,9 @@ pub struct SessionHandoff {
     /// Content-addressed hash of the model profile bound to this session (optional).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_profile_hash: Option<HashRef>,
+    /// Content-addressed hash of the policy bundle bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_bundle_hash: Option<HashRef>,
 
     /// 128-character hex-encoded Ed25519 signature from initiator
     pub initiator_signature: String,
@@ -184,6 +191,7 @@ impl SessionHandoff {
             prior_receipt_hash: self.prior_receipt_hash.clone(),
             intended_spend_bits: self.intended_spend_bits,
             model_profile_hash: self.model_profile_hash.clone(),
+            policy_bundle_hash: self.policy_bundle_hash.clone(),
         }
     }
 }
@@ -207,6 +215,7 @@ pub struct UnsignedSessionHandoffBuilder {
     prior_receipt_hash: Option<String>,
     intended_spend_bits: Option<u32>,
     model_profile_hash: Option<HashRef>,
+    policy_bundle_hash: Option<HashRef>,
 }
 
 impl UnsignedSessionHandoffBuilder {
@@ -282,6 +291,12 @@ impl UnsignedSessionHandoffBuilder {
         self
     }
 
+    /// Set policy bundle hash (optional).
+    pub fn policy_bundle_hash(mut self, hash: Option<HashRef>) -> Self {
+        self.policy_bundle_hash = hash;
+        self
+    }
+
     /// Build the UnsignedSessionHandoff
     ///
     /// # Panics
@@ -304,6 +319,7 @@ impl UnsignedSessionHandoffBuilder {
                 .intended_spend_bits
                 .expect("intended_spend_bits is required"),
             model_profile_hash: self.model_profile_hash,
+            policy_bundle_hash: self.policy_bundle_hash,
         }
     }
 }
@@ -424,6 +440,7 @@ mod tests {
             prior_receipt_hash: Some("c".repeat(64)),
             intended_spend_bits: 11,
             model_profile_hash: None,
+            policy_bundle_hash: None,
             initiator_signature: "a".repeat(128),
             acceptor_signature: "b".repeat(128),
         };
@@ -483,6 +500,7 @@ mod tests {
             prior_receipt_hash: None,
             intended_spend_bits: 11,
             model_profile_hash: Some(HashRef::sha256("test-profile")),
+            policy_bundle_hash: None,
             initiator_signature: "a".repeat(128),
             acceptor_signature: "b".repeat(128),
         };

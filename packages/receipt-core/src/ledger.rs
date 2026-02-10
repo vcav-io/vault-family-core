@@ -226,6 +226,8 @@ mod tests {
             }),
             model_identity: None,
             agreement_hash: None,
+            model_profile_hash: None,
+            policy_bundle_hash: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         };

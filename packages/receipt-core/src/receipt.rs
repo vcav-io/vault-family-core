@@ -213,6 +213,10 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_profile_hash: Option<String>,
 
+    /// Content-addressed hash of the policy bundle bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_bundle_hash: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -330,6 +334,10 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_profile_hash: Option<String>,
 
+    /// Content-addressed hash of the policy bundle bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_bundle_hash: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -363,6 +371,7 @@ impl UnsignedReceipt {
             agreement_hash: self.agreement_hash,
             receipt_key_id: self.receipt_key_id,
             model_profile_hash: self.model_profile_hash,
+            policy_bundle_hash: self.policy_bundle_hash,
             attestation: self.attestation,
             signature,
         }
@@ -399,6 +408,7 @@ pub struct ReceiptBuilder {
     agreement_hash: Option<String>,
     receipt_key_id: Option<String>,
     model_profile_hash: Option<String>,
+    policy_bundle_hash: Option<String>,
     attestation: Option<Attestation>,
 }
 
@@ -547,6 +557,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the policy bundle hash (optional)
+    pub fn policy_bundle_hash(mut self, hash: Option<String>) -> Self {
+        self.policy_bundle_hash = hash;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
         self.attestation = attestation;
@@ -582,6 +598,7 @@ impl ReceiptBuilder {
             agreement_hash: self.agreement_hash,
             receipt_key_id: self.receipt_key_id,
             model_profile_hash: self.model_profile_hash,
+            policy_bundle_hash: self.policy_bundle_hash,
             attestation: self.attestation,
         })
     }
@@ -642,6 +659,7 @@ mod tests {
             agreement_hash: None,
             receipt_key_id: None,
             model_profile_hash: None,
+            policy_bundle_hash: None,
             attestation: None,
         }
     }
@@ -929,5 +947,59 @@ mod tests {
 
         let signed = unsigned.sign("e".repeat(128));
         assert_eq!(signed.model_profile_hash, Some("a".repeat(64)));
+    }
+
+    // ==================== Policy Bundle Hash Tests ====================
+
+    #[test]
+    fn test_receipt_without_policy_bundle_hash_omits_field() {
+        let unsigned = sample_unsigned_receipt();
+        assert_eq!(unsigned.policy_bundle_hash, None);
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(!json.contains("policy_bundle_hash"));
+    }
+
+    #[test]
+    fn test_receipt_with_policy_bundle_hash_roundtrip() {
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.policy_bundle_hash = Some("b".repeat(64));
+
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(json.contains("policy_bundle_hash"));
+        let parsed: UnsignedReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(unsigned, parsed);
+    }
+
+    #[test]
+    fn test_receipt_builder_with_policy_bundle_hash() {
+        let usage = sample_budget_usage();
+        let start = Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap();
+
+        let unsigned = Receipt::builder()
+            .session_id("b".repeat(64))
+            .purpose_code(Purpose::Compatibility)
+            .participant_ids(vec!["agent-a".to_string(), "agent-b".to_string()])
+            .runtime_hash("c".repeat(64))
+            .guardian_policy_hash("d".repeat(64))
+            .model_weights_hash("e".repeat(64))
+            .llama_cpp_version("0.1.0")
+            .inference_config_hash("f".repeat(64))
+            .output_schema_version("1.0.0")
+            .session_start(start)
+            .session_end(end)
+            .fixed_window_duration_seconds(120)
+            .status(ReceiptStatus::Completed)
+            .execution_lane(ExecutionLane::GlassLocal)
+            .output_entropy_bits(8)
+            .budget_usage(usage)
+            .policy_bundle_hash(Some("b".repeat(64)))
+            .build_unsigned()
+            .expect("Builder should succeed");
+
+        assert_eq!(unsigned.policy_bundle_hash, Some("b".repeat(64)));
+
+        let signed = unsigned.sign("e".repeat(128));
+        assert_eq!(signed.policy_bundle_hash, Some("b".repeat(64)));
     }
 }
