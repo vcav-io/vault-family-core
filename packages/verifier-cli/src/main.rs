@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! # VCAV Verifier CLI
 //!
 //! Offline verification of VCAV receipts.

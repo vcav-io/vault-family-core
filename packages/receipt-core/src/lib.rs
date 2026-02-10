@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! # Receipt Core
 //!
 //! Cryptographic receipt generation and signing for VCAV sessions.
