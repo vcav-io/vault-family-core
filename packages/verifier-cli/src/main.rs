@@ -13,6 +13,7 @@
 //!   2 - Schema validation skipped (when --skip-schema-validation used)
 
 mod embedded_schemas;
+mod tiers;
 
 use anyhow::Result;
 use clap::Parser;
@@ -65,6 +66,22 @@ struct Args {
     /// Quiet mode: only output pass/fail exit code
     #[arg(short, long)]
     quiet: bool,
+
+    /// Path to SessionAgreementFields JSON file for agreement hash verification (Tier 1)
+    #[arg(long)]
+    agreement_fields: Option<String>,
+
+    /// Path to model profile JSON file for profile hash verification (Tier 2)
+    #[arg(long)]
+    profile: Option<String>,
+
+    /// Path to policy bundle JSON file for policy hash verification (Tier 2)
+    #[arg(long)]
+    policy: Option<String>,
+
+    /// Path to contract JSON file for contract hash verification (Tier 2)
+    #[arg(long)]
+    contract: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -85,6 +102,11 @@ struct VerificationResult {
     schema_skipped: bool,
     output_schema_valid: Option<bool>,
     output_schema_id: Option<String>,
+    verification_tier: u8,
+    agreement_hash_valid: Option<bool>,
+    profile_hash_valid: Option<bool>,
+    policy_hash_valid: Option<bool>,
+    contract_hash_valid: Option<bool>,
     errors: Vec<String>,
 }
 
@@ -94,6 +116,10 @@ enum VerificationStatus {
     Ok,
     FailSignature,
     FailReceiptHash,
+    FailAgreementHash,
+    FailProfileHash,
+    FailPolicyHash,
+    FailContractHash,
     FailSchema,
     FailOutputSchema,
     SkippedSchema,
@@ -105,6 +131,10 @@ impl std::fmt::Display for VerificationStatus {
             VerificationStatus::Ok => write!(f, "OK"),
             VerificationStatus::FailSignature => write!(f, "FAIL_SIGNATURE"),
             VerificationStatus::FailReceiptHash => write!(f, "FAIL_RECEIPT_HASH"),
+            VerificationStatus::FailAgreementHash => write!(f, "FAIL_AGREEMENT_HASH"),
+            VerificationStatus::FailProfileHash => write!(f, "FAIL_PROFILE_HASH"),
+            VerificationStatus::FailPolicyHash => write!(f, "FAIL_POLICY_HASH"),
+            VerificationStatus::FailContractHash => write!(f, "FAIL_CONTRACT_HASH"),
             VerificationStatus::FailSchema => write!(f, "FAIL_SCHEMA"),
             VerificationStatus::FailOutputSchema => write!(f, "FAIL_OUTPUT_SCHEMA"),
             VerificationStatus::SkippedSchema => write!(f, "SKIPPED_SCHEMA"),
@@ -119,6 +149,7 @@ struct VerifyDetails {
     schema_skipped: bool,
     output_schema_valid: Option<bool>,
     output_schema_id: Option<String>,
+    tier_result: tiers::TierResult,
     error: Option<String>,
 }
 
@@ -162,6 +193,23 @@ fn main() -> Result<()> {
                         println!("Agreement hash: {}", agreement_hash);
                     }
 
+                    // Tier verification results
+                    if details.tier_result.tier > 0 {
+                        println!("Verification tier: {}", details.tier_result.tier);
+                    }
+                    if let Some(valid) = details.tier_result.agreement_hash_valid {
+                        println!("Agreement hash valid: {}", valid);
+                    }
+                    if let Some(valid) = details.tier_result.profile_hash_valid {
+                        println!("Profile hash valid: {}", valid);
+                    }
+                    if let Some(valid) = details.tier_result.policy_hash_valid {
+                        println!("Policy hash valid: {}", valid);
+                    }
+                    if let Some(valid) = details.tier_result.contract_hash_valid {
+                        println!("Contract hash valid: {}", valid);
+                    }
+
                     if let Some(schema_id) = &details.output_schema_id {
                         println!("Output schema: {}", schema_id);
                         if let Some(valid) = details.output_schema_valid {
@@ -202,6 +250,11 @@ fn main() -> Result<()> {
                 schema_skipped: details.schema_skipped,
                 output_schema_valid: details.output_schema_valid,
                 output_schema_id: details.output_schema_id,
+                verification_tier: details.tier_result.tier,
+                agreement_hash_valid: details.tier_result.agreement_hash_valid,
+                profile_hash_valid: details.tier_result.profile_hash_valid,
+                policy_hash_valid: details.tier_result.policy_hash_valid,
+                contract_hash_valid: details.tier_result.contract_hash_valid,
                 errors: details.error.map(|e| vec![e]).unwrap_or_default(),
             };
             println!("{}", serde_json::to_string_pretty(&json_result)?);
@@ -234,6 +287,7 @@ fn verify(args: &Args) -> VerifyDetails {
                     "Failed to read receipt file: {}: {}",
                     args.receipt, e
                 )),
+                tier_result: tiers::TierResult::default(),
             };
         }
     };
@@ -247,6 +301,7 @@ fn verify(args: &Args) -> VerifyDetails {
                 schema_skipped: false,
                 output_schema_valid: None,
                 output_schema_id: None,
+                tier_result: tiers::TierResult::default(),
                 error: Some(format!("Failed to parse receipt JSON: {}", e)),
             };
         }
@@ -265,6 +320,7 @@ fn verify(args: &Args) -> VerifyDetails {
                     schema_skipped: false,
                     output_schema_valid: None,
                     output_schema_id: None,
+                    tier_result: tiers::TierResult::default(),
                     error: Some(e),
                 };
             }
@@ -279,6 +335,7 @@ fn verify(args: &Args) -> VerifyDetails {
                     schema_skipped: false,
                     output_schema_valid: None,
                     output_schema_id: None,
+                    tier_result: tiers::TierResult::default(),
                     error: Some(e),
                 };
             }
@@ -290,6 +347,7 @@ fn verify(args: &Args) -> VerifyDetails {
             schema_skipped: false,
             output_schema_valid: None,
             output_schema_id: None,
+            tier_result: tiers::TierResult::default(),
             error: Some("Either --pubkey or --keyring-dir must be provided".to_string()),
         };
     };
@@ -305,6 +363,7 @@ fn verify(args: &Args) -> VerifyDetails {
             schema_skipped: false,
             output_schema_valid: None,
             output_schema_id: None,
+            tier_result: tiers::TierResult::default(),
             error: Some(format!("Signature verification failed: {}", e)),
         };
     }
@@ -321,6 +380,7 @@ fn verify(args: &Args) -> VerifyDetails {
                     schema_skipped: false,
                     output_schema_valid: None,
                     output_schema_id: None,
+                    tier_result: tiers::TierResult::default(),
                     error: Some(format!(
                         "budget_chain.receipt_hash mismatch: embedded={} recomputed={}",
                         chain.receipt_hash, recomputed
@@ -334,8 +394,182 @@ fn verify(args: &Args) -> VerifyDetails {
                     schema_skipped: false,
                     output_schema_valid: None,
                     output_schema_id: None,
+                    tier_result: tiers::TierResult::default(),
                     error: Some(format!("Failed to compute receipt_hash: {}", e)),
                 };
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Tier 1: Agreement hash verification (when --agreement-fields provided)
+    // ---------------------------------------------------------------
+    let mut tier = tiers::TierResult::default();
+    tier.tier = 1; // baseline is Tier 1
+
+    if let Some(ref agreement_fields_path) = args.agreement_fields {
+        if let Some(ref declared_hash) = receipt.agreement_hash {
+            match tiers::verify_agreement_hash(Path::new(agreement_fields_path), declared_hash) {
+                Ok(true) => {
+                    tier.agreement_hash_valid = Some(true);
+                }
+                Ok(false) => {
+                    tier.agreement_hash_valid = Some(false);
+                    tier.error = Some("Agreement hash mismatch: recomputed hash differs from receipt".to_string());
+                    let err = tier.error.clone();
+                    return VerifyDetails {
+                        receipt: Some(receipt),
+                        status: VerificationStatus::FailAgreementHash,
+                        schema_skipped: false,
+                        output_schema_valid: None,
+                        output_schema_id: None,
+                        tier_result: tier,
+                        error: err,
+                    };
+                }
+                Err(e) => {
+                    tier.agreement_hash_valid = Some(false);
+                    tier.error = Some(format!("Agreement hash verification error: {}", e));
+                    let err = tier.error.clone();
+                    return VerifyDetails {
+                        receipt: Some(receipt),
+                        status: VerificationStatus::FailAgreementHash,
+                        schema_skipped: false,
+                        output_schema_valid: None,
+                        output_schema_id: None,
+                        tier_result: tier,
+                        error: err,
+                    };
+                }
+            }
+        }
+        // If receipt has no agreement_hash, skip (legacy receipt)
+    }
+
+    // ---------------------------------------------------------------
+    // Tier 2: Artefact hash verification (when --profile/--policy/--contract provided)
+    // ---------------------------------------------------------------
+    let has_tier2_args = args.profile.is_some() || args.policy.is_some() || args.contract.is_some();
+
+    if has_tier2_args {
+        tier.tier = 2;
+
+        // Profile hash check
+        if let Some(ref profile_path) = args.profile {
+            if let Some(ref declared_hash) = receipt.model_profile_hash {
+                match tiers::verify_profile_hash(Path::new(profile_path), declared_hash) {
+                    Ok(true) => {
+                        tier.profile_hash_valid = Some(true);
+                    }
+                    Ok(false) => {
+                        tier.profile_hash_valid = Some(false);
+                        tier.error = Some("Profile hash mismatch: recomputed hash differs from receipt".to_string());
+                        let err = tier.error.clone();
+                        return VerifyDetails {
+                            receipt: Some(receipt),
+                            status: VerificationStatus::FailProfileHash,
+                            schema_skipped: false,
+                            output_schema_valid: None,
+                            output_schema_id: None,
+                            tier_result: tier,
+                            error: err,
+                        };
+                    }
+                    Err(e) => {
+                        tier.profile_hash_valid = Some(false);
+                        tier.error = Some(format!("Profile hash verification error: {}", e));
+                        let err = tier.error.clone();
+                        return VerifyDetails {
+                            receipt: Some(receipt),
+                            status: VerificationStatus::FailProfileHash,
+                            schema_skipped: false,
+                            output_schema_valid: None,
+                            output_schema_id: None,
+                            tier_result: tier,
+                            error: err,
+                        };
+                    }
+                }
+            }
+        }
+
+        // Policy hash check
+        if let Some(ref policy_path) = args.policy {
+            if let Some(ref declared_hash) = receipt.policy_bundle_hash {
+                match tiers::verify_policy_hash(Path::new(policy_path), declared_hash) {
+                    Ok(true) => {
+                        tier.policy_hash_valid = Some(true);
+                    }
+                    Ok(false) => {
+                        tier.policy_hash_valid = Some(false);
+                        tier.error = Some("Policy hash mismatch: recomputed hash differs from receipt".to_string());
+                        let err = tier.error.clone();
+                        return VerifyDetails {
+                            receipt: Some(receipt),
+                            status: VerificationStatus::FailPolicyHash,
+                            schema_skipped: false,
+                            output_schema_valid: None,
+                            output_schema_id: None,
+                            tier_result: tier,
+                            error: err,
+                        };
+                    }
+                    Err(e) => {
+                        tier.policy_hash_valid = Some(false);
+                        tier.error = Some(format!("Policy hash verification error: {}", e));
+                        let err = tier.error.clone();
+                        return VerifyDetails {
+                            receipt: Some(receipt),
+                            status: VerificationStatus::FailPolicyHash,
+                            schema_skipped: false,
+                            output_schema_valid: None,
+                            output_schema_id: None,
+                            tier_result: tier,
+                            error: err,
+                        };
+                    }
+                }
+            }
+        }
+
+        // Contract hash check
+        if let Some(ref contract_path) = args.contract {
+            // Contract hash is not stored in the receipt directly — it uses
+            // the guardian_policy_hash field as the canonical hash binding.
+            // For now, verify against guardian_policy_hash.
+            let declared_hash = &receipt.guardian_policy_hash;
+            match tiers::verify_contract_hash(Path::new(contract_path), declared_hash) {
+                Ok(true) => {
+                    tier.contract_hash_valid = Some(true);
+                }
+                Ok(false) => {
+                    tier.contract_hash_valid = Some(false);
+                    tier.error = Some("Contract hash mismatch: recomputed hash differs from receipt".to_string());
+                    let err = tier.error.clone();
+                    return VerifyDetails {
+                        receipt: Some(receipt),
+                        status: VerificationStatus::FailContractHash,
+                        schema_skipped: false,
+                        output_schema_valid: None,
+                        output_schema_id: None,
+                        tier_result: tier,
+                        error: err,
+                    };
+                }
+                Err(e) => {
+                    tier.contract_hash_valid = Some(false);
+                    tier.error = Some(format!("Contract hash verification error: {}", e));
+                    let err = tier.error.clone();
+                    return VerifyDetails {
+                        receipt: Some(receipt),
+                        status: VerificationStatus::FailContractHash,
+                        schema_skipped: false,
+                        output_schema_valid: None,
+                        output_schema_id: None,
+                        tier_result: tier,
+                        error: err,
+                    };
+                }
             }
         }
     }
@@ -349,6 +583,7 @@ fn verify(args: &Args) -> VerifyDetails {
             schema_skipped: true,
             output_schema_valid: None,
             output_schema_id: None,
+            tier_result: tier,
             error: None,
         };
     }
@@ -364,6 +599,7 @@ fn verify(args: &Args) -> VerifyDetails {
                     schema_skipped: false,
                     output_schema_valid: None,
                     output_schema_id: None,
+                    tier_result: tier,
                     error: Some(format!("Failed to load schemas from {}: {}", schema_dir, e)),
                 };
             }
@@ -379,6 +615,7 @@ fn verify(args: &Args) -> VerifyDetails {
                     schema_skipped: false,
                     output_schema_valid: None,
                     output_schema_id: None,
+                    tier_result: tier,
                     error: Some(format!("Failed to load embedded schemas: {}", e)),
                 };
             }
@@ -395,6 +632,7 @@ fn verify(args: &Args) -> VerifyDetails {
                 schema_skipped: false,
                 output_schema_valid: None,
                 output_schema_id: None,
+                tier_result: tier,
                 error: Some(format!(
                     "Failed to serialize receipt for schema validation: {}",
                     e
@@ -410,6 +648,7 @@ fn verify(args: &Args) -> VerifyDetails {
             schema_skipped: false,
             output_schema_valid: None,
             output_schema_id: None,
+            tier_result: tier,
             error: Some(format!("Receipt failed schema validation: {}", e)),
         };
     }
@@ -452,6 +691,7 @@ fn verify(args: &Args) -> VerifyDetails {
             schema_skipped: false,
             output_schema_valid,
             output_schema_id,
+            tier_result: tier,
             error: Some("Output failed schema validation".to_string()),
         };
     }
@@ -462,6 +702,7 @@ fn verify(args: &Args) -> VerifyDetails {
         schema_skipped: false,
         output_schema_valid,
         output_schema_id,
+        tier_result: tier,
         error: None,
     }
 }
@@ -877,6 +1118,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -900,6 +1145,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -931,6 +1180,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -961,6 +1214,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1001,6 +1258,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1033,6 +1294,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1068,6 +1333,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1100,6 +1369,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1129,6 +1402,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1148,6 +1425,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1172,6 +1453,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1221,6 +1506,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1246,6 +1535,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1268,6 +1561,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1282,6 +1579,26 @@ mod tests {
         assert_eq!(
             VerificationStatus::FailSignature.to_string(),
             "FAIL_SIGNATURE"
+        );
+        assert_eq!(
+            VerificationStatus::FailReceiptHash.to_string(),
+            "FAIL_RECEIPT_HASH"
+        );
+        assert_eq!(
+            VerificationStatus::FailAgreementHash.to_string(),
+            "FAIL_AGREEMENT_HASH"
+        );
+        assert_eq!(
+            VerificationStatus::FailProfileHash.to_string(),
+            "FAIL_PROFILE_HASH"
+        );
+        assert_eq!(
+            VerificationStatus::FailPolicyHash.to_string(),
+            "FAIL_POLICY_HASH"
+        );
+        assert_eq!(
+            VerificationStatus::FailContractHash.to_string(),
+            "FAIL_CONTRACT_HASH"
         );
         assert_eq!(VerificationStatus::FailSchema.to_string(), "FAIL_SCHEMA");
         assert_eq!(
@@ -1378,6 +1695,10 @@ mod tests {
             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1406,6 +1727,10 @@ mod tests {
             output_schema_id: Some("vault_result_compatibility".to_string()),
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1483,6 +1808,10 @@ mod tests {
                             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
                             format: OutputFormat::Text,
                             quiet: false,
+                            agreement_fields: None,
+                            profile: None,
+                            policy: None,
+                            contract: None,
                         };
 
                         let details = verify(&args);
@@ -1544,6 +1873,10 @@ mod tests {
             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1588,6 +1921,10 @@ mod tests {
             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1610,6 +1947,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Text,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1795,6 +2136,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Json,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1831,6 +2176,10 @@ mod tests {
             output_schema_id: None,
             format: OutputFormat::Json,
             quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
         };
 
         let details = verify(&args);
@@ -1865,5 +2214,264 @@ mod tests {
             declared_digest,
             "Recomputed SHA-256 digest must match vector's declared digest"
         );
+    }
+
+    // ========================================================================
+    // Tier verification tests (#305)
+    // ========================================================================
+
+    #[test]
+    fn test_tier1_agreement_hash_valid() {
+        // Use the known-good vector which has agreement_fields
+        let path = vectors_dir().join("receipt-verification-v1.json");
+        let content = std::fs::read_to_string(&path).unwrap();
+        let vector: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        let unsigned: UnsignedReceipt =
+            serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
+        let sig_hex = vector["expected"]["signature_hex"].as_str().unwrap();
+        let vk_hex = vector["input"]["verifying_key_hex"].as_str().unwrap();
+        let receipt = unsigned.sign(sig_hex.to_string());
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", vk_hex).unwrap();
+
+        // Write agreement fields to temp file
+        let agreement_fields = &vector["input"]["agreement_fields"]["session_agreement_fields"];
+        let mut agreement_file = NamedTempFile::new().unwrap();
+        writeln!(agreement_file, "{}", serde_json::to_string(&agreement_fields).unwrap()).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: Some(agreement_file.path().to_str().unwrap().to_string()),
+            profile: None,
+            policy: None,
+            contract: None,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::Ok);
+        assert_eq!(details.tier_result.agreement_hash_valid, Some(true));
+        assert_eq!(details.tier_result.tier, 1);
+    }
+
+    #[test]
+    fn test_tier1_agreement_hash_mismatch_via_cli() {
+        // Create a receipt with a known agreement_hash, then provide agreement
+        // fields that produce a different hash to trigger mismatch.
+        let (signing_key, verifying_key) = generate_keypair();
+
+        // Compute a real agreement hash from specific fields
+        let agreement_fields = receipt_core::SessionAgreementFields {
+            session_id: "b".repeat(64),
+            purpose_code: "COMPATIBILITY".to_string(),
+            participants: vec!["agent-alice".to_string(), "agent-bob".to_string()],
+            model_identity: receipt_core::ModelIdentity {
+                provider: "LOCAL".to_string(),
+                model_id: "phi-3-mini".to_string(),
+                model_version: Some("1.0.0".to_string()),
+            },
+            symmetry_rule: "SYMMETRIC".to_string(),
+            contract_id: "COMPATIBILITY".to_string(),
+            expiry: "2025-12-31T23:59:59Z".to_string(),
+            output_budget: 8,
+            model_profile_hash: Some("1".repeat(64)),
+            policy_bundle_hash: Some("2".repeat(64)),
+            pre_agreement_hash: "3".repeat(64),
+            input_schema_hashes: vec!["4".repeat(64)],
+        };
+        let agreement_hash = receipt_core::compute_agreement_hash(&agreement_fields).unwrap();
+
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.agreement_hash = Some(agreement_hash);
+        recompute_budget_chain_receipt_hash(&mut unsigned);
+
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        // Provide DIFFERENT agreement fields (changed participant) that will hash differently
+        let tampered_fields = receipt_core::SessionAgreementFields {
+            participants: vec!["agent-alice".to_string(), "agent-charlie".to_string()],
+            ..agreement_fields
+        };
+
+        let mut agreement_file = NamedTempFile::new().unwrap();
+        writeln!(agreement_file, "{}", serde_json::to_string(&tampered_fields).unwrap()).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: Some(agreement_file.path().to_str().unwrap().to_string()),
+            profile: None,
+            policy: None,
+            contract: None,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::FailAgreementHash);
+        assert_eq!(details.tier_result.agreement_hash_valid, Some(false));
+    }
+
+    #[test]
+    fn test_tier_defaults_to_1_without_artefact_args() {
+        let (receipt_file, pubkey_file, _receipt) = create_test_files();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::Ok);
+        assert_eq!(details.tier_result.tier, 1);
+        assert_eq!(details.tier_result.agreement_hash_valid, None);
+        assert_eq!(details.tier_result.profile_hash_valid, None);
+        assert_eq!(details.tier_result.policy_hash_valid, None);
+        assert_eq!(details.tier_result.contract_hash_valid, None);
+    }
+
+    #[test]
+    fn test_tier2_profile_hash_mismatch() {
+        // Create a receipt with a known model_profile_hash, then provide a
+        // profile file that produces a different hash.
+        let (signing_key, verifying_key) = generate_keypair();
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.model_profile_hash = Some("a".repeat(64));
+        recompute_budget_chain_receipt_hash(&mut unsigned);
+
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        // Write a valid profile JSON that will hash to something != "aaa..."
+        let profile_json = serde_json::json!({
+            "profile_id": "test-profile",
+            "profile_version": 1,
+            "execution_lane": "sealed-local",
+            "provider": "local-gguf",
+            "model_id": "phi-3-mini",
+            "model_version": "1.0.0",
+            "inference_params": {
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_tokens": 1024
+            },
+            "prompt_template_hash": "b".repeat(64),
+            "system_prompt_hash": "c".repeat(64)
+        });
+        let mut profile_file = NamedTempFile::new().unwrap();
+        writeln!(profile_file, "{}", serde_json::to_string(&profile_json).unwrap()).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: None,
+            profile: Some(profile_file.path().to_str().unwrap().to_string()),
+            policy: None,
+            contract: None,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::FailProfileHash);
+        assert_eq!(details.tier_result.profile_hash_valid, Some(false));
+        assert_eq!(details.tier_result.tier, 2);
+    }
+
+    #[test]
+    fn test_tier2_policy_hash_mismatch() {
+        let (signing_key, verifying_key) = generate_keypair();
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.policy_bundle_hash = Some("a".repeat(64));
+        recompute_budget_chain_receipt_hash(&mut unsigned);
+
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
+
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        let policy_json = serde_json::json!({
+            "policy_id": "test-policy",
+            "policy_version": "1.0",
+            "entropy_budget_bits": 8,
+            "allowed_lanes": ["sealed-local"],
+            "asymmetry_rule": "SYMMETRIC",
+            "allowed_provenance": ["ORCHESTRATOR_GENERATED"],
+            "ttl_bounds": { "min_seconds": 60, "max_seconds": 300 }
+        });
+        let mut policy_file = NamedTempFile::new().unwrap();
+        writeln!(policy_file, "{}", serde_json::to_string(&policy_json).unwrap()).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: Some(policy_file.path().to_str().unwrap().to_string()),
+            contract: None,
+        };
+
+        let details = verify(&args);
+        assert_eq!(details.status, VerificationStatus::FailPolicyHash);
+        assert_eq!(details.tier_result.policy_hash_valid, Some(false));
+        assert_eq!(details.tier_result.tier, 2);
     }
 }
