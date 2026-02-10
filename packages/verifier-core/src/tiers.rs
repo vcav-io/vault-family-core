@@ -1,0 +1,640 @@
+//! Verification tier logic for three-tier receipt verification.
+//!
+//! All functions accept `&str` / `&[u8]` inputs — no filesystem dependencies.
+//!
+//! Tier 1 (Receipt-only): Signature, schema, budget-chain hash, agreement hash recomputation
+//! Tier 2 (Receipt + artefacts): Tier 1 + profile/policy/contract hash verification
+//! Tier 3 (Manifest): Tier 1/2 + manifest signature verification and artefact coverage
+
+use receipt_core::{
+    compute_agreement_hash, canonicalize::canonicalize_serializable,
+    parse_public_key_hex, verify_manifest, PublicationManifest, SessionAgreementFields,
+};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::HashSet;
+
+// ============================================================================
+// Domain Prefixes (must match TypeScript and vault-runtime implementations)
+// ============================================================================
+
+const PROFILE_HASH_DOMAIN_PREFIX: &str = "vcav/model_profile/v1";
+const POLICY_BUNDLE_DOMAIN_PREFIX: &str = "vcav/policy_bundle/v1";
+
+// ============================================================================
+// Profile Digest (mirrors vault-runtime::config::ProfileDigestV1)
+// ============================================================================
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InferenceParamsDigest {
+    pub temperature_bp: u32,
+    pub top_p_bp: u32,
+    pub top_k: u32,
+    pub max_tokens: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProfileDigestV1 {
+    pub execution_lane: String,
+    pub provider: String,
+    pub model_id: String,
+    pub model_version: String,
+    pub inference_params: InferenceParamsDigest,
+    pub prompt_template_hash: String,
+    pub system_prompt_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_weights_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokenizer_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engine_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grammar_constraint_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_bundle_hash: Option<String>,
+}
+
+/// Full model profile including mutable fields (for loading from file).
+/// The digest is extracted from this for hashing.
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct ModelProfile {
+    pub profile_id: String,
+    pub profile_version: serde_json::Value, // integer in practice
+    pub execution_lane: String,
+    pub provider: String,
+    pub model_id: String,
+    pub model_version: String,
+    pub inference_params: InferenceParamsRaw,
+    pub prompt_template_hash: String,
+    pub system_prompt_hash: String,
+    #[serde(default)]
+    pub model_weights_hash: Option<String>,
+    #[serde(default)]
+    pub tokenizer_hash: Option<String>,
+    #[serde(default)]
+    pub engine_version: Option<String>,
+    #[serde(default)]
+    pub grammar_constraint_hash: Option<String>,
+    #[serde(default)]
+    pub policy_bundle_hash: Option<String>,
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Raw inference params from profile file (floats, not basis points).
+#[derive(Debug, Clone, Deserialize)]
+pub struct InferenceParamsRaw {
+    pub temperature: f64,
+    pub top_p: f64,
+    pub top_k: u32,
+    pub max_tokens: u32,
+    #[serde(default)]
+    pub seed: Option<u32>,
+}
+
+// ============================================================================
+// Policy Digest (mirrors TS PolicyDigestV1)
+// ============================================================================
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TtlBounds {
+    pub min_seconds: u32,
+    pub max_seconds: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyDigestV1 {
+    pub allowed_lanes: Vec<String>,
+    pub allowed_provenance: Vec<String>,
+    pub asymmetry_rule: String,
+    pub entropy_budget_bits: u32,
+    pub ttl_bounds: TtlBounds,
+}
+
+/// Full policy bundle including mutable fields (for loading from file).
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct PolicyBundle {
+    pub policy_id: String,
+    pub policy_version: String,
+    pub entropy_budget_bits: u32,
+    pub allowed_lanes: Vec<String>,
+    pub asymmetry_rule: String,
+    pub allowed_provenance: Vec<String>,
+    pub ttl_bounds: TtlBounds,
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+}
+
+// ============================================================================
+// Hash Computation
+// ============================================================================
+
+/// Compute the content-addressed hash of a ProfileDigestV1.
+/// `SHA-256("vcav/model_profile/v1" || canonicalize(digest))`
+pub fn compute_profile_hash(digest: &ProfileDigestV1) -> Result<String, String> {
+    let canonical = canonicalize_serializable(digest)
+        .map_err(|e| format!("Failed to canonicalize profile digest: {}", e))?;
+    let prefixed = format!("{}{}", PROFILE_HASH_DOMAIN_PREFIX, canonical);
+    let mut hasher = Sha256::new();
+    hasher.update(prefixed.as_bytes());
+    Ok(hex::encode(hasher.finalize()))
+}
+
+/// Compute the content-addressed hash of a PolicyDigestV1.
+/// `SHA-256("vcav/policy_bundle/v1" || canonicalize(digest))`
+pub fn compute_policy_bundle_hash(digest: &PolicyDigestV1) -> Result<String, String> {
+    let canonical = canonicalize_serializable(digest)
+        .map_err(|e| format!("Failed to canonicalize policy digest: {}", e))?;
+    let prefixed = format!("{}{}", POLICY_BUNDLE_DOMAIN_PREFIX, canonical);
+    let mut hasher = Sha256::new();
+    hasher.update(prefixed.as_bytes());
+    Ok(hex::encode(hasher.finalize()))
+}
+
+/// Build a ProfileDigestV1 from a full ModelProfile.
+/// Converts floats to basis points for deterministic hashing.
+pub fn build_profile_digest(profile: &ModelProfile) -> ProfileDigestV1 {
+    ProfileDigestV1 {
+        execution_lane: profile.execution_lane.clone(),
+        provider: profile.provider.clone(),
+        model_id: profile.model_id.clone(),
+        model_version: profile.model_version.clone(),
+        inference_params: InferenceParamsDigest {
+            temperature_bp: (profile.inference_params.temperature * 1000.0).round() as u32,
+            top_p_bp: (profile.inference_params.top_p * 1000.0).round() as u32,
+            top_k: profile.inference_params.top_k,
+            max_tokens: profile.inference_params.max_tokens,
+            seed: profile.inference_params.seed,
+        },
+        prompt_template_hash: profile.prompt_template_hash.clone(),
+        system_prompt_hash: profile.system_prompt_hash.clone(),
+        model_weights_hash: profile.model_weights_hash.clone(),
+        tokenizer_hash: profile.tokenizer_hash.clone(),
+        engine_version: profile.engine_version.clone(),
+        grammar_constraint_hash: profile.grammar_constraint_hash.clone(),
+        policy_bundle_hash: profile.policy_bundle_hash.clone(),
+    }
+}
+
+/// Build a PolicyDigestV1 from a full PolicyBundle.
+/// Arrays are sorted for deterministic hashing (matching TS behavior).
+pub fn build_policy_digest(bundle: &PolicyBundle) -> PolicyDigestV1 {
+    let mut allowed_lanes = bundle.allowed_lanes.clone();
+    allowed_lanes.sort();
+    let mut allowed_provenance = bundle.allowed_provenance.clone();
+    allowed_provenance.sort();
+
+    PolicyDigestV1 {
+        allowed_lanes,
+        allowed_provenance,
+        asymmetry_rule: bundle.asymmetry_rule.clone(),
+        entropy_budget_bits: bundle.entropy_budget_bits,
+        ttl_bounds: bundle.ttl_bounds.clone(),
+    }
+}
+
+// ============================================================================
+// Tier Result
+// ============================================================================
+
+/// Results from manifest (Tier 3) verification checks.
+#[derive(Debug, Clone, Default)]
+pub struct ManifestResult {
+    /// Whether the manifest signature is valid
+    pub signature_valid: Option<bool>,
+    /// Whether the receipt's model_profile_hash is covered by the manifest
+    pub profile_covered: Option<bool>,
+    /// Whether the receipt's policy_bundle_hash is covered by the manifest
+    pub policy_covered: Option<bool>,
+}
+
+/// Results from tier verification checks.
+#[derive(Debug, Clone, Default)]
+pub struct TierResult {
+    /// Which tier was achieved (1 = receipt-only, 2 = receipt + artefacts, 3 = manifest)
+    pub tier: u8,
+    /// Agreement hash verification result (None = not checked)
+    pub agreement_hash_valid: Option<bool>,
+    /// Profile hash verification result (None = not checked)
+    pub profile_hash_valid: Option<bool>,
+    /// Policy hash verification result (None = not checked)
+    pub policy_hash_valid: Option<bool>,
+    /// Contract hash verification result (None = not checked)
+    pub contract_hash_valid: Option<bool>,
+    /// Manifest verification result (None = not checked)
+    pub manifest: Option<ManifestResult>,
+    /// Error message for the first failing check
+    pub error: Option<String>,
+}
+
+// ============================================================================
+// String-based Verification Functions (no filesystem)
+// ============================================================================
+
+/// Verify the agreement hash from a JSON string containing SessionAgreementFields.
+pub fn verify_agreement_hash_from_str(
+    agreement_fields_json: &str,
+    declared_hash: &str,
+) -> Result<bool, String> {
+    let fields: SessionAgreementFields = serde_json::from_str(agreement_fields_json)
+        .map_err(|e| format!("Failed to parse agreement fields JSON: {}", e))?;
+
+    let recomputed = compute_agreement_hash(&fields)
+        .map_err(|e| format!("Failed to compute agreement hash: {}", e))?;
+
+    Ok(recomputed == declared_hash)
+}
+
+/// Verify the model profile hash from a JSON string containing the profile.
+pub fn verify_profile_hash_from_str(
+    profile_json: &str,
+    declared_hash: &str,
+) -> Result<bool, String> {
+    let profile: ModelProfile = serde_json::from_str(profile_json)
+        .map_err(|e| format!("Failed to parse profile JSON: {}", e))?;
+
+    let digest = build_profile_digest(&profile);
+    let recomputed = compute_profile_hash(&digest)?;
+
+    Ok(recomputed == declared_hash)
+}
+
+/// Verify the policy bundle hash from a JSON string containing the policy bundle.
+pub fn verify_policy_hash_from_str(
+    policy_json: &str,
+    declared_hash: &str,
+) -> Result<bool, String> {
+    let bundle: PolicyBundle = serde_json::from_str(policy_json)
+        .map_err(|e| format!("Failed to parse policy JSON: {}", e))?;
+
+    let digest = build_policy_digest(&bundle);
+    let recomputed = compute_policy_bundle_hash(&digest)?;
+
+    Ok(recomputed == declared_hash)
+}
+
+/// Verify a contract hash by computing SHA-256 of the raw content bytes.
+pub fn verify_contract_hash_from_bytes(
+    content: &[u8],
+    declared_hash: &str,
+) -> Result<bool, String> {
+    let mut hasher = Sha256::new();
+    hasher.update(content);
+    let recomputed = hex::encode(hasher.finalize());
+
+    Ok(recomputed == declared_hash)
+}
+
+/// Verify a signed publication manifest from a JSON string (Tier 3).
+///
+/// 1. Parse and verify the manifest signature using the embedded operator public key.
+/// 2. Check if the receipt's `model_profile_hash` appears in the manifest's profile artefacts.
+/// 3. Check if the receipt's `policy_bundle_hash` appears in the manifest's policy artefacts.
+///
+/// The `receipt_guardian_hash` is also checked against both policy and contract artefact
+/// hashes in the manifest for coverage.
+pub fn verify_manifest_from_str(
+    manifest_json: &str,
+    receipt_profile_hash: Option<&str>,
+    receipt_policy_hash: Option<&str>,
+    receipt_guardian_hash: &str,
+) -> Result<ManifestResult, String> {
+    let manifest: PublicationManifest = serde_json::from_str(manifest_json)
+        .map_err(|e| format!("Failed to parse manifest JSON: {}", e))?;
+
+    // Parse operator public key from the manifest
+    let public_key = parse_public_key_hex(&manifest.operator_public_key_hex)
+        .map_err(|e| format!("Invalid operator public key in manifest: {}", e))?;
+
+    // Verify manifest signature
+    let signature_valid = verify_manifest(&manifest, &public_key).is_ok();
+
+    if !signature_valid {
+        return Ok(ManifestResult {
+            signature_valid: Some(false),
+            profile_covered: None,
+            policy_covered: None,
+        });
+    }
+
+    // Collect artefact hashes from manifest
+    let profile_hashes: HashSet<&str> = manifest
+        .artefacts
+        .profiles
+        .iter()
+        .map(|e| e.content_hash.as_str())
+        .collect();
+
+    let policy_hashes: HashSet<&str> = manifest
+        .artefacts
+        .policies
+        .iter()
+        .map(|e| e.content_hash.as_str())
+        .collect();
+
+    let contract_hashes: HashSet<&str> = manifest
+        .artefacts
+        .contracts
+        .iter()
+        .map(|e| e.content_hash.as_str())
+        .collect();
+
+    // Check profile coverage
+    let profile_covered = receipt_profile_hash.map(|h| profile_hashes.contains(h));
+
+    // Check policy coverage: receipt's policy_bundle_hash in policy hashes,
+    // or guardian_policy_hash in policy OR contract hashes
+    let policy_covered = if let Some(h) = receipt_policy_hash {
+        Some(
+            policy_hashes.contains(h)
+                || policy_hashes.contains(receipt_guardian_hash)
+                || contract_hashes.contains(receipt_guardian_hash),
+        )
+    } else {
+        // No policy_bundle_hash in receipt — check guardian_policy_hash only
+        Some(
+            policy_hashes.contains(receipt_guardian_hash)
+                || contract_hashes.contains(receipt_guardian_hash),
+        )
+    };
+
+    Ok(ManifestResult {
+        signature_valid: Some(true),
+        profile_covered,
+        policy_covered,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_profile_hash_deterministic() {
+        let digest = ProfileDigestV1 {
+            execution_lane: "sealed-local".to_string(),
+            provider: "local-gguf".to_string(),
+            model_id: "phi-3-mini".to_string(),
+            model_version: "1.0.0".to_string(),
+            inference_params: InferenceParamsDigest {
+                temperature_bp: 700,
+                top_p_bp: 950,
+                top_k: 40,
+                max_tokens: 1024,
+                seed: None,
+            },
+            prompt_template_hash: "a".repeat(64),
+            system_prompt_hash: "b".repeat(64),
+            model_weights_hash: None,
+            tokenizer_hash: None,
+            engine_version: None,
+            grammar_constraint_hash: None,
+            policy_bundle_hash: None,
+        };
+
+        let hash1 = compute_profile_hash(&digest).unwrap();
+        let hash2 = compute_profile_hash(&digest).unwrap();
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash1.len(), 64);
+    }
+
+    #[test]
+    fn test_compute_policy_bundle_hash_deterministic() {
+        let digest = PolicyDigestV1 {
+            allowed_lanes: vec!["sealed-local".to_string()],
+            allowed_provenance: vec!["ORCHESTRATOR_GENERATED".to_string()],
+            asymmetry_rule: "SYMMETRIC".to_string(),
+            entropy_budget_bits: 8,
+            ttl_bounds: TtlBounds {
+                min_seconds: 60,
+                max_seconds: 300,
+            },
+        };
+
+        let hash1 = compute_policy_bundle_hash(&digest).unwrap();
+        let hash2 = compute_policy_bundle_hash(&digest).unwrap();
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash1.len(), 64);
+    }
+
+    #[test]
+    fn test_build_profile_digest_converts_floats_to_basis_points() {
+        let profile = ModelProfile {
+            profile_id: "test".to_string(),
+            profile_version: serde_json::json!(1),
+            execution_lane: "sealed-local".to_string(),
+            provider: "local-gguf".to_string(),
+            model_id: "phi-3-mini".to_string(),
+            model_version: "1.0.0".to_string(),
+            inference_params: InferenceParamsRaw {
+                temperature: 0.7,
+                top_p: 0.95,
+                top_k: 40,
+                max_tokens: 1024,
+                seed: Some(42),
+            },
+            prompt_template_hash: "a".repeat(64),
+            system_prompt_hash: "b".repeat(64),
+            model_weights_hash: None,
+            tokenizer_hash: None,
+            engine_version: None,
+            grammar_constraint_hash: None,
+            policy_bundle_hash: None,
+            metadata: None,
+        };
+
+        let digest = build_profile_digest(&profile);
+        assert_eq!(digest.inference_params.temperature_bp, 700);
+        assert_eq!(digest.inference_params.top_p_bp, 950);
+        assert_eq!(digest.inference_params.seed, Some(42));
+    }
+
+    #[test]
+    fn test_build_policy_digest_sorts_arrays() {
+        let bundle = PolicyBundle {
+            policy_id: "test".to_string(),
+            policy_version: "1.0".to_string(),
+            entropy_budget_bits: 8,
+            allowed_lanes: vec!["sealed-local".to_string(), "api-mediated".to_string()],
+            asymmetry_rule: "SYMMETRIC".to_string(),
+            allowed_provenance: vec![
+                "SYMMETRIC_CONSTRUCTION".to_string(),
+                "ORCHESTRATOR_GENERATED".to_string(),
+            ],
+            ttl_bounds: TtlBounds {
+                min_seconds: 60,
+                max_seconds: 300,
+            },
+            metadata: None,
+        };
+
+        let digest = build_policy_digest(&bundle);
+        assert_eq!(digest.allowed_lanes, vec!["api-mediated", "sealed-local"]);
+        assert_eq!(
+            digest.allowed_provenance,
+            vec!["ORCHESTRATOR_GENERATED", "SYMMETRIC_CONSTRUCTION"]
+        );
+    }
+
+    #[test]
+    fn test_compute_profile_hash_matches_golden_vector() {
+        // Load the golden test vector
+        let fixtures_path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-vectors/profile-digest-v1.json"
+        );
+        let fixtures_str = std::fs::read_to_string(fixtures_path)
+            .expect("Failed to read profile-digest-v1.json");
+        let fixture: serde_json::Value =
+            serde_json::from_str(&fixtures_str).expect("Failed to parse fixture");
+
+        let expected_hash = fixture["expected"]["model_profile_hash"]
+            .as_str()
+            .expect("missing expected.model_profile_hash");
+
+        // Build digest from fixture
+        let ed = &fixture["expected"]["digest"];
+        let ip = &ed["inference_params"];
+        let digest = ProfileDigestV1 {
+            execution_lane: ed["execution_lane"].as_str().unwrap().to_string(),
+            provider: ed["provider"].as_str().unwrap().to_string(),
+            model_id: ed["model_id"].as_str().unwrap().to_string(),
+            model_version: ed["model_version"].as_str().unwrap().to_string(),
+            inference_params: InferenceParamsDigest {
+                temperature_bp: ip["temperature_bp"].as_u64().unwrap() as u32,
+                top_p_bp: ip["top_p_bp"].as_u64().unwrap() as u32,
+                top_k: ip["top_k"].as_u64().unwrap() as u32,
+                max_tokens: ip["max_tokens"].as_u64().unwrap() as u32,
+                seed: ip.get("seed").and_then(|s| s.as_u64()).map(|s| s as u32),
+            },
+            prompt_template_hash: ed["prompt_template_hash"].as_str().unwrap().to_string(),
+            system_prompt_hash: ed["system_prompt_hash"].as_str().unwrap().to_string(),
+            model_weights_hash: ed.get("model_weights_hash").and_then(|v| v.as_str()).map(String::from),
+            tokenizer_hash: ed.get("tokenizer_hash").and_then(|v| v.as_str()).map(String::from),
+            engine_version: ed.get("engine_version").and_then(|v| v.as_str()).map(String::from),
+            grammar_constraint_hash: ed.get("grammar_constraint_hash").and_then(|v| v.as_str()).map(String::from),
+            policy_bundle_hash: ed.get("policy_bundle_hash").and_then(|v| v.as_str()).map(String::from),
+        };
+
+        let computed = compute_profile_hash(&digest).unwrap();
+        assert_eq!(computed, expected_hash, "Profile hash must match golden vector");
+    }
+
+    #[test]
+    fn test_verify_agreement_hash_from_str_valid() {
+        // Create a valid SessionAgreementFields and compute its hash
+        let fields = SessionAgreementFields {
+            session_id: "a".repeat(64),
+            pre_agreement_hash: "d".repeat(64),
+            participants: vec!["alice".to_string(), "bob".to_string()],
+            contract_id: "contract-1".to_string(),
+            purpose_code: "COMPATIBILITY".to_string(),
+            model_identity: receipt_core::ModelIdentity {
+                provider: "local-gguf".to_string(),
+                model_id: "phi-3-mini".to_string(),
+                model_version: Some("1.0.0".to_string()),
+            },
+            output_budget: 128,
+            symmetry_rule: "SYMMETRIC".to_string(),
+            input_schema_hashes: vec!["e".repeat(64)],
+            expiry: "2025-12-31T23:59:59Z".to_string(),
+            model_profile_hash: None,
+            policy_bundle_hash: None,
+        };
+        let expected_hash = receipt_core::compute_agreement_hash(&fields).unwrap();
+
+        let json = serde_json::to_string(&fields).unwrap();
+        assert!(verify_agreement_hash_from_str(&json, &expected_hash).unwrap());
+    }
+
+    #[test]
+    fn test_verify_agreement_hash_from_str_mismatch() {
+        let fields = SessionAgreementFields {
+            session_id: "a".repeat(64),
+            pre_agreement_hash: "d".repeat(64),
+            participants: vec!["alice".to_string(), "bob".to_string()],
+            contract_id: "contract-1".to_string(),
+            purpose_code: "COMPATIBILITY".to_string(),
+            model_identity: receipt_core::ModelIdentity {
+                provider: "local-gguf".to_string(),
+                model_id: "phi-3-mini".to_string(),
+                model_version: Some("1.0.0".to_string()),
+            },
+            output_budget: 128,
+            symmetry_rule: "SYMMETRIC".to_string(),
+            input_schema_hashes: vec!["e".repeat(64)],
+            expiry: "2025-12-31T23:59:59Z".to_string(),
+            model_profile_hash: None,
+            policy_bundle_hash: None,
+        };
+
+        let json = serde_json::to_string(&fields).unwrap();
+        assert!(!verify_agreement_hash_from_str(&json, "wrong_hash").unwrap());
+    }
+
+    #[test]
+    fn test_verify_profile_hash_from_str() {
+        let profile_json = serde_json::json!({
+            "profile_id": "test",
+            "profile_version": 1,
+            "execution_lane": "sealed-local",
+            "provider": "local-gguf",
+            "model_id": "phi-3-mini",
+            "model_version": "1.0.0",
+            "inference_params": {
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_tokens": 1024
+            },
+            "prompt_template_hash": "a".repeat(64),
+            "system_prompt_hash": "b".repeat(64)
+        });
+
+        // Compute expected hash
+        let profile: ModelProfile = serde_json::from_value(profile_json.clone()).unwrap();
+        let digest = build_profile_digest(&profile);
+        let expected_hash = compute_profile_hash(&digest).unwrap();
+
+        let json_str = serde_json::to_string(&profile_json).unwrap();
+        assert!(verify_profile_hash_from_str(&json_str, &expected_hash).unwrap());
+        assert!(!verify_profile_hash_from_str(&json_str, "wrong_hash").unwrap());
+    }
+
+    #[test]
+    fn test_verify_policy_hash_from_str() {
+        let policy_json = serde_json::json!({
+            "policy_id": "test",
+            "policy_version": "1.0",
+            "entropy_budget_bits": 8,
+            "allowed_lanes": ["sealed-local"],
+            "asymmetry_rule": "SYMMETRIC",
+            "allowed_provenance": ["ORCHESTRATOR_GENERATED"],
+            "ttl_bounds": { "min_seconds": 60, "max_seconds": 300 }
+        });
+
+        // Compute expected hash
+        let bundle: PolicyBundle = serde_json::from_value(policy_json.clone()).unwrap();
+        let digest = build_policy_digest(&bundle);
+        let expected_hash = compute_policy_bundle_hash(&digest).unwrap();
+
+        let json_str = serde_json::to_string(&policy_json).unwrap();
+        assert!(verify_policy_hash_from_str(&json_str, &expected_hash).unwrap());
+        assert!(!verify_policy_hash_from_str(&json_str, "wrong_hash").unwrap());
+    }
+
+    #[test]
+    fn test_verify_contract_hash_from_bytes() {
+        let content = b"contract content bytes";
+        let mut hasher = Sha256::new();
+        hasher.update(content);
+        let expected_hash = hex::encode(hasher.finalize());
+
+        assert!(verify_contract_hash_from_bytes(content, &expected_hash).unwrap());
+        assert!(!verify_contract_hash_from_bytes(content, "wrong_hash").unwrap());
+    }
+}

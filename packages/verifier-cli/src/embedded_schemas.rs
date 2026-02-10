@@ -1,105 +1,13 @@
-//! Embedded JSON schemas for offline verification
+//! Embedded JSON schemas for offline verification.
 //!
-//! These schemas are embedded at compile time so the verifier can perform
-//! schema validation without needing external schema files.
+//! Schema constants are sourced from `verifier_core::schema_validator`.
+//! This module handles the `SchemaRegistry` loading which requires
+//! `guardian-core` and filesystem (tempdir) — not WASM-compatible.
 
 use guardian_core::SchemaRegistry;
 use std::io::Write;
 use tempfile::TempDir;
-
-// Embed all schema files at compile time
-pub const RECEIPT_SCHEMA: &str = include_str!("../../../schemas/receipt.schema.json");
-pub const ENCRYPTED_INPUT_SCHEMA: &str =
-    include_str!("../../../schemas/encrypted_input.schema.json");
-pub const SIGNED_INPUT_SCHEMA: &str = include_str!("../../../schemas/signed_input.schema.json");
-pub const INPUT_CIPHERTEXT_ENVELOPE_V1_SCHEMA: &str =
-    include_str!("../../../schemas/input_ciphertext_envelope_v1.schema.json");
-pub const CONTEXT_DELTA_SCHEMA: &str = include_str!("../../../schemas/context_delta.schema.json");
-pub const RELATIONSHIP_TOKEN_SCHEMA: &str =
-    include_str!("../../../schemas/relationship_token.schema.json");
-pub const SESSION_ABORT_SCHEMA: &str = include_str!("../../../schemas/session_abort.schema.json");
-pub const VAULT_RESULT_COMPATIBILITY_SCHEMA: &str =
-    include_str!("../../../schemas/vault_result_compatibility.schema.json");
-pub const VAULT_RESULT_COMPATIBILITY_D2_SCHEMA: &str =
-    include_str!("../../../schemas/vault_result_compatibility_d2.schema.json");
-pub const VAULT_RESULT_MEDIATION_SCHEMA: &str =
-    include_str!("../../../schemas/vault_result_mediation.schema.json");
-pub const VAULT_RESULT_NEGOTIATION_SCHEMA: &str =
-    include_str!("../../../schemas/vault_result_negotiation.schema.json");
-pub const VAULT_RESULT_SCHEDULING_SCHEMA: &str =
-    include_str!("../../../schemas/vault_result_scheduling.schema.json");
-pub const INPUT_PAYLOAD_COMPATIBILITY_SCHEMA: &str =
-    include_str!("../../../schemas/input_payload_compatibility.schema.json");
-pub const INPUT_PAYLOAD_SCHEDULING_SCHEMA: &str =
-    include_str!("../../../schemas/input_payload_scheduling.schema.json");
-
-/// Schema entry for loading into registry
-struct SchemaEntry {
-    /// File name (with .schema.json suffix)
-    filename: &'static str,
-    /// The embedded JSON schema content
-    content: &'static str,
-}
-
-/// All embedded schemas
-const SCHEMAS: &[SchemaEntry] = &[
-    SchemaEntry {
-        filename: "receipt.schema.json",
-        content: RECEIPT_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "encrypted_input.schema.json",
-        content: ENCRYPTED_INPUT_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "signed_input.schema.json",
-        content: SIGNED_INPUT_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "input_ciphertext_envelope_v1.schema.json",
-        content: INPUT_CIPHERTEXT_ENVELOPE_V1_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "context_delta.schema.json",
-        content: CONTEXT_DELTA_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "relationship_token.schema.json",
-        content: RELATIONSHIP_TOKEN_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "session_abort.schema.json",
-        content: SESSION_ABORT_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "vault_result_compatibility.schema.json",
-        content: VAULT_RESULT_COMPATIBILITY_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "vault_result_compatibility_d2.schema.json",
-        content: VAULT_RESULT_COMPATIBILITY_D2_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "vault_result_mediation.schema.json",
-        content: VAULT_RESULT_MEDIATION_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "vault_result_negotiation.schema.json",
-        content: VAULT_RESULT_NEGOTIATION_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "vault_result_scheduling.schema.json",
-        content: VAULT_RESULT_SCHEDULING_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "input_payload_compatibility.schema.json",
-        content: INPUT_PAYLOAD_COMPATIBILITY_SCHEMA,
-    },
-    SchemaEntry {
-        filename: "input_payload_scheduling.schema.json",
-        content: INPUT_PAYLOAD_SCHEDULING_SCHEMA,
-    },
-];
+use verifier_core::schema_validator::SCHEMAS;
 
 /// Errors that can occur when loading embedded schemas
 #[derive(Debug)]
