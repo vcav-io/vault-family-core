@@ -101,6 +101,10 @@ pub struct UnsignedSessionHandoff {
 
     /// Planned budget spend (bits) for this session.
     pub intended_spend_bits: u32,
+
+    /// Content-addressed hash of the model profile bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_profile_hash: Option<HashRef>,
 }
 
 impl UnsignedSessionHandoff {
@@ -153,6 +157,10 @@ pub struct SessionHandoff {
     /// Planned budget spend (bits) for this session.
     pub intended_spend_bits: u32,
 
+    /// Content-addressed hash of the model profile bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_profile_hash: Option<HashRef>,
+
     /// 128-character hex-encoded Ed25519 signature from initiator
     pub initiator_signature: String,
 
@@ -175,6 +183,7 @@ impl SessionHandoff {
             capability_tokens: self.capability_tokens.clone(),
             prior_receipt_hash: self.prior_receipt_hash.clone(),
             intended_spend_bits: self.intended_spend_bits,
+            model_profile_hash: self.model_profile_hash.clone(),
         }
     }
 }
@@ -197,6 +206,7 @@ pub struct UnsignedSessionHandoffBuilder {
     capability_tokens: Option<Vec<String>>,
     prior_receipt_hash: Option<String>,
     intended_spend_bits: Option<u32>,
+    model_profile_hash: Option<HashRef>,
 }
 
 impl UnsignedSessionHandoffBuilder {
@@ -266,6 +276,12 @@ impl UnsignedSessionHandoffBuilder {
         self
     }
 
+    /// Set model profile hash (optional).
+    pub fn model_profile_hash(mut self, hash: Option<HashRef>) -> Self {
+        self.model_profile_hash = hash;
+        self
+    }
+
     /// Build the UnsignedSessionHandoff
     ///
     /// # Panics
@@ -287,6 +303,7 @@ impl UnsignedSessionHandoffBuilder {
             intended_spend_bits: self
                 .intended_spend_bits
                 .expect("intended_spend_bits is required"),
+            model_profile_hash: self.model_profile_hash,
         }
     }
 }
@@ -406,6 +423,7 @@ mod tests {
             capability_tokens: vec![],
             prior_receipt_hash: Some("c".repeat(64)),
             intended_spend_bits: 11,
+            model_profile_hash: None,
             initiator_signature: "a".repeat(128),
             acceptor_signature: "b".repeat(128),
         };
@@ -414,5 +432,62 @@ mod tests {
         assert_eq!(unsigned.handoff_id, signed.handoff_id);
         assert_eq!(unsigned.participants, signed.participants);
         assert_eq!(unsigned.contract_id, signed.contract_id);
+    }
+
+    #[test]
+    fn test_handoff_without_profile_hash_omits_field() {
+        let handoff = sample_unsigned_handoff();
+        assert_eq!(handoff.model_profile_hash, None);
+        let json = serde_json::to_string(&handoff).unwrap();
+        assert!(!json.contains("model_profile_hash"));
+        let parsed: UnsignedSessionHandoff = serde_json::from_str(&json).unwrap();
+        assert_eq!(handoff, parsed);
+    }
+
+    #[test]
+    fn test_handoff_with_profile_hash_roundtrip() {
+        let handoff = UnsignedSessionHandoff::builder()
+            .handoff_id("handoff-99999999")
+            .participants(vec!["agent-a".to_string(), "agent-b".to_string()])
+            .contract_id("compat.v1")
+            .contract_version(1)
+            .contract_hash(HashRef::sha256("abc"))
+            .budget_tier(BudgetTierV2::Small)
+            .ttl_seconds(120)
+            .operator_endpoint_id("op-001")
+            .capability_tokens(vec![])
+            .prior_receipt_hash(None)
+            .intended_spend_bits(11)
+            .model_profile_hash(Some(HashRef::sha256("profile-hash-base64")))
+            .build();
+
+        assert!(handoff.model_profile_hash.is_some());
+        let json = serde_json::to_string(&handoff).unwrap();
+        assert!(json.contains("model_profile_hash"));
+        let parsed: UnsignedSessionHandoff = serde_json::from_str(&json).unwrap();
+        assert_eq!(handoff, parsed);
+    }
+
+    #[test]
+    fn test_to_unsigned_preserves_profile_hash() {
+        let signed = SessionHandoff {
+            handoff_id: "handoff-12345678".to_string(),
+            participants: vec!["agent-a".to_string(), "agent-b".to_string()],
+            contract_id: "dating.v1.d2".to_string(),
+            contract_version: 1,
+            contract_hash: HashRef::sha256("abc"),
+            budget_tier: BudgetTierV2::Medium,
+            ttl_seconds: 120,
+            operator_endpoint_id: "operator-001".to_string(),
+            capability_tokens: vec![],
+            prior_receipt_hash: None,
+            intended_spend_bits: 11,
+            model_profile_hash: Some(HashRef::sha256("test-profile")),
+            initiator_signature: "a".repeat(128),
+            acceptor_signature: "b".repeat(128),
+        };
+
+        let unsigned = signed.to_unsigned();
+        assert_eq!(unsigned.model_profile_hash, signed.model_profile_hash);
     }
 }
