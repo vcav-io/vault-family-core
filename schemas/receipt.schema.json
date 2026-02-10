@@ -247,6 +247,17 @@
       "pattern": "^[a-f0-9]{64}$",
       "description": "Content-addressed SHA-256 hash of the policy bundle bound to this session"
     },
+    "contract_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Content-addressed SHA-256 hash of the contract bound to this session"
+    },
+    "output_schema_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Identifier of the output schema used for this session"
+    },
     "attestation": {
       "oneOf": [
         { "type": "null" },

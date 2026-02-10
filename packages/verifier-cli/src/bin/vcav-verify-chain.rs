@@ -530,6 +530,8 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         agreement_hash: receipt.agreement_hash.clone(),
         model_profile_hash: receipt.model_profile_hash.clone(),
         policy_bundle_hash: receipt.policy_bundle_hash.clone(),
+        contract_hash: receipt.contract_hash.clone(),
+        output_schema_id: receipt.output_schema_id.clone(),
         receipt_key_id: receipt.receipt_key_id.clone(),
         attestation: receipt.attestation.clone(),
     }
@@ -791,6 +793,8 @@ mod tests {
             agreement_hash: None,
             model_profile_hash: None,
             policy_bundle_hash: None,
+            contract_hash: None,
+            output_schema_id: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         }

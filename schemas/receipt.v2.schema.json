@@ -198,21 +198,33 @@
       "description": "SessionHandoff ID that authorized this session (Phase 2)"
     },
     "contract_hash": {
-      "type": "object",
-      "properties": {
-        "hash_alg": {
-          "type": "string",
-          "const": "sha256",
-          "description": "Hash algorithm"
-        },
-        "hash_b64": {
-          "type": "string",
-          "description": "Base64url-encoded hash value"
-        }
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Content-addressed SHA-256 hash of the contract bound to this session"
+    },
+    "output_schema_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Identifier of the output schema used for this session"
+    },
+    "model_profile_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Content-addressed SHA-256 hash of the model profile bound to this session"
+    },
+    "policy_bundle_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Content-addressed SHA-256 hash of the policy bundle bound to this session"
+    },
+    "mitigations_applied": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z0-9._:-]{1,64}$"
       },
-      "required": ["hash_alg", "hash_b64"],
-      "additionalProperties": false,
-      "description": "Content-addressed hash of the contract template used"
+      "description": "Mitigation IDs applied during this session"
     },
     "attestation": {
       "oneOf": [

@@ -614,10 +614,10 @@ fn verify(args: &Args) -> VerifyDetails {
 
         // Contract hash check
         if let Some(ref contract_path) = args.contract {
-            // Contract hash is not stored in the receipt directly — it uses
-            // the guardian_policy_hash field as the canonical hash binding.
-            // For now, verify against guardian_policy_hash.
-            let declared_hash = &receipt.guardian_policy_hash;
+            // Prefer receipt.contract_hash when present; fall back to
+            // guardian_policy_hash for legacy receipts without the field.
+            let declared_hash = receipt.contract_hash.as_deref()
+                .unwrap_or(&receipt.guardian_policy_hash);
             match tiers::verify_contract_hash(Path::new(contract_path), declared_hash) {
                 Ok(true) => {
                     tier.contract_hash_valid = Some(true);
@@ -833,21 +833,25 @@ fn verify(args: &Args) -> VerifyDetails {
     // Output schema validation (if requested)
     let (output_schema_valid, output_schema_id) = if args.validate_output {
         if let Some(ref output) = receipt.output {
-            // Determine output schema ID
-            let schema_id = args.output_schema_id.clone().unwrap_or_else(|| {
-                // Infer schema from purpose code
-                match receipt.purpose_code {
-                    guardian_core::Purpose::Compatibility => {
-                        "vault_result_compatibility".to_string()
+            // Determine output schema ID: CLI arg > receipt field > purpose-based fallback
+            let schema_id = args.output_schema_id.clone()
+                .or_else(|| receipt.output_schema_id.clone())
+                .unwrap_or_else(|| {
+                    // Infer schema from purpose code
+                    match receipt.purpose_code {
+                        guardian_core::Purpose::Compatibility => {
+                            "vault_result_compatibility".to_string()
+                        }
+                        guardian_core::Purpose::Scheduling => "vault_result_scheduling".to_string(),
+                        guardian_core::Purpose::Mediation => "vault_result_mediation".to_string(),
+                        guardian_core::Purpose::Negotiation => {
+                            "vault_result_negotiation".to_string()
+                        }
+                        guardian_core::Purpose::SchedulingCompatV1 => {
+                            "vault_result_scheduling_compat_v1".to_string()
+                        }
                     }
-                    guardian_core::Purpose::Scheduling => "vault_result_scheduling".to_string(),
-                    guardian_core::Purpose::Mediation => "vault_result_mediation".to_string(),
-                    guardian_core::Purpose::Negotiation => "vault_result_negotiation".to_string(),
-                    guardian_core::Purpose::SchedulingCompatV1 => {
-                        "vault_result_scheduling_compat_v1".to_string()
-                    }
-                }
-            });
+                });
 
             // Validate output against its schema
             let valid = registry.validate(&schema_id, output).is_ok();
@@ -911,6 +915,8 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         agreement_hash: receipt.agreement_hash.clone(),
         model_profile_hash: receipt.model_profile_hash.clone(),
         policy_bundle_hash: receipt.policy_bundle_hash.clone(),
+        contract_hash: receipt.contract_hash.clone(),
+        output_schema_id: receipt.output_schema_id.clone(),
         receipt_key_id: receipt.receipt_key_id.clone(),
         attestation: receipt.attestation.clone(),
     }
@@ -1195,6 +1201,8 @@ mod tests {
             agreement_hash: None,
             model_profile_hash: None,
             policy_bundle_hash: None,
+            contract_hash: None,
+            output_schema_id: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         })
@@ -1864,6 +1872,8 @@ mod tests {
             agreement_hash: None,
             model_profile_hash: None,
             policy_bundle_hash: None,
+            contract_hash: None,
+            output_schema_id: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         })

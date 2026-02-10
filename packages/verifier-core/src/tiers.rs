@@ -989,6 +989,8 @@ mod tests {
             receipt_key_id: receipt.receipt_key_id,
             model_profile_hash: receipt.model_profile_hash,
             policy_bundle_hash: receipt.policy_bundle_hash,
+            contract_hash: receipt.contract_hash,
+            output_schema_id: receipt.output_schema_id,
             attestation: receipt.attestation,
         };
         (unsigned, sig)

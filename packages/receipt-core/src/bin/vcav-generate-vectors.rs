@@ -90,6 +90,8 @@ fn sample_unsigned_receipt() -> UnsignedReceipt {
         agreement_hash: None,
         model_profile_hash: None,
         policy_bundle_hash: None,
+        contract_hash: None,
+        output_schema_id: None,
         receipt_key_id: None,
         attestation: None,
     }
@@ -128,6 +130,8 @@ fn sample_aborted_receipt() -> UnsignedReceipt {
         agreement_hash: None,
         model_profile_hash: None,
         policy_bundle_hash: None,
+        contract_hash: None,
+        output_schema_id: None,
         receipt_key_id: None,
         attestation: None,
     }
@@ -858,6 +862,8 @@ fn sample_full_receipt(vault_pub_hex: &str) -> UnsignedReceipt {
         agreement_hash: Some(agreement_hash),
         model_profile_hash: Some("1".repeat(64)),
         policy_bundle_hash: Some("2".repeat(64)),
+        contract_hash: None,
+        output_schema_id: None,
         receipt_key_id: Some(key_id),
         attestation: None,
     }

@@ -228,6 +228,8 @@ mod tests {
             agreement_hash: None,
             model_profile_hash: None,
             policy_bundle_hash: None,
+            contract_hash: None,
+            output_schema_id: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         };

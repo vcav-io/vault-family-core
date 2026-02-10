@@ -217,6 +217,14 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub policy_bundle_hash: Option<String>,
 
+    /// Content-addressed hash of the contract bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract_hash: Option<String>,
+
+    /// Output schema identifier used for this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_schema_id: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -338,6 +346,14 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub policy_bundle_hash: Option<String>,
 
+    /// Content-addressed hash of the contract bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract_hash: Option<String>,
+
+    /// Output schema identifier used for this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_schema_id: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -372,6 +388,8 @@ impl UnsignedReceipt {
             receipt_key_id: self.receipt_key_id,
             model_profile_hash: self.model_profile_hash,
             policy_bundle_hash: self.policy_bundle_hash,
+            contract_hash: self.contract_hash,
+            output_schema_id: self.output_schema_id,
             attestation: self.attestation,
             signature,
         }
@@ -409,6 +427,8 @@ pub struct ReceiptBuilder {
     receipt_key_id: Option<String>,
     model_profile_hash: Option<String>,
     policy_bundle_hash: Option<String>,
+    contract_hash: Option<String>,
+    output_schema_id: Option<String>,
     attestation: Option<Attestation>,
 }
 
@@ -563,6 +583,18 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the contract hash (optional)
+    pub fn contract_hash(mut self, hash: Option<String>) -> Self {
+        self.contract_hash = hash;
+        self
+    }
+
+    /// Set the output schema id (optional)
+    pub fn output_schema_id(mut self, id: Option<String>) -> Self {
+        self.output_schema_id = id;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
         self.attestation = attestation;
@@ -599,6 +631,8 @@ impl ReceiptBuilder {
             receipt_key_id: self.receipt_key_id,
             model_profile_hash: self.model_profile_hash,
             policy_bundle_hash: self.policy_bundle_hash,
+            contract_hash: self.contract_hash,
+            output_schema_id: self.output_schema_id,
             attestation: self.attestation,
         })
     }
@@ -660,6 +694,8 @@ mod tests {
             receipt_key_id: None,
             model_profile_hash: None,
             policy_bundle_hash: None,
+            contract_hash: None,
+            output_schema_id: None,
             attestation: None,
         }
     }
@@ -1001,5 +1037,208 @@ mod tests {
 
         let signed = unsigned.sign("e".repeat(128));
         assert_eq!(signed.policy_bundle_hash, Some("b".repeat(64)));
+    }
+
+    // ==================== Contract Hash Tests ====================
+
+    #[test]
+    fn test_receipt_without_contract_hash_omits_field() {
+        let unsigned = sample_unsigned_receipt();
+        assert_eq!(unsigned.contract_hash, None);
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(!json.contains("contract_hash"));
+    }
+
+    #[test]
+    fn test_receipt_with_contract_hash_roundtrip() {
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.contract_hash = Some("a".repeat(64));
+
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(json.contains("contract_hash"));
+        let parsed: UnsignedReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(unsigned, parsed);
+    }
+
+    // ==================== Output Schema ID Tests ====================
+
+    #[test]
+    fn test_receipt_without_output_schema_id_omits_field() {
+        let unsigned = sample_unsigned_receipt();
+        assert_eq!(unsigned.output_schema_id, None);
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(!json.contains("\"output_schema_id\""));
+    }
+
+    #[test]
+    fn test_receipt_with_output_schema_id_roundtrip() {
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.output_schema_id = Some("vault_result_compatibility".to_string());
+
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(json.contains("output_schema_id"));
+        let parsed: UnsignedReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(unsigned, parsed);
+    }
+
+    // ==================== Backward Compatibility Tests ====================
+
+    #[test]
+    fn test_old_receipt_without_new_fields_deserializes() {
+        // Simulate a receipt JSON from before contract_hash and output_schema_id existed
+        let unsigned = sample_unsigned_receipt();
+        let mut value = serde_json::to_value(&unsigned).unwrap();
+        let obj = value.as_object_mut().unwrap();
+        obj.remove("contract_hash");
+        obj.remove("output_schema_id");
+
+        let parsed: UnsignedReceipt = serde_json::from_value(value).unwrap();
+        assert_eq!(parsed.contract_hash, None);
+        assert_eq!(parsed.output_schema_id, None);
+    }
+
+    // ==================== Builder with New Fields Tests ====================
+
+    #[test]
+    fn test_receipt_builder_with_contract_hash_and_output_schema_id() {
+        let usage = sample_budget_usage();
+        let start = Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap();
+
+        let unsigned = Receipt::builder()
+            .session_id("b".repeat(64))
+            .purpose_code(Purpose::Compatibility)
+            .participant_ids(vec!["agent-a".to_string(), "agent-b".to_string()])
+            .runtime_hash("c".repeat(64))
+            .guardian_policy_hash("d".repeat(64))
+            .model_weights_hash("e".repeat(64))
+            .llama_cpp_version("0.1.0")
+            .inference_config_hash("f".repeat(64))
+            .output_schema_version("1.0.0")
+            .session_start(start)
+            .session_end(end)
+            .fixed_window_duration_seconds(120)
+            .status(ReceiptStatus::Completed)
+            .execution_lane(ExecutionLane::GlassLocal)
+            .output_entropy_bits(8)
+            .budget_usage(usage)
+            .contract_hash(Some("a".repeat(64)))
+            .output_schema_id(Some("vault_result_compatibility".to_string()))
+            .build_unsigned()
+            .expect("Builder should succeed");
+
+        assert_eq!(unsigned.contract_hash, Some("a".repeat(64)));
+        assert_eq!(unsigned.output_schema_id, Some("vault_result_compatibility".to_string()));
+
+        let signed = unsigned.sign("e".repeat(128));
+        assert_eq!(signed.contract_hash, Some("a".repeat(64)));
+        assert_eq!(signed.output_schema_id, Some("vault_result_compatibility".to_string()));
+    }
+
+    // ==================== Test Vector Generation ====================
+
+    #[test]
+    fn test_generate_receipt_v2_vector_02() {
+        use crate::{
+            compute_receipt_hash, sign_receipt, verify_receipt,
+            public_key_to_hex, SigningKey, BudgetChainRecord, RECEIPT_HASH_PLACEHOLDER,
+        };
+
+        let signing_key = SigningKey::from_bytes(&[0x03u8; 32]);
+        let verifying_key = signing_key.verifying_key();
+        let verifying_key_hex = public_key_to_hex(&verifying_key);
+
+        let mut unsigned = UnsignedReceipt {
+            schema_version: SCHEMA_VERSION.to_string(),
+            session_id: "b".repeat(64),
+            purpose_code: Purpose::Compatibility,
+            participant_ids: vec!["agent-alice".to_string(), "agent-bob".to_string()],
+            runtime_hash: "c".repeat(64),
+            guardian_policy_hash: "d".repeat(64),
+            model_weights_hash: "e".repeat(64),
+            llama_cpp_version: "0.1.0".to_string(),
+            inference_config_hash: "f".repeat(64),
+            output_schema_version: "1.0.0".to_string(),
+            session_start: Utc.with_ymd_and_hms(2025, 6, 1, 12, 0, 0).unwrap(),
+            session_end: Utc.with_ymd_and_hms(2025, 6, 1, 12, 2, 0).unwrap(),
+            fixed_window_duration_seconds: 120,
+            status: ReceiptStatus::Completed,
+            execution_lane: ExecutionLane::GlassLocal,
+            output: Some(serde_json::json!({
+                "decision": "PROCEED",
+                "confidence_bucket": "HIGH",
+                "reason_code": "MUTUAL_INTEREST_UNCLEAR"
+            })),
+            output_entropy_bits: 8,
+            mitigations_applied: vec![],
+            budget_usage: sample_budget_usage(),
+            budget_chain: Some(BudgetChainRecord {
+                chain_id: format!("chain-{}", "1".repeat(64)),
+                prev_receipt_hash: None,
+                receipt_hash: RECEIPT_HASH_PLACEHOLDER.to_string(),
+            }),
+            model_identity: None,
+            agreement_hash: None,
+            model_profile_hash: None,
+            policy_bundle_hash: None,
+            contract_hash: Some("a".repeat(64)),
+            output_schema_id: Some("vault_result_compatibility".to_string()),
+            receipt_key_id: None,
+            attestation: None,
+        };
+
+        // Patch receipt hash
+        let receipt_hash = compute_receipt_hash(&unsigned).expect("compute hash");
+        unsigned.budget_chain.as_mut().unwrap().receipt_hash = receipt_hash;
+
+        // Sign
+        let signature = sign_receipt(&unsigned, &signing_key).expect("sign");
+
+        // Verify signature
+        verify_receipt(&unsigned, &signature, &verifying_key)
+            .expect("signature must verify");
+
+        let signed = unsigned.sign(signature.clone());
+
+        // Verify contract_hash and output_schema_id are present in JSON
+        let json = serde_json::to_string_pretty(&signed).unwrap();
+        assert!(json.contains("contract_hash"));
+        assert!(json.contains("output_schema_id"));
+        assert!(json.contains("vault_result_compatibility"));
+
+        // Write vector file
+        let vector = serde_json::json!({
+            "description": "Signed receipt with contract_hash and output_schema_id fields (COMPLETED, Ed25519)",
+            "expected": {
+                "signature_hex": signature,
+                "verification_result": "PASS"
+            },
+            "input": {
+                "signed_receipt": signed,
+                "verifying_key_hex": verifying_key_hex
+            },
+            "schemas": [
+                "https://vcav.io/schemas/receipt.v2.schema.json"
+            ]
+        });
+
+        let vector_path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-vectors/receipt_v2_vector_02.json"
+        );
+        std::fs::write(
+            vector_path,
+            serde_json::to_string_pretty(&vector).unwrap(),
+        )
+        .expect("write vector file");
+
+        // Verify the vector file can be read back
+        let read_back: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(vector_path).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(read_back["expected"]["verification_result"], "PASS");
+        assert!(read_back["input"]["signed_receipt"]["contract_hash"].is_string());
+        assert!(read_back["input"]["signed_receipt"]["output_schema_id"].is_string());
     }
 }
