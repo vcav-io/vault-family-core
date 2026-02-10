@@ -2639,7 +2639,8 @@ mod tests {
     // ========================================================================
 
     use receipt_core::{
-        sign_manifest, ArtefactEntry, ManifestArtefacts, PublicationManifest, UnsignedManifest,
+        compute_operator_key_id, sign_manifest, ArtefactEntry, ManifestArtefacts,
+        PublicationManifest, UnsignedManifest,
     };
 
     /// Create a receipt with known artefact hashes and a matching signed manifest.
@@ -2668,10 +2669,12 @@ mod tests {
         writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
 
         // Create manifest that covers these hashes
+        let manifest_pub_hex = public_key_to_hex(&manifest_vk);
         let unsigned_manifest = UnsignedManifest {
             manifest_version: "1.0.0".to_string(),
             operator_id: "operator-test-001".to_string(),
-            operator_public_key_hex: public_key_to_hex(&manifest_vk),
+            operator_key_id: compute_operator_key_id(&manifest_pub_hex),
+            operator_public_key_hex: manifest_pub_hex,
             protocol_version: "1.0.0".to_string(),
             published_at: "2026-02-10T00:00:00Z".to_string(),
             artefacts: ManifestArtefacts {
@@ -2694,6 +2697,7 @@ mod tests {
         let manifest = PublicationManifest {
             manifest_version: unsigned_manifest.manifest_version,
             operator_id: unsigned_manifest.operator_id,
+            operator_key_id: unsigned_manifest.operator_key_id,
             operator_public_key_hex: unsigned_manifest.operator_public_key_hex,
             protocol_version: unsigned_manifest.protocol_version,
             published_at: unsigned_manifest.published_at,
@@ -2821,10 +2825,12 @@ mod tests {
         writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
 
         // Manifest with different profile hash
+        let manifest_pub_hex = public_key_to_hex(&manifest_vk);
         let unsigned_manifest = UnsignedManifest {
             manifest_version: "1.0.0".to_string(),
             operator_id: "operator-test-001".to_string(),
-            operator_public_key_hex: public_key_to_hex(&manifest_vk),
+            operator_key_id: compute_operator_key_id(&manifest_pub_hex),
+            operator_public_key_hex: manifest_pub_hex,
             protocol_version: "1.0.0".to_string(),
             published_at: "2026-02-10T00:00:00Z".to_string(),
             artefacts: ManifestArtefacts {
@@ -2847,6 +2853,7 @@ mod tests {
         let manifest = PublicationManifest {
             manifest_version: unsigned_manifest.manifest_version,
             operator_id: unsigned_manifest.operator_id,
+            operator_key_id: unsigned_manifest.operator_key_id,
             operator_public_key_hex: unsigned_manifest.operator_public_key_hex,
             protocol_version: unsigned_manifest.protocol_version,
             published_at: unsigned_manifest.published_at,
@@ -2916,10 +2923,12 @@ mod tests {
         writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
 
         // Manifest with profile covered but different policy AND contract hashes
+        let manifest_pub_hex = public_key_to_hex(&manifest_vk);
         let unsigned_manifest = UnsignedManifest {
             manifest_version: "1.0.0".to_string(),
             operator_id: "operator-test-001".to_string(),
-            operator_public_key_hex: public_key_to_hex(&manifest_vk),
+            operator_key_id: compute_operator_key_id(&manifest_pub_hex),
+            operator_public_key_hex: manifest_pub_hex,
             protocol_version: "1.0.0".to_string(),
             published_at: "2026-02-10T00:00:00Z".to_string(),
             artefacts: ManifestArtefacts {
@@ -2942,6 +2951,7 @@ mod tests {
         let manifest = PublicationManifest {
             manifest_version: unsigned_manifest.manifest_version,
             operator_id: unsigned_manifest.operator_id,
+            operator_key_id: unsigned_manifest.operator_key_id,
             operator_public_key_hex: unsigned_manifest.operator_public_key_hex,
             protocol_version: unsigned_manifest.protocol_version,
             published_at: unsigned_manifest.published_at,
@@ -3051,10 +3061,12 @@ mod tests {
 
         // Create signed manifest
         let (manifest_sk, manifest_vk) = generate_keypair();
+        let manifest_pub_hex = public_key_to_hex(&manifest_vk);
         let unsigned_manifest = UnsignedManifest {
             manifest_version: "1.0.0".to_string(),
             operator_id: "operator-combined-001".to_string(),
-            operator_public_key_hex: public_key_to_hex(&manifest_vk),
+            operator_key_id: compute_operator_key_id(&manifest_pub_hex),
+            operator_public_key_hex: manifest_pub_hex,
             protocol_version: "1.0.0".to_string(),
             published_at: "2026-02-10T00:00:00Z".to_string(),
             artefacts: ManifestArtefacts {
@@ -3076,6 +3088,7 @@ mod tests {
         let manifest = PublicationManifest {
             manifest_version: unsigned_manifest.manifest_version,
             operator_id: unsigned_manifest.operator_id,
+            operator_key_id: unsigned_manifest.operator_key_id,
             operator_public_key_hex: unsigned_manifest.operator_public_key_hex,
             protocol_version: unsigned_manifest.protocol_version,
             published_at: unsigned_manifest.published_at,

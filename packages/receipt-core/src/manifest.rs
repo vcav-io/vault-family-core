@@ -7,6 +7,7 @@
 
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::canonicalize::canonicalize_serializable;
 use crate::signer::{hash_message, parse_signature_hex, SigningError};
@@ -17,6 +18,15 @@ use crate::signer::{hash_message, parse_signature_hex, SigningError};
 
 /// Domain separation prefix for manifest signatures
 pub const MANIFEST_DOMAIN_PREFIX: &str = "VCAV-MANIFEST-V1:";
+
+/// Compute a stable operator key identifier from the hex-encoded public key.
+///
+/// Format: `opkey-` + 64 lowercase hex (SHA-256 of the UTF-8 bytes of `public_key_hex`).
+pub fn compute_operator_key_id(public_key_hex: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(public_key_hex.as_bytes());
+    format!("opkey-{}", hex::encode(hasher.finalize()))
+}
 
 // ============================================================================
 // Types
@@ -52,6 +62,8 @@ pub struct UnsignedManifest {
     pub manifest_version: String,
     /// Operator identifier (e.g. "operator-acme-001")
     pub operator_id: String,
+    /// Stable key identifier: `opkey-` + hex(SHA-256(operator_public_key_hex as UTF-8 bytes))
+    pub operator_key_id: String,
     /// 64-character hex-encoded Ed25519 verifying key
     pub operator_public_key_hex: String,
     /// VCAV protocol version (e.g. "1.0.0")
@@ -69,6 +81,8 @@ pub struct PublicationManifest {
     pub manifest_version: String,
     /// Operator identifier
     pub operator_id: String,
+    /// Stable key identifier: `opkey-` + hex(SHA-256(operator_public_key_hex as UTF-8 bytes))
+    pub operator_key_id: String,
     /// 64-character hex-encoded Ed25519 verifying key
     pub operator_public_key_hex: String,
     /// VCAV protocol version
@@ -87,6 +101,7 @@ impl PublicationManifest {
         UnsignedManifest {
             manifest_version: self.manifest_version.clone(),
             operator_id: self.operator_id.clone(),
+            operator_key_id: self.operator_key_id.clone(),
             operator_public_key_hex: self.operator_public_key_hex.clone(),
             protocol_version: self.protocol_version.clone(),
             published_at: self.published_at.clone(),
@@ -167,10 +182,12 @@ mod tests {
     }
 
     fn sample_unsigned_manifest(verifying_key: &VerifyingKey) -> UnsignedManifest {
+        let pub_hex = public_key_to_hex(verifying_key);
         UnsignedManifest {
             manifest_version: "1.0.0".to_string(),
             operator_id: "operator-acme-001".to_string(),
-            operator_public_key_hex: public_key_to_hex(verifying_key),
+            operator_key_id: compute_operator_key_id(&pub_hex),
+            operator_public_key_hex: pub_hex,
             protocol_version: "1.0.0".to_string(),
             published_at: "2026-02-10T00:00:00Z".to_string(),
             artefacts: sample_artefacts(),
@@ -251,6 +268,7 @@ mod tests {
         let manifest = PublicationManifest {
             manifest_version: unsigned.manifest_version.clone(),
             operator_id: unsigned.operator_id.clone(),
+            operator_key_id: unsigned.operator_key_id.clone(),
             operator_public_key_hex: unsigned.operator_public_key_hex.clone(),
             protocol_version: unsigned.protocol_version.clone(),
             published_at: unsigned.published_at.clone(),
@@ -271,6 +289,7 @@ mod tests {
         let manifest = PublicationManifest {
             manifest_version: unsigned.manifest_version,
             operator_id: unsigned.operator_id,
+            operator_key_id: unsigned.operator_key_id,
             operator_public_key_hex: unsigned.operator_public_key_hex,
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
@@ -293,6 +312,7 @@ mod tests {
         let mut manifest = PublicationManifest {
             manifest_version: unsigned.manifest_version,
             operator_id: unsigned.operator_id,
+            operator_key_id: unsigned.operator_key_id,
             operator_public_key_hex: unsigned.operator_public_key_hex,
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
@@ -317,6 +337,7 @@ mod tests {
         let mut manifest = PublicationManifest {
             manifest_version: unsigned.manifest_version,
             operator_id: unsigned.operator_id,
+            operator_key_id: unsigned.operator_key_id,
             operator_public_key_hex: unsigned.operator_public_key_hex,
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
@@ -407,6 +428,7 @@ mod tests {
         let manifest = PublicationManifest {
             manifest_version: unsigned.manifest_version.clone(),
             operator_id: unsigned.operator_id.clone(),
+            operator_key_id: unsigned.operator_key_id.clone(),
             operator_public_key_hex: unsigned.operator_public_key_hex.clone(),
             protocol_version: unsigned.protocol_version.clone(),
             published_at: unsigned.published_at.clone(),
@@ -437,6 +459,7 @@ mod tests {
         let manifest = PublicationManifest {
             manifest_version: unsigned.manifest_version,
             operator_id: unsigned.operator_id,
+            operator_key_id: unsigned.operator_key_id,
             operator_public_key_hex: unsigned.operator_public_key_hex,
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
@@ -456,6 +479,7 @@ mod tests {
         let manifest = PublicationManifest {
             manifest_version: unsigned.manifest_version,
             operator_id: unsigned.operator_id,
+            operator_key_id: unsigned.operator_key_id,
             operator_public_key_hex: unsigned.operator_public_key_hex,
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
@@ -465,6 +489,7 @@ mod tests {
         let json = serde_json::to_string(&manifest).unwrap();
         assert!(json.contains("\"manifest_version\""));
         assert!(json.contains("\"operator_id\""));
+        assert!(json.contains("\"operator_key_id\""));
         assert!(json.contains("\"operator_public_key_hex\""));
         assert!(json.contains("\"protocol_version\""));
         assert!(json.contains("\"published_at\""));
@@ -473,5 +498,36 @@ mod tests {
         assert!(json.contains("\"contracts\""));
         assert!(json.contains("\"profiles\""));
         assert!(json.contains("\"policies\""));
+    }
+
+    // ==================== Operator Key ID Tests ====================
+
+    #[test]
+    fn test_compute_operator_key_id_format() {
+        let (_, vk) = generate_keypair();
+        let pub_hex = public_key_to_hex(&vk);
+        let key_id = compute_operator_key_id(&pub_hex);
+        assert!(key_id.starts_with("opkey-"));
+        // opkey- (6 chars) + 64 hex chars = 70
+        assert_eq!(key_id.len(), 70);
+        assert!(key_id[6..].chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_compute_operator_key_id_deterministic() {
+        let (_, vk) = generate_keypair();
+        let pub_hex = public_key_to_hex(&vk);
+        let id1 = compute_operator_key_id(&pub_hex);
+        let id2 = compute_operator_key_id(&pub_hex);
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn test_compute_operator_key_id_different_keys() {
+        let (_, vk1) = generate_keypair();
+        let (_, vk2) = generate_keypair();
+        let id1 = compute_operator_key_id(&public_key_to_hex(&vk1));
+        let id2 = compute_operator_key_id(&public_key_to_hex(&vk2));
+        assert_ne!(id1, id2);
     }
 }

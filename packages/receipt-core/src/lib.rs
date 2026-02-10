@@ -41,8 +41,9 @@ pub use receipt::{
     ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
 };
 pub use manifest::{
-    create_manifest_signing_message, sign_manifest, verify_manifest, ArtefactEntry,
-    ManifestArtefacts, PublicationManifest, UnsignedManifest, MANIFEST_DOMAIN_PREFIX,
+    compute_operator_key_id, create_manifest_signing_message, sign_manifest, verify_manifest,
+    ArtefactEntry, ManifestArtefacts, PublicationManifest, UnsignedManifest,
+    MANIFEST_DOMAIN_PREFIX,
 };
 pub use signer::{
     compute_budget_chain_id, compute_receipt_hash, compute_receipt_key_id,

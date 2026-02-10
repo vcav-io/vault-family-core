@@ -16,9 +16,9 @@ use std::process::Command;
 
 use chrono::{TimeZone, Utc};
 use receipt_core::{
-    generate_keypair, public_key_to_hex, sign_manifest, sign_receipt, verify_manifest,
-    verify_receipt, ArtefactEntry, BudgetUsageRecord, ExecutionLane, ManifestArtefacts,
-    PublicationManifest, ReceiptBuilder, ReceiptStatus, UnsignedManifest,
+    compute_operator_key_id, generate_keypair, public_key_to_hex, sign_manifest, sign_receipt,
+    verify_manifest, verify_receipt, ArtefactEntry, BudgetUsageRecord, ExecutionLane,
+    ManifestArtefacts, PublicationManifest, ReceiptBuilder, ReceiptStatus, UnsignedManifest,
 };
 use sha2::{Digest, Sha256};
 
@@ -144,10 +144,12 @@ fn build_signed_manifest(
     verifying_key: &receipt_core::VerifyingKey,
     artefacts: &TestArtefacts,
 ) -> PublicationManifest {
+    let pub_hex = public_key_to_hex(verifying_key);
     let unsigned = UnsignedManifest {
         manifest_version: "1.0.0".to_string(),
         operator_id: "operator-test-001".to_string(),
-        operator_public_key_hex: public_key_to_hex(verifying_key),
+        operator_key_id: compute_operator_key_id(&pub_hex),
+        operator_public_key_hex: pub_hex,
         protocol_version: "1.0.0".to_string(),
         published_at: "2025-06-01T00:00:00Z".to_string(),
         artefacts: ManifestArtefacts {
@@ -171,6 +173,7 @@ fn build_signed_manifest(
     PublicationManifest {
         manifest_version: unsigned.manifest_version,
         operator_id: unsigned.operator_id,
+        operator_key_id: unsigned.operator_key_id,
         operator_public_key_hex: unsigned.operator_public_key_hex,
         protocol_version: unsigned.protocol_version,
         published_at: unsigned.published_at,
