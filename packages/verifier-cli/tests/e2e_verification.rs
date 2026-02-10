@@ -216,6 +216,8 @@ fn write_receipt_file(
         receipt_key_id: unsigned.receipt_key_id.clone(),
         model_profile_hash: unsigned.model_profile_hash.clone(),
         policy_bundle_hash: unsigned.policy_bundle_hash.clone(),
+        contract_hash: unsigned.contract_hash.clone(),
+        output_schema_id: unsigned.output_schema_id.clone(),
         attestation: unsigned.attestation.clone(),
         signature: signature.to_string(),
     };

@@ -2,6 +2,7 @@
 //!
 //! Tier 1 (Receipt-only): Signature, schema, budget-chain hash, agreement hash recomputation
 //! Tier 2 (Receipt + artefacts): Tier 1 + profile/policy/contract hash verification
+//! Tier 3 (Manifest): Tier 1/2 + manifest signature verification and artefact coverage
 
 use receipt_core::{
     canonicalize::canonicalize_serializable, compute_agreement_hash, SessionAgreementFields,
@@ -10,6 +11,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
+
+// Re-export manifest types from verifier-core (single source of truth for CLI + WASM)
+pub use verifier_core::{ManifestResult, ManifestVerifyError};
 
 // ============================================================================
 // Domain Prefixes (must match TypeScript and vault-runtime implementations)
@@ -201,7 +205,7 @@ pub fn build_policy_digest(bundle: &PolicyBundle) -> PolicyDigestV1 {
 /// Results from tier verification checks.
 #[derive(Debug, Clone, Default)]
 pub struct TierResult {
-    /// Which tier was achieved (1 = receipt-only, 2 = receipt + artefacts)
+    /// Which tier was achieved (1 = receipt-only, 2 = receipt + artefacts, 3 = manifest)
     pub tier: u8,
     /// Agreement hash verification result (None = not checked)
     pub agreement_hash_valid: Option<bool>,
@@ -211,6 +215,8 @@ pub struct TierResult {
     pub policy_hash_valid: Option<bool>,
     /// Contract hash verification result (None = not checked)
     pub contract_hash_valid: Option<bool>,
+    /// Manifest verification result (None = not checked)
+    pub manifest: Option<ManifestResult>,
     /// Error message for the first failing check
     pub error: Option<String>,
 }
@@ -277,6 +283,29 @@ pub fn verify_contract_hash(contract_path: &Path, declared_hash: &str) -> Result
     let recomputed = hex::encode(hasher.finalize());
 
     Ok(recomputed == declared_hash)
+}
+
+/// Verify a signed publication manifest from a file (Tier 3).
+/// Delegates to `verifier_core::tiers::verify_manifest_from_str`.
+pub fn verify_manifest_tier(
+    manifest_path: &Path,
+    receipt_profile_hash: Option<&str>,
+    receipt_policy_hash: Option<&str>,
+    receipt_guardian_hash: &str,
+    receipt_runtime_hash: Option<&str>,
+    strict_runtime: bool,
+) -> Result<ManifestResult, ManifestVerifyError> {
+    let content = fs::read_to_string(manifest_path)
+        .map_err(|e| ManifestVerifyError::Other(format!("Failed to read manifest file: {}", e)))?;
+
+    verifier_core::tiers::verify_manifest_from_str(
+        &content,
+        receipt_profile_hash,
+        receipt_policy_hash,
+        receipt_guardian_hash,
+        receipt_runtime_hash,
+        strict_runtime,
+    )
 }
 
 #[cfg(test)]
