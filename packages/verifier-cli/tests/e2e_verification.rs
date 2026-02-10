@@ -166,6 +166,7 @@ fn build_signed_manifest(
                 content_hash: artefacts.policy_hash.clone(),
             }],
         },
+        runtime_hashes: None,
     };
 
     let signature = sign_manifest(&unsigned, signing_key).expect("manifest signing succeeds");
@@ -178,6 +179,7 @@ fn build_signed_manifest(
         protocol_version: unsigned.protocol_version,
         published_at: unsigned.published_at,
         artefacts: unsigned.artefacts,
+        runtime_hashes: unsigned.runtime_hashes,
         signature,
     }
 }

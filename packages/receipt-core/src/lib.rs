@@ -42,7 +42,7 @@ pub use receipt::{
 };
 pub use manifest::{
     compute_operator_key_id, create_manifest_signing_message, sign_manifest, verify_manifest,
-    ArtefactEntry, ManifestArtefacts, PublicationManifest, UnsignedManifest,
+    ArtefactEntry, ManifestArtefacts, PublicationManifest, RuntimeHashes, UnsignedManifest,
     MANIFEST_DOMAIN_PREFIX,
 };
 pub use signer::{

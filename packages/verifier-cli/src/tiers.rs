@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 
 // Re-export types from verifier-core used by callers
-pub use verifier_core::{ManifestResult, TierResult};
+pub use verifier_core::{ManifestResult, ManifestVerifyError, TierResult};
 
 /// Verify the agreement hash by loading SessionAgreementFields from a file
 /// and recomputing the hash.
@@ -60,14 +60,18 @@ pub fn verify_manifest_tier(
     receipt_profile_hash: Option<&str>,
     receipt_policy_hash: Option<&str>,
     receipt_guardian_hash: &str,
-) -> Result<ManifestResult, String> {
+    receipt_runtime_hash: Option<&str>,
+    strict_runtime: bool,
+) -> Result<ManifestResult, ManifestVerifyError> {
     let content = fs::read_to_string(manifest_path)
-        .map_err(|e| format!("Failed to read manifest file: {}", e))?;
+        .map_err(|e| ManifestVerifyError::Other(format!("Failed to read manifest file: {}", e)))?;
 
     verifier_core::tiers::verify_manifest_from_str(
         &content,
         receipt_profile_hash,
         receipt_policy_hash,
         receipt_guardian_hash,
+        receipt_runtime_hash,
+        strict_runtime,
     )
 }

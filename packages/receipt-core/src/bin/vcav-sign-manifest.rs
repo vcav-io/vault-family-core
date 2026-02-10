@@ -210,6 +210,7 @@ fn run() -> Result<(), String> {
             profiles,
             policies,
         },
+        runtime_hashes: None,
     };
 
     let signature = sign_manifest(&unsigned, &signing_key)
@@ -223,6 +224,7 @@ fn run() -> Result<(), String> {
         protocol_version: unsigned.protocol_version,
         published_at: unsigned.published_at,
         artefacts: unsigned.artefacts,
+        runtime_hashes: unsigned.runtime_hashes,
         signature,
     };
 

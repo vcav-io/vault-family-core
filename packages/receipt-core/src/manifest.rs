@@ -41,6 +41,15 @@ pub struct ArtefactEntry {
     pub content_hash: String,
 }
 
+/// Optional runtime hashes for verifying receipt runtime claims against the manifest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuntimeHashes {
+    /// SHA-256 of the vault-runtime binary
+    pub runtime_hash: String,
+    /// SHA-256 of the guardian policy configuration
+    pub guardian_policy_hash: String,
+}
+
 /// Categorized artefact entries in a publication.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ManifestArtefacts {
@@ -72,6 +81,9 @@ pub struct UnsignedManifest {
     pub published_at: String,
     /// Categorized artefact hashes
     pub artefacts: ManifestArtefacts,
+    /// Optional runtime and guardian policy hashes
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_hashes: Option<RuntimeHashes>,
 }
 
 /// Complete signed publication manifest.
@@ -91,6 +103,9 @@ pub struct PublicationManifest {
     pub published_at: String,
     /// Categorized artefact hashes
     pub artefacts: ManifestArtefacts,
+    /// Optional runtime and guardian policy hashes
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_hashes: Option<RuntimeHashes>,
     /// 128-character hex-encoded Ed25519 signature
     pub signature: String,
 }
@@ -106,6 +121,7 @@ impl PublicationManifest {
             protocol_version: self.protocol_version.clone(),
             published_at: self.published_at.clone(),
             artefacts: self.artefacts.clone(),
+            runtime_hashes: self.runtime_hashes.clone(),
         }
     }
 }
@@ -191,6 +207,7 @@ mod tests {
             protocol_version: "1.0.0".to_string(),
             published_at: "2026-02-10T00:00:00Z".to_string(),
             artefacts: sample_artefacts(),
+            runtime_hashes: None,
         }
     }
 
@@ -273,6 +290,7 @@ mod tests {
             protocol_version: unsigned.protocol_version.clone(),
             published_at: unsigned.published_at.clone(),
             artefacts: unsigned.artefacts.clone(),
+            runtime_hashes: None,
             signature,
         };
 
@@ -294,6 +312,7 @@ mod tests {
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
             artefacts: unsigned.artefacts,
+            runtime_hashes: None,
             signature,
         };
 
@@ -317,6 +336,7 @@ mod tests {
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
             artefacts: unsigned.artefacts,
+            runtime_hashes: None,
             signature,
         };
 
@@ -342,6 +362,7 @@ mod tests {
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
             artefacts: unsigned.artefacts,
+            runtime_hashes: None,
             signature,
         };
 
@@ -433,6 +454,7 @@ mod tests {
             protocol_version: unsigned.protocol_version.clone(),
             published_at: unsigned.published_at.clone(),
             artefacts: unsigned.artefacts.clone(),
+            runtime_hashes: None,
             signature,
         };
 
@@ -464,6 +486,7 @@ mod tests {
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
             artefacts: unsigned.artefacts,
+            runtime_hashes: None,
             signature,
         };
         let json = serde_json::to_string_pretty(&manifest).unwrap();
@@ -484,6 +507,7 @@ mod tests {
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
             artefacts: unsigned.artefacts,
+            runtime_hashes: None,
             signature,
         };
         let json = serde_json::to_string(&manifest).unwrap();
@@ -498,6 +522,112 @@ mod tests {
         assert!(json.contains("\"contracts\""));
         assert!(json.contains("\"profiles\""));
         assert!(json.contains("\"policies\""));
+        // runtime_hashes is None so should not appear
+        assert!(!json.contains("\"runtime_hashes\""));
+    }
+
+    #[test]
+    fn test_manifest_with_runtime_hashes_serialization() {
+        let (sk, vk) = generate_keypair();
+        let mut unsigned = sample_unsigned_manifest(&vk);
+        unsigned.runtime_hashes = Some(RuntimeHashes {
+            runtime_hash: "d".repeat(64),
+            guardian_policy_hash: "e".repeat(64),
+        });
+        let signature = sign_manifest(&unsigned, &sk).unwrap();
+        let manifest = PublicationManifest {
+            manifest_version: unsigned.manifest_version.clone(),
+            operator_id: unsigned.operator_id.clone(),
+            operator_key_id: unsigned.operator_key_id.clone(),
+            operator_public_key_hex: unsigned.operator_public_key_hex.clone(),
+            protocol_version: unsigned.protocol_version.clone(),
+            published_at: unsigned.published_at.clone(),
+            artefacts: unsigned.artefacts.clone(),
+            runtime_hashes: unsigned.runtime_hashes.clone(),
+            signature,
+        };
+
+        let json = serde_json::to_string(&manifest).unwrap();
+        assert!(json.contains("\"runtime_hashes\""));
+        assert!(json.contains("\"runtime_hash\""));
+        assert!(json.contains("\"guardian_policy_hash\""));
+
+        // Roundtrip
+        let parsed: PublicationManifest = serde_json::from_str(&json).unwrap();
+        assert_eq!(manifest, parsed);
+        assert_eq!(
+            parsed.runtime_hashes.as_ref().unwrap().runtime_hash,
+            "d".repeat(64)
+        );
+    }
+
+    #[test]
+    fn test_to_unsigned_preserves_runtime_hashes() {
+        let (sk, vk) = generate_keypair();
+        let mut unsigned = sample_unsigned_manifest(&vk);
+        unsigned.runtime_hashes = Some(RuntimeHashes {
+            runtime_hash: "d".repeat(64),
+            guardian_policy_hash: "e".repeat(64),
+        });
+        let signature = sign_manifest(&unsigned, &sk).unwrap();
+        let manifest = PublicationManifest {
+            manifest_version: unsigned.manifest_version.clone(),
+            operator_id: unsigned.operator_id.clone(),
+            operator_key_id: unsigned.operator_key_id.clone(),
+            operator_public_key_hex: unsigned.operator_public_key_hex.clone(),
+            protocol_version: unsigned.protocol_version.clone(),
+            published_at: unsigned.published_at.clone(),
+            artefacts: unsigned.artefacts.clone(),
+            runtime_hashes: unsigned.runtime_hashes.clone(),
+            signature,
+        };
+        let extracted = manifest.to_unsigned();
+        assert_eq!(extracted.runtime_hashes, unsigned.runtime_hashes);
+    }
+
+    #[test]
+    fn test_sign_and_verify_with_runtime_hashes() {
+        let (sk, vk) = generate_keypair();
+        let mut unsigned = sample_unsigned_manifest(&vk);
+        unsigned.runtime_hashes = Some(RuntimeHashes {
+            runtime_hash: "d".repeat(64),
+            guardian_policy_hash: "e".repeat(64),
+        });
+        let signature = sign_manifest(&unsigned, &sk).unwrap();
+        let manifest = PublicationManifest {
+            manifest_version: unsigned.manifest_version.clone(),
+            operator_id: unsigned.operator_id.clone(),
+            operator_key_id: unsigned.operator_key_id.clone(),
+            operator_public_key_hex: unsigned.operator_public_key_hex.clone(),
+            protocol_version: unsigned.protocol_version.clone(),
+            published_at: unsigned.published_at.clone(),
+            artefacts: unsigned.artefacts.clone(),
+            runtime_hashes: unsigned.runtime_hashes.clone(),
+            signature,
+        };
+        assert!(verify_manifest(&manifest, &vk).is_ok());
+    }
+
+    #[test]
+    fn test_backward_compat_no_runtime_hashes_in_json() {
+        // A manifest JSON without runtime_hashes should deserialize with None
+        let (sk, vk) = generate_keypair();
+        let unsigned = sample_unsigned_manifest(&vk);
+        let signature = sign_manifest(&unsigned, &sk).unwrap();
+
+        // Build JSON manually without runtime_hashes
+        let json = serde_json::json!({
+            "manifest_version": unsigned.manifest_version,
+            "operator_id": unsigned.operator_id,
+            "operator_key_id": unsigned.operator_key_id,
+            "operator_public_key_hex": unsigned.operator_public_key_hex,
+            "protocol_version": unsigned.protocol_version,
+            "published_at": unsigned.published_at,
+            "artefacts": unsigned.artefacts,
+            "signature": signature
+        });
+        let parsed: PublicationManifest = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed.runtime_hashes, None);
     }
 
     // ==================== Operator Key ID Tests ====================

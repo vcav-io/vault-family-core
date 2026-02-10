@@ -87,6 +87,10 @@ struct Args {
     /// Path to signed publication manifest JSON for manifest verification (Tier 3)
     #[arg(long)]
     manifest: Option<String>,
+
+    /// Strict runtime hash checking: mismatches are hard failures instead of warnings
+    #[arg(long, default_value = "false")]
+    strict_runtime: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -115,6 +119,8 @@ struct VerificationResult {
     manifest_signature_valid: Option<bool>,
     manifest_profile_covered: Option<bool>,
     manifest_policy_covered: Option<bool>,
+    manifest_runtime_hash_match: Option<bool>,
+    manifest_guardian_hash_match: Option<bool>,
     errors: Vec<String>,
 }
 
@@ -134,6 +140,7 @@ enum VerificationStatus {
     FailManifestSignature,
     FailManifestProfileNotCovered,
     FailManifestPolicyNotCovered,
+    FailManifestRuntimeHash,
 }
 
 impl std::fmt::Display for VerificationStatus {
@@ -155,6 +162,9 @@ impl std::fmt::Display for VerificationStatus {
             }
             VerificationStatus::FailManifestPolicyNotCovered => {
                 write!(f, "FAIL_MANIFEST_POLICY_NOT_COVERED")
+            }
+            VerificationStatus::FailManifestRuntimeHash => {
+                write!(f, "FAIL_MANIFEST_RUNTIME_HASH")
             }
         }
     }
@@ -239,6 +249,12 @@ fn main() -> Result<()> {
                         if let Some(covered) = manifest.policy_covered {
                             println!("Manifest policy covered: {}", covered);
                         }
+                        if let Some(matched) = manifest.runtime_hash_match {
+                            println!("Manifest runtime hash match: {}", matched);
+                        }
+                        if let Some(matched) = manifest.guardian_hash_match {
+                            println!("Manifest guardian hash match: {}", matched);
+                        }
                     }
 
                     if let Some(schema_id) = &details.output_schema_id {
@@ -301,6 +317,16 @@ fn main() -> Result<()> {
                     .manifest
                     .as_ref()
                     .and_then(|m| m.policy_covered),
+                manifest_runtime_hash_match: details
+                    .tier_result
+                    .manifest
+                    .as_ref()
+                    .and_then(|m| m.runtime_hash_match),
+                manifest_guardian_hash_match: details
+                    .tier_result
+                    .manifest
+                    .as_ref()
+                    .and_then(|m| m.guardian_hash_match),
                 errors: details.error.map(|e| vec![e]).unwrap_or_default(),
             };
             println!("{}", serde_json::to_string_pretty(&json_result)?);
@@ -631,6 +657,8 @@ fn verify(args: &Args) -> VerifyDetails {
             receipt.model_profile_hash.as_deref(),
             receipt.policy_bundle_hash.as_deref(),
             &receipt.guardian_policy_hash,
+            Some(&receipt.runtime_hash),
+            args.strict_runtime,
         ) {
             Ok(result) => {
                 if result.signature_valid == Some(false) {
@@ -686,16 +714,23 @@ fn verify(args: &Args) -> VerifyDetails {
                 tier.manifest = Some(result);
             }
             Err(e) => {
+                let is_runtime_err = matches!(e, tiers::ManifestVerifyError::StrictRuntimeMismatch(_));
                 tier.manifest = Some(tiers::ManifestResult {
-                    signature_valid: Some(false),
+                    signature_valid: if is_runtime_err { Some(true) } else { Some(false) },
                     profile_covered: None,
                     policy_covered: None,
+                    runtime_hash_match: None,
+                    guardian_hash_match: None,
                 });
                 tier.error = Some(format!("Manifest verification error: {}", e));
                 let err = tier.error.clone();
                 return VerifyDetails {
                     receipt: Some(receipt),
-                    status: VerificationStatus::FailManifestSignature,
+                    status: if is_runtime_err {
+                        VerificationStatus::FailManifestRuntimeHash
+                    } else {
+                        VerificationStatus::FailManifestSignature
+                    },
                     schema_skipped: false,
                     output_schema_valid: None,
                     output_schema_id: None,
@@ -1255,6 +1290,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1283,6 +1319,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1319,6 +1356,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1354,6 +1392,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1399,6 +1438,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1436,6 +1476,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1476,6 +1517,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1513,6 +1555,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1547,6 +1590,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1571,6 +1615,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1600,6 +1645,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1654,6 +1700,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1684,6 +1731,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1711,6 +1759,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1846,6 +1895,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1879,6 +1929,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -1961,6 +2012,7 @@ mod tests {
                             policy: None,
                             contract: None,
                             manifest: None,
+                            strict_runtime: false,
                         };
 
                         let details = verify(&args);
@@ -2027,6 +2079,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2076,6 +2129,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2103,6 +2157,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2293,6 +2348,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2334,6 +2390,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2413,6 +2470,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2485,6 +2543,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2511,6 +2570,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2575,6 +2635,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2626,6 +2687,7 @@ mod tests {
             policy: Some(policy_file.path().to_str().unwrap().to_string()),
             contract: None,
             manifest: None,
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2691,6 +2753,7 @@ mod tests {
                     content_hash: policy_hash.to_string(),
                 }],
             },
+            runtime_hashes: None,
         };
 
         let manifest_sig = sign_manifest(&unsigned_manifest, &manifest_sk).unwrap();
@@ -2702,6 +2765,7 @@ mod tests {
             protocol_version: unsigned_manifest.protocol_version,
             published_at: unsigned_manifest.published_at,
             artefacts: unsigned_manifest.artefacts,
+            runtime_hashes: unsigned_manifest.runtime_hashes,
             signature: manifest_sig,
         };
 
@@ -2740,6 +2804,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2789,6 +2854,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: Some(tampered_file.path().to_str().unwrap().to_string()),
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2847,6 +2913,7 @@ mod tests {
                     content_hash: policy_hash,
                 }],
             },
+            runtime_hashes: None,
         };
 
         let manifest_sig = sign_manifest(&unsigned_manifest, &manifest_sk).unwrap();
@@ -2858,6 +2925,7 @@ mod tests {
             protocol_version: unsigned_manifest.protocol_version,
             published_at: unsigned_manifest.published_at,
             artefacts: unsigned_manifest.artefacts,
+            runtime_hashes: unsigned_manifest.runtime_hashes,
             signature: manifest_sig,
         };
 
@@ -2884,6 +2952,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -2945,6 +3014,7 @@ mod tests {
                     content_hash: "e".repeat(64), // Different from policy_hash
                 }],
             },
+            runtime_hashes: None,
         };
 
         let manifest_sig = sign_manifest(&unsigned_manifest, &manifest_sk).unwrap();
@@ -2956,6 +3026,7 @@ mod tests {
             protocol_version: unsigned_manifest.protocol_version,
             published_at: unsigned_manifest.published_at,
             artefacts: unsigned_manifest.artefacts,
+            runtime_hashes: unsigned_manifest.runtime_hashes,
             signature: manifest_sig,
         };
 
@@ -2982,6 +3053,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
+            strict_runtime: false,
         };
 
         let details = verify(&args);
@@ -3083,6 +3155,7 @@ mod tests {
                     content_hash: policy_hash,
                 }],
             },
+            runtime_hashes: None,
         };
         let manifest_sig = sign_manifest(&unsigned_manifest, &manifest_sk).unwrap();
         let manifest = PublicationManifest {
@@ -3093,6 +3166,7 @@ mod tests {
             protocol_version: unsigned_manifest.protocol_version,
             published_at: unsigned_manifest.published_at,
             artefacts: unsigned_manifest.artefacts,
+            runtime_hashes: unsigned_manifest.runtime_hashes,
             signature: manifest_sig,
         };
 
@@ -3119,6 +3193,7 @@ mod tests {
             policy: None,
             contract: None,
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
+            strict_runtime: false,
         };
 
         let details = verify(&args);

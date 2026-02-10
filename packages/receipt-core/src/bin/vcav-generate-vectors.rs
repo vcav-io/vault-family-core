@@ -1053,6 +1053,7 @@ fn generate_manifest_vectors(dir: &Path) {
             protocol_version: "1.0.0".to_string(),
             published_at: "2026-01-01T00:00:00Z".to_string(),
             artefacts: artefacts.clone(),
+            runtime_hashes: None,
         };
 
         let canonical =
@@ -1070,6 +1071,7 @@ fn generate_manifest_vectors(dir: &Path) {
             protocol_version: unsigned.protocol_version.clone(),
             published_at: unsigned.published_at.clone(),
             artefacts: unsigned.artefacts.clone(),
+            runtime_hashes: None,
             signature: signature.clone(),
         };
 
@@ -1112,6 +1114,7 @@ fn generate_manifest_vectors(dir: &Path) {
             protocol_version: "1.0.0".to_string(),
             published_at: "2026-01-01T00:00:00Z".to_string(),
             artefacts: artefacts.clone(),
+            runtime_hashes: None,
         };
 
         let signature = sign_manifest(&unsigned, &operator_key).expect("sign manifest");
@@ -1125,6 +1128,7 @@ fn generate_manifest_vectors(dir: &Path) {
             protocol_version: unsigned.protocol_version,
             published_at: unsigned.published_at,
             artefacts: unsigned.artefacts,
+            runtime_hashes: None,
             signature: signature.clone(),
         };
 

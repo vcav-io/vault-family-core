@@ -198,6 +198,29 @@ pub fn build_policy_digest(bundle: &PolicyBundle) -> PolicyDigestV1 {
 }
 
 // ============================================================================
+// Manifest verification error
+// ============================================================================
+
+/// Structured error type for manifest verification, enabling callers to dispatch
+/// on error kind without string matching.
+#[derive(Debug, Clone)]
+pub enum ManifestVerifyError {
+    /// Runtime or guardian hash check failed in strict mode
+    StrictRuntimeMismatch(String),
+    /// Any other verification error (parse, key, signature)
+    Other(String),
+}
+
+impl std::fmt::Display for ManifestVerifyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ManifestVerifyError::StrictRuntimeMismatch(msg) => write!(f, "{}", msg),
+            ManifestVerifyError::Other(msg) => write!(f, "{}", msg),
+        }
+    }
+}
+
+// ============================================================================
 // Tier Result
 // ============================================================================
 
@@ -210,6 +233,12 @@ pub struct ManifestResult {
     pub profile_covered: Option<bool>,
     /// Whether the receipt's policy_bundle_hash is covered by the manifest
     pub policy_covered: Option<bool>,
+    /// Whether the receipt's runtime_hash matches the manifest's runtime_hash
+    /// None = not checked (manifest or receipt missing hash), Some(true) = match, Some(false) = mismatch
+    pub runtime_hash_match: Option<bool>,
+    /// Whether the receipt's guardian_policy_hash matches the manifest's guardian_policy_hash
+    /// None = not checked, Some(true) = match, Some(false) = mismatch
+    pub guardian_hash_match: Option<bool>,
 }
 
 /// Results from tier verification checks.
@@ -294,21 +323,30 @@ pub fn verify_contract_hash_from_bytes(
 /// 1. Parse and verify the manifest signature using the embedded operator public key.
 /// 2. Check if the receipt's `model_profile_hash` appears in the manifest's profile artefacts.
 /// 3. Check if the receipt's `policy_bundle_hash` appears in the manifest's policy artefacts.
+/// 4. If the manifest contains `runtime_hashes`, compare against receipt runtime/guardian hashes.
 ///
 /// The `receipt_guardian_hash` is also checked against both policy and contract artefact
 /// hashes in the manifest for coverage.
+///
+/// ## Runtime hash checking
+///
+/// - **Default mode** (`strict_runtime = false`): mismatches are recorded in
+///   `runtime_hash_match` / `guardian_hash_match` as warnings (caller decides action).
+/// - **Strict mode** (`strict_runtime = true`): any mismatch returns an error.
 pub fn verify_manifest_from_str(
     manifest_json: &str,
     receipt_profile_hash: Option<&str>,
     receipt_policy_hash: Option<&str>,
     receipt_guardian_hash: &str,
-) -> Result<ManifestResult, String> {
+    receipt_runtime_hash: Option<&str>,
+    strict_runtime: bool,
+) -> Result<ManifestResult, ManifestVerifyError> {
     let manifest: PublicationManifest = serde_json::from_str(manifest_json)
-        .map_err(|e| format!("Failed to parse manifest JSON: {}", e))?;
+        .map_err(|e| ManifestVerifyError::Other(format!("Failed to parse manifest JSON: {}", e)))?;
 
     // Parse operator public key from the manifest
     let public_key = parse_public_key_hex(&manifest.operator_public_key_hex)
-        .map_err(|e| format!("Invalid operator public key in manifest: {}", e))?;
+        .map_err(|e| ManifestVerifyError::Other(format!("Invalid operator public key in manifest: {}", e)))?;
 
     // Verify manifest signature
     let signature_valid = verify_manifest(&manifest, &public_key).is_ok();
@@ -318,6 +356,8 @@ pub fn verify_manifest_from_str(
             signature_valid: Some(false),
             profile_covered: None,
             policy_covered: None,
+            runtime_hash_match: None,
+            guardian_hash_match: None,
         });
     }
 
@@ -362,10 +402,40 @@ pub fn verify_manifest_from_str(
         )
     };
 
+    // Check runtime hashes (only if manifest declares them)
+    let (runtime_hash_match, guardian_hash_match) =
+        if let Some(ref manifest_rt) = manifest.runtime_hashes {
+            let rt_match = receipt_runtime_hash
+                .map(|rh| rh == manifest_rt.runtime_hash);
+
+            let gp_match = Some(receipt_guardian_hash == manifest_rt.guardian_policy_hash);
+
+            // In strict mode, mismatches are hard failures
+            if strict_runtime {
+                if let Some(false) = rt_match {
+                    return Err(ManifestVerifyError::StrictRuntimeMismatch(
+                        "receipt runtime_hash does not match manifest".to_string(),
+                    ));
+                }
+                if gp_match == Some(false) {
+                    return Err(ManifestVerifyError::StrictRuntimeMismatch(
+                        "receipt guardian_policy_hash does not match manifest".to_string(),
+                    ));
+                }
+            }
+
+            (rt_match, gp_match)
+        } else {
+            // Manifest has no runtime_hashes — nothing to check
+            (None, None)
+        };
+
     Ok(ManifestResult {
         signature_valid: Some(true),
         profile_covered,
         policy_covered,
+        runtime_hash_match,
+        guardian_hash_match,
     })
 }
 
@@ -636,5 +706,285 @@ mod tests {
 
         assert!(verify_contract_hash_from_bytes(content, &expected_hash).unwrap());
         assert!(!verify_contract_hash_from_bytes(content, "wrong_hash").unwrap());
+    }
+
+    // =========================================================================
+    // Runtime hash verification tests
+    // =========================================================================
+
+    use receipt_core::{
+        compute_operator_key_id, sign_manifest, ArtefactEntry, ManifestArtefacts,
+        PublicationManifest, RuntimeHashes, UnsignedManifest,
+    };
+    use receipt_core::signer::{generate_keypair, public_key_to_hex};
+
+    fn build_test_manifest(runtime_hashes: Option<RuntimeHashes>) -> String {
+        let (sk, vk) = generate_keypair();
+        let pub_hex = public_key_to_hex(&vk);
+        let key_id = compute_operator_key_id(&pub_hex);
+        let unsigned = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-test-001".to_string(),
+            operator_key_id: key_id,
+            operator_public_key_hex: pub_hex,
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-02-10T00:00:00Z".to_string(),
+            artefacts: ManifestArtefacts {
+                contracts: vec![ArtefactEntry {
+                    filename: "contracts/test.json".to_string(),
+                    content_hash: "c".repeat(64),
+                }],
+                profiles: vec![ArtefactEntry {
+                    filename: "profiles/test.json".to_string(),
+                    content_hash: "a".repeat(64),
+                }],
+                policies: vec![ArtefactEntry {
+                    filename: "policies/test.json".to_string(),
+                    content_hash: "b".repeat(64),
+                }],
+            },
+            runtime_hashes,
+        };
+        let sig = sign_manifest(&unsigned, &sk).unwrap();
+        let manifest = PublicationManifest {
+            manifest_version: unsigned.manifest_version,
+            operator_id: unsigned.operator_id,
+            operator_key_id: unsigned.operator_key_id,
+            operator_public_key_hex: unsigned.operator_public_key_hex,
+            protocol_version: unsigned.protocol_version,
+            published_at: unsigned.published_at,
+            artefacts: unsigned.artefacts,
+            runtime_hashes: unsigned.runtime_hashes,
+            signature: sig,
+        };
+        serde_json::to_string(&manifest).unwrap()
+    }
+
+    #[test]
+    fn test_runtime_hashes_none_in_manifest_returns_none() {
+        let json = build_test_manifest(None);
+        let result = verify_manifest_from_str(
+            &json,
+            Some(&"a".repeat(64)),
+            Some(&"b".repeat(64)),
+            &"c".repeat(64),
+            Some(&"d".repeat(64)),
+            false,
+        )
+        .unwrap();
+        assert_eq!(result.signature_valid, Some(true));
+        assert_eq!(result.runtime_hash_match, None);
+        assert_eq!(result.guardian_hash_match, None);
+    }
+
+    #[test]
+    fn test_runtime_hashes_match() {
+        let rt_hash = "d".repeat(64);
+        let gp_hash = "e".repeat(64);
+        let json = build_test_manifest(Some(RuntimeHashes {
+            runtime_hash: rt_hash.clone(),
+            guardian_policy_hash: gp_hash.clone(),
+        }));
+        let result = verify_manifest_from_str(
+            &json,
+            Some(&"a".repeat(64)),
+            Some(&"b".repeat(64)),
+            &gp_hash,
+            Some(&rt_hash),
+            false,
+        )
+        .unwrap();
+        assert_eq!(result.signature_valid, Some(true));
+        assert_eq!(result.runtime_hash_match, Some(true));
+        assert_eq!(result.guardian_hash_match, Some(true));
+    }
+
+    #[test]
+    fn test_runtime_hash_mismatch_default_mode_warns() {
+        let rt_hash = "d".repeat(64);
+        let gp_hash = "e".repeat(64);
+        let json = build_test_manifest(Some(RuntimeHashes {
+            runtime_hash: rt_hash.clone(),
+            guardian_policy_hash: gp_hash.clone(),
+        }));
+        // Mismatched runtime_hash
+        let result = verify_manifest_from_str(
+            &json,
+            Some(&"a".repeat(64)),
+            Some(&"b".repeat(64)),
+            &gp_hash,
+            Some(&"f".repeat(64)),
+            false,
+        )
+        .unwrap();
+        assert_eq!(result.signature_valid, Some(true));
+        assert_eq!(result.runtime_hash_match, Some(false));
+        assert_eq!(result.guardian_hash_match, Some(true));
+    }
+
+    #[test]
+    fn test_guardian_hash_mismatch_default_mode_warns() {
+        let rt_hash = "d".repeat(64);
+        let gp_hash = "e".repeat(64);
+        let json = build_test_manifest(Some(RuntimeHashes {
+            runtime_hash: rt_hash.clone(),
+            guardian_policy_hash: gp_hash,
+        }));
+        // Mismatched guardian_policy_hash
+        let result = verify_manifest_from_str(
+            &json,
+            Some(&"a".repeat(64)),
+            Some(&"b".repeat(64)),
+            &"f".repeat(64), // different from manifest
+            Some(&rt_hash),
+            false,
+        )
+        .unwrap();
+        assert_eq!(result.signature_valid, Some(true));
+        assert_eq!(result.runtime_hash_match, Some(true));
+        assert_eq!(result.guardian_hash_match, Some(false));
+    }
+
+    #[test]
+    fn test_strict_runtime_hash_mismatch_returns_error() {
+        let rt_hash = "d".repeat(64);
+        let gp_hash = "e".repeat(64);
+        let json = build_test_manifest(Some(RuntimeHashes {
+            runtime_hash: rt_hash,
+            guardian_policy_hash: gp_hash.clone(),
+        }));
+        let result = verify_manifest_from_str(
+            &json,
+            Some(&"a".repeat(64)),
+            Some(&"b".repeat(64)),
+            &gp_hash,
+            Some(&"f".repeat(64)), // mismatched
+            true,                  // strict
+        );
+        let err = result.unwrap_err();
+        assert!(matches!(err, ManifestVerifyError::StrictRuntimeMismatch(_)));
+        assert!(err.to_string().contains("runtime_hash"));
+    }
+
+    #[test]
+    fn test_strict_guardian_hash_mismatch_returns_error() {
+        let rt_hash = "d".repeat(64);
+        let gp_hash = "e".repeat(64);
+        let json = build_test_manifest(Some(RuntimeHashes {
+            runtime_hash: rt_hash.clone(),
+            guardian_policy_hash: gp_hash,
+        }));
+        let result = verify_manifest_from_str(
+            &json,
+            Some(&"a".repeat(64)),
+            Some(&"b".repeat(64)),
+            &"f".repeat(64), // mismatched guardian
+            Some(&rt_hash),
+            true, // strict
+        );
+        let err = result.unwrap_err();
+        assert!(matches!(err, ManifestVerifyError::StrictRuntimeMismatch(_)));
+        assert!(err.to_string().contains("guardian_policy_hash"));
+    }
+
+    #[test]
+    fn test_strict_mode_passes_when_hashes_match() {
+        let rt_hash = "d".repeat(64);
+        let gp_hash = "e".repeat(64);
+        let json = build_test_manifest(Some(RuntimeHashes {
+            runtime_hash: rt_hash.clone(),
+            guardian_policy_hash: gp_hash.clone(),
+        }));
+        let result = verify_manifest_from_str(
+            &json,
+            Some(&"a".repeat(64)),
+            Some(&"b".repeat(64)),
+            &gp_hash,
+            Some(&rt_hash),
+            true, // strict
+        )
+        .unwrap();
+        assert_eq!(result.signature_valid, Some(true));
+        assert_eq!(result.runtime_hash_match, Some(true));
+        assert_eq!(result.guardian_hash_match, Some(true));
+    }
+
+    #[test]
+    fn test_runtime_hash_none_receipt_with_manifest_hashes() {
+        let rt_hash = "d".repeat(64);
+        let gp_hash = "e".repeat(64);
+        let json = build_test_manifest(Some(RuntimeHashes {
+            runtime_hash: rt_hash,
+            guardian_policy_hash: gp_hash.clone(),
+        }));
+        // Receipt has no runtime_hash (None)
+        let result = verify_manifest_from_str(
+            &json,
+            Some(&"a".repeat(64)),
+            Some(&"b".repeat(64)),
+            &gp_hash,
+            None, // no receipt runtime hash
+            false,
+        )
+        .unwrap();
+        assert_eq!(result.runtime_hash_match, None);
+        assert_eq!(result.guardian_hash_match, Some(true));
+    }
+
+    #[test]
+    fn test_manifest_runtime_hashes_included_in_signature() {
+        // Verify that runtime_hashes are part of the signed manifest data
+        // (changing them after signing should invalidate the signature)
+        let (sk, vk) = generate_keypair();
+        let pub_hex = public_key_to_hex(&vk);
+        let key_id = compute_operator_key_id(&pub_hex);
+        let unsigned = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "operator-test-001".to_string(),
+            operator_key_id: key_id,
+            operator_public_key_hex: pub_hex,
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-02-10T00:00:00Z".to_string(),
+            artefacts: ManifestArtefacts {
+                contracts: vec![],
+                profiles: vec![],
+                policies: vec![],
+            },
+            runtime_hashes: Some(RuntimeHashes {
+                runtime_hash: "a".repeat(64),
+                guardian_policy_hash: "b".repeat(64),
+            }),
+        };
+        let sig = sign_manifest(&unsigned, &sk).unwrap();
+        let mut manifest = PublicationManifest {
+            manifest_version: unsigned.manifest_version,
+            operator_id: unsigned.operator_id,
+            operator_key_id: unsigned.operator_key_id,
+            operator_public_key_hex: unsigned.operator_public_key_hex,
+            protocol_version: unsigned.protocol_version,
+            published_at: unsigned.published_at,
+            artefacts: unsigned.artefacts,
+            runtime_hashes: unsigned.runtime_hashes,
+            signature: sig,
+        };
+
+        // Tamper with runtime_hashes
+        manifest.runtime_hashes = Some(RuntimeHashes {
+            runtime_hash: "c".repeat(64),
+            guardian_policy_hash: "d".repeat(64),
+        });
+
+        let json = serde_json::to_string(&manifest).unwrap();
+        let result = verify_manifest_from_str(
+            &json,
+            None,
+            None,
+            &"x".repeat(64),
+            None,
+            false,
+        )
+        .unwrap();
+        // Signature should be invalid because runtime_hashes were tampered
+        assert_eq!(result.signature_valid, Some(false));
     }
 }
