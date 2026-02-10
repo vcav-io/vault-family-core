@@ -88,8 +88,8 @@ fn format_canonical_float(f: f64) -> String {
         return "0".to_string();
     }
 
-    // Check if it's a whole number
-    if f.fract() == 0.0 && f.abs() < 1e21 {
+    // Check if it's a whole number that fits in i64
+    if f.fract() == 0.0 && f.abs() < 1e21 && f >= (i64::MIN as f64) && f <= (i64::MAX as f64) {
         return format!("{}", f as i64);
     }
 
