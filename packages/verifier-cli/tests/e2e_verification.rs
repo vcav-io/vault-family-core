@@ -219,6 +219,7 @@ fn write_receipt_file(
         contract_hash: unsigned.contract_hash.clone(),
         output_schema_id: unsigned.output_schema_id.clone(),
         attestation: unsigned.attestation.clone(),
+        signal_class: unsigned.signal_class.clone(),
         signature: signature.to_string(),
     };
     let path = dir.join("receipt.json");
