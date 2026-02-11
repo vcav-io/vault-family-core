@@ -917,6 +917,7 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         policy_bundle_hash: receipt.policy_bundle_hash.clone(),
         contract_hash: receipt.contract_hash.clone(),
         output_schema_id: receipt.output_schema_id.clone(),
+        signal_class: receipt.signal_class,
         receipt_key_id: receipt.receipt_key_id.clone(),
         attestation: receipt.attestation.clone(),
     }
@@ -1203,6 +1204,7 @@ mod tests {
             policy_bundle_hash: None,
             contract_hash: None,
             output_schema_id: None,
+            signal_class: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         })
@@ -1874,6 +1876,7 @@ mod tests {
             policy_bundle_hash: None,
             contract_hash: None,
             output_schema_id: None,
+            signal_class: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         })

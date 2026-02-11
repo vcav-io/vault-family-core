@@ -39,6 +39,40 @@ impl std::fmt::Display for ReceiptStatus {
     }
 }
 
+// ============================================================================
+// SignalClass
+// ============================================================================
+
+/// Low-bandwidth signal label for receipt-driven external notification.
+///
+/// Signal classes tag receipts with a coarse classification so external systems
+/// can react (via webhooks or polling) without interpreting vault internals.
+/// All interpretation happens outside the vault boundary — these are passive
+/// emission labels, not control-flow triggers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum SignalClass {
+    /// Session ran to completion and produced output.
+    SessionCompleted,
+    /// Session was aborted (generic — no output produced).
+    SessionAborted,
+    /// Session aborted specifically because privacy budget was exhausted.
+    BudgetExhausted,
+    /// One or more inputs were rejected by guardian policy checks.
+    InputRejected,
+}
+
+impl std::fmt::Display for SignalClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SignalClass::SessionCompleted => write!(f, "SESSION_COMPLETED"),
+            SignalClass::SessionAborted => write!(f, "SESSION_ABORTED"),
+            SignalClass::BudgetExhausted => write!(f, "BUDGET_EXHAUSTED"),
+            SignalClass::InputRejected => write!(f, "INPUT_REJECTED"),
+        }
+    }
+}
+
 /// Execution lane for this session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -225,6 +259,10 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_schema_id: Option<String>,
 
+    /// Low-bandwidth signal label for external notification (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signal_class: Option<SignalClass>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -354,6 +392,10 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_schema_id: Option<String>,
 
+    /// Low-bandwidth signal label for external notification (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signal_class: Option<SignalClass>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -390,6 +432,7 @@ impl UnsignedReceipt {
             policy_bundle_hash: self.policy_bundle_hash,
             contract_hash: self.contract_hash,
             output_schema_id: self.output_schema_id,
+            signal_class: self.signal_class,
             attestation: self.attestation,
             signature,
         }
@@ -429,6 +472,7 @@ pub struct ReceiptBuilder {
     policy_bundle_hash: Option<String>,
     contract_hash: Option<String>,
     output_schema_id: Option<String>,
+    signal_class: Option<SignalClass>,
     attestation: Option<Attestation>,
 }
 
@@ -595,6 +639,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the signal class (optional)
+    pub fn signal_class(mut self, class: Option<SignalClass>) -> Self {
+        self.signal_class = class;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
         self.attestation = attestation;
@@ -633,6 +683,7 @@ impl ReceiptBuilder {
             policy_bundle_hash: self.policy_bundle_hash,
             contract_hash: self.contract_hash,
             output_schema_id: self.output_schema_id,
+            signal_class: self.signal_class,
             attestation: self.attestation,
         })
     }
@@ -696,6 +747,7 @@ mod tests {
             policy_bundle_hash: None,
             contract_hash: None,
             output_schema_id: None,
+            signal_class: None,
             attestation: None,
         }
     }
@@ -1081,20 +1133,106 @@ mod tests {
         assert_eq!(unsigned, parsed);
     }
 
+    // ==================== SignalClass Tests ====================
+
+    #[test]
+    fn test_signal_class_serde() {
+        let completed = serde_json::to_string(&SignalClass::SessionCompleted).unwrap();
+        assert_eq!(completed, "\"SESSION_COMPLETED\"");
+
+        let aborted = serde_json::to_string(&SignalClass::SessionAborted).unwrap();
+        assert_eq!(aborted, "\"SESSION_ABORTED\"");
+
+        let budget = serde_json::to_string(&SignalClass::BudgetExhausted).unwrap();
+        assert_eq!(budget, "\"BUDGET_EXHAUSTED\"");
+
+        let rejected = serde_json::to_string(&SignalClass::InputRejected).unwrap();
+        assert_eq!(rejected, "\"INPUT_REJECTED\"");
+
+        let parsed: SignalClass = serde_json::from_str("\"SESSION_COMPLETED\"").unwrap();
+        assert_eq!(parsed, SignalClass::SessionCompleted);
+
+        let parsed: SignalClass = serde_json::from_str("\"BUDGET_EXHAUSTED\"").unwrap();
+        assert_eq!(parsed, SignalClass::BudgetExhausted);
+    }
+
+    #[test]
+    fn test_signal_class_display() {
+        assert_eq!(SignalClass::SessionCompleted.to_string(), "SESSION_COMPLETED");
+        assert_eq!(SignalClass::SessionAborted.to_string(), "SESSION_ABORTED");
+        assert_eq!(SignalClass::BudgetExhausted.to_string(), "BUDGET_EXHAUSTED");
+        assert_eq!(SignalClass::InputRejected.to_string(), "INPUT_REJECTED");
+    }
+
+    #[test]
+    fn test_receipt_without_signal_class_omits_field() {
+        let unsigned = sample_unsigned_receipt();
+        assert_eq!(unsigned.signal_class, None);
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(!json.contains("signal_class"));
+    }
+
+    #[test]
+    fn test_receipt_with_signal_class_roundtrip() {
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.signal_class = Some(SignalClass::SessionCompleted);
+
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(json.contains("signal_class"));
+        assert!(json.contains("SESSION_COMPLETED"));
+        let parsed: UnsignedReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(unsigned, parsed);
+    }
+
+    #[test]
+    fn test_receipt_builder_with_signal_class() {
+        let usage = sample_budget_usage();
+        let start = Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap();
+
+        let unsigned = Receipt::builder()
+            .session_id("b".repeat(64))
+            .purpose_code(Purpose::Compatibility)
+            .participant_ids(vec!["agent-a".to_string(), "agent-b".to_string()])
+            .runtime_hash("c".repeat(64))
+            .guardian_policy_hash("d".repeat(64))
+            .model_weights_hash("e".repeat(64))
+            .llama_cpp_version("0.1.0")
+            .inference_config_hash("f".repeat(64))
+            .output_schema_version("1.0.0")
+            .session_start(start)
+            .session_end(end)
+            .fixed_window_duration_seconds(120)
+            .status(ReceiptStatus::Completed)
+            .execution_lane(ExecutionLane::GlassLocal)
+            .output_entropy_bits(8)
+            .budget_usage(usage)
+            .signal_class(Some(SignalClass::BudgetExhausted))
+            .build_unsigned()
+            .expect("Builder should succeed");
+
+        assert_eq!(unsigned.signal_class, Some(SignalClass::BudgetExhausted));
+
+        let signed = unsigned.sign("e".repeat(128));
+        assert_eq!(signed.signal_class, Some(SignalClass::BudgetExhausted));
+    }
+
     // ==================== Backward Compatibility Tests ====================
 
     #[test]
     fn test_old_receipt_without_new_fields_deserializes() {
-        // Simulate a receipt JSON from before contract_hash and output_schema_id existed
+        // Simulate a receipt JSON from before contract_hash, output_schema_id, signal_class existed
         let unsigned = sample_unsigned_receipt();
         let mut value = serde_json::to_value(&unsigned).unwrap();
         let obj = value.as_object_mut().unwrap();
         obj.remove("contract_hash");
         obj.remove("output_schema_id");
+        obj.remove("signal_class");
 
         let parsed: UnsignedReceipt = serde_json::from_value(value).unwrap();
         assert_eq!(parsed.contract_hash, None);
         assert_eq!(parsed.output_schema_id, None);
+        assert_eq!(parsed.signal_class, None);
     }
 
     // ==================== Builder with New Fields Tests ====================
@@ -1183,6 +1321,7 @@ mod tests {
             policy_bundle_hash: None,
             contract_hash: Some("a".repeat(64)),
             output_schema_id: Some("vault_result_compatibility".to_string()),
+            signal_class: None,
             receipt_key_id: None,
             attestation: None,
         };

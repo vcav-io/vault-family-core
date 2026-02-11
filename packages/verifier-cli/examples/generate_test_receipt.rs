@@ -46,6 +46,7 @@ fn main() {
         policy_bundle_hash: None,
         contract_hash: None,
         output_schema_id: None,
+        signal_class: None,
         receipt_key_id: None,
         attestation: None,
     };

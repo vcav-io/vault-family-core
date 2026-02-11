@@ -38,7 +38,7 @@ pub use handoff::{
 pub use ledger::{ApplyOutcome, BudgetLedger, LedgerError};
 pub use receipt::{
     Attestation, BudgetChainRecord, BudgetUsageRecord, ExecutionLane, Receipt, ReceiptBuilder,
-    ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
+    ReceiptStatus, SignalClass, UnsignedReceipt, SCHEMA_VERSION,
 };
 pub use manifest::{
     compute_operator_key_id, create_manifest_signing_message, sign_manifest, verify_manifest,

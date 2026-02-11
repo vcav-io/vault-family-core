@@ -991,6 +991,7 @@ mod tests {
             policy_bundle_hash: receipt.policy_bundle_hash,
             contract_hash: receipt.contract_hash,
             output_schema_id: receipt.output_schema_id,
+            signal_class: receipt.signal_class,
             attestation: receipt.attestation,
         };
         (unsigned, sig)
