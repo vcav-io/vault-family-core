@@ -68,6 +68,7 @@ fn build_test_receipt(
             bits_used_after: 8,
             budget_limit: 128,
             budget_tier: guardian_core::BudgetTier::Default,
+            budget_enforcement: None,
         })
         .model_profile_hash(profile_hash)
         .policy_bundle_hash(policy_hash)

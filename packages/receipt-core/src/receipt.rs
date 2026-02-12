@@ -123,6 +123,11 @@ pub struct BudgetUsageRecord {
 
     /// Active budget tier
     pub budget_tier: BudgetTier,
+
+    /// Whether budget enforcement was active ("enforced") or disabled ("disabled").
+    /// Absent for legacy receipts (treated as enforced).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_enforcement: Option<String>,
 }
 
 /// Receipt-chain linkage for budget integrity verification.
@@ -795,6 +800,7 @@ mod tests {
             bits_used_after: 11,
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
+            budget_enforcement: None,
         }
     }
 

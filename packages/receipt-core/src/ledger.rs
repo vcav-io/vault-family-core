@@ -218,6 +218,7 @@ mod tests {
                 bits_used_after: bits_after,
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
+                budget_enforcement: None,
             },
             budget_chain: Some(BudgetChainRecord {
                 chain_id: chain_id(),

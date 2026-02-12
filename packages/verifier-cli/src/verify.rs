@@ -858,6 +858,7 @@ mod tests {
                 bits_used_after: 11,
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
+                budget_enforcement: None,
             },
             budget_chain: None, // set by helper to ensure receipt_hash binding is test-covered
             model_identity: None,
@@ -1547,6 +1548,7 @@ mod tests {
                 bits_used_after: 20,
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
+                budget_enforcement: None,
             },
             budget_chain: None,
             model_identity: None,

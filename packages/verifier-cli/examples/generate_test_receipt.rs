@@ -38,6 +38,7 @@ fn main() {
             bits_used_after: 11,
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
+            budget_enforcement: None,
         },
         budget_chain: None,
         model_identity: None,

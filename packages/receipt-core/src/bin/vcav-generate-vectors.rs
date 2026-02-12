@@ -79,6 +79,7 @@ fn sample_unsigned_receipt() -> UnsignedReceipt {
             bits_used_after: 8,
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
+            budget_enforcement: None,
         },
         budget_chain: Some(BudgetChainRecord {
             chain_id: format!("chain-{}", "1".repeat(64)),
@@ -128,6 +129,7 @@ fn sample_aborted_receipt() -> UnsignedReceipt {
             bits_used_after: 8,
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
+            budget_enforcement: None,
         },
         budget_chain: None,
         execution_lane: receipt_core::ExecutionLane::GlassLocal,
@@ -858,6 +860,7 @@ fn sample_full_receipt(vault_pub_hex: &str) -> UnsignedReceipt {
             bits_used_after: 8,
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
+            budget_enforcement: None,
         },
         budget_chain: Some(BudgetChainRecord {
             chain_id: format!("chain-{}", "1".repeat(64)),
