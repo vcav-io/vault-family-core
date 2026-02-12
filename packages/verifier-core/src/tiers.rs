@@ -1813,6 +1813,10 @@ mod tests {
 
     #[test]
     fn redteam_receipt_omits_timing_class() {
+        // Receipt omits contract_timing_class. Window check still runs because:
+        // - Contract default has timing_class="STANDARD" (from make_contract_json)
+        // - Receipt has fixed_window_duration_seconds=120
+        // - 120s matches STANDARD → Some(true)
         let receipt = serde_json::json!({
             "entropy_budget_bits": 8,
             "fixed_window_duration_seconds": 120,
@@ -1851,7 +1855,11 @@ mod tests {
 
     #[test]
     fn redteam_receipt_omits_all_enforcement_fields() {
-        // Receipt contains ONLY session_id and window — no enforcement fields
+        // Receipt contains ONLY session_id and window — no enforcement fields.
+        // This produces zero warnings even in strict mode. This is acceptable
+        // because the receipt builder (session.rs) includes all fields
+        // unconditionally — omitting fields requires receipt modification,
+        // which breaks the Ed25519 signature (verified at Tier 1).
         let receipt = serde_json::json!({
             "session_id": "attacker-session",
             "fixed_window_duration_seconds": 120,
