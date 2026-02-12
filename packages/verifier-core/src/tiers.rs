@@ -1686,4 +1686,231 @@ mod tests {
             );
         }
     }
+
+    // =========================================================================
+    // Seq 32 Red-Team: Adversarial contract enforcement scenarios
+    // =========================================================================
+
+    // Attack 1: Timing class substitution (receipt says FAST, contract says STANDARD)
+    #[test]
+    fn redteam_timing_class_substitution_strict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "contract_timing_class": "FAST",
+            "fixed_window_duration_seconds": 30
+        }));
+        let contract = make_contract_json(&serde_json::json!({
+            "timing_class": "STANDARD"
+        }));
+        let err = verify_contract_enforcement(&receipt, &contract, true).unwrap_err();
+        assert!(err.contains("timing_class mismatch"));
+        assert!(err.contains("FAST"));
+        assert!(err.contains("STANDARD"));
+    }
+
+    #[test]
+    fn redteam_timing_class_substitution_nonstrict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "contract_timing_class": "FAST",
+            "fixed_window_duration_seconds": 30
+        }));
+        let contract = make_contract_json(&serde_json::json!({
+            "timing_class": "STANDARD"
+        }));
+        let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
+        assert_eq!(result.timing_class_matches, Some(false));
+        // Window is consistent with the receipt's timing class (FAST=30s),
+        // but the CONTRACT says STANDARD which expects 120s
+        assert_eq!(result.timing_window_consistent, Some(false));
+    }
+
+    // Attack 2: Entropy budget inflation (receipt says 256, contract says 8)
+    #[test]
+    fn redteam_entropy_inflation_strict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "entropy_budget_bits": 256
+        }));
+        let contract = make_contract_json(&serde_json::json!({
+            "entropy_budget_bits": 8
+        }));
+        let err = verify_contract_enforcement(&receipt, &contract, true).unwrap_err();
+        assert!(err.contains("entropy_budget_bits mismatch"));
+        assert!(err.contains("256"));
+        assert!(err.contains("8"));
+    }
+
+    #[test]
+    fn redteam_entropy_inflation_nonstrict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "entropy_budget_bits": 256
+        }));
+        let contract = make_contract_json(&serde_json::json!({
+            "entropy_budget_bits": 8
+        }));
+        let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
+        assert_eq!(result.entropy_budget_matches, Some(false));
+        assert!(result.warnings.iter().any(|w| w.contains("256") && w.contains("8")));
+    }
+
+    // Attack 5: Timing class/window inconsistency (FAST class with 120s window)
+    #[test]
+    fn redteam_timing_window_mismatch_all_classes_strict() {
+        // For each timing class, pair it with every OTHER class's window
+        let classes = [
+            ("FAST", 30u64),
+            ("SHORT", 60),
+            ("STANDARD", 120),
+            ("EXTENDED", 300),
+            ("LONG", 600),
+        ];
+
+        for (class, _correct_window) in &classes {
+            for (_, wrong_window) in classes.iter().filter(|(c, _)| c != class) {
+                let receipt = serde_json::json!({
+                    "contract_timing_class": class,
+                    "fixed_window_duration_seconds": wrong_window,
+                    "entropy_budget_bits": 8,
+                    "prompt_template_hash": "a".repeat(64),
+                });
+                let contract = serde_json::json!({
+                    "timing_class": class,
+                    "entropy_budget_bits": 8,
+                    "prompt_template_hash": "a".repeat(64),
+                });
+                let receipt_str = serde_json::to_string(&receipt).unwrap();
+                let contract_str = serde_json::to_string(&contract).unwrap();
+
+                let err = verify_contract_enforcement(&receipt_str, &contract_str, true)
+                    .unwrap_err();
+                assert!(
+                    err.contains("timing window inconsistent"),
+                    "Expected window inconsistency for {class} with {wrong_window}s window, got: {err}"
+                );
+            }
+        }
+    }
+
+    // Attack 6: Receipt field omission for evasion
+    #[test]
+    fn redteam_receipt_omits_entropy_field() {
+        // Receipt has no entropy_budget_bits — verifier skips the check
+        let receipt = serde_json::json!({
+            "contract_timing_class": "STANDARD",
+            "fixed_window_duration_seconds": 120,
+            "prompt_template_hash": "a".repeat(64),
+        });
+        let contract = make_contract_json(&serde_json::json!({}));
+        let result = verify_contract_enforcement(
+            &serde_json::to_string(&receipt).unwrap(),
+            &contract,
+            true,
+        ).unwrap();
+        // Entropy check returns None (not checked), not Err
+        assert_eq!(result.entropy_budget_matches, None);
+        // Other checks still pass
+        assert_eq!(result.timing_class_matches, Some(true));
+        assert_eq!(result.prompt_template_hash_matches, Some(true));
+    }
+
+    #[test]
+    fn redteam_receipt_omits_timing_class() {
+        let receipt = serde_json::json!({
+            "entropy_budget_bits": 8,
+            "fixed_window_duration_seconds": 120,
+            "prompt_template_hash": "a".repeat(64),
+        });
+        let contract = make_contract_json(&serde_json::json!({}));
+        let result = verify_contract_enforcement(
+            &serde_json::to_string(&receipt).unwrap(),
+            &contract,
+            true,
+        ).unwrap();
+        // Timing class check returns None (receipt has no contract_timing_class)
+        assert_eq!(result.timing_class_matches, None);
+        // Window consistency is still checked (contract has timing_class, receipt has window)
+        assert_eq!(result.timing_window_consistent, Some(true));
+    }
+
+    #[test]
+    fn redteam_receipt_omits_prompt_hash() {
+        let receipt = serde_json::json!({
+            "entropy_budget_bits": 8,
+            "contract_timing_class": "STANDARD",
+            "fixed_window_duration_seconds": 120,
+        });
+        let contract = make_contract_json(&serde_json::json!({}));
+        let result = verify_contract_enforcement(
+            &serde_json::to_string(&receipt).unwrap(),
+            &contract,
+            true,
+        ).unwrap();
+        assert_eq!(result.prompt_template_hash_matches, None);
+        // Other checks still pass
+        assert_eq!(result.entropy_budget_matches, Some(true));
+        assert_eq!(result.timing_class_matches, Some(true));
+    }
+
+    #[test]
+    fn redteam_receipt_omits_all_enforcement_fields() {
+        // Receipt contains ONLY session_id and window — no enforcement fields
+        let receipt = serde_json::json!({
+            "session_id": "attacker-session",
+            "fixed_window_duration_seconds": 120,
+        });
+        let contract = make_contract_json(&serde_json::json!({}));
+        let result = verify_contract_enforcement(
+            &serde_json::to_string(&receipt).unwrap(),
+            &contract,
+            true,
+        ).unwrap();
+        // All checks skipped — no errors, all None
+        assert_eq!(result.entropy_budget_matches, None);
+        assert_eq!(result.timing_class_matches, None);
+        // Window consistency IS checked because contract has timing_class
+        assert_eq!(result.timing_window_consistent, Some(true));
+        assert_eq!(result.prompt_template_hash_matches, None);
+        assert!(result.warnings.is_empty());
+    }
+
+    // Attack 7: Modified receipt (enforcement field tampering)
+    #[test]
+    fn redteam_all_four_fields_tampered_strict() {
+        // Every enforcement field in the receipt differs from the contract
+        let receipt = make_receipt_json(&serde_json::json!({
+            "entropy_budget_bits": 256,
+            "contract_timing_class": "LONG",
+            "fixed_window_duration_seconds": 600,
+            "prompt_template_hash": "b".repeat(64),
+        }));
+        let contract = make_contract_json(&serde_json::json!({
+            "entropy_budget_bits": 8,
+            "timing_class": "FAST",
+            "prompt_template_hash": "a".repeat(64),
+        }));
+        // Strict mode returns Err on first mismatch
+        let err = verify_contract_enforcement(&receipt, &contract, true).unwrap_err();
+        assert!(err.contains("mismatch") || err.contains("inconsistent"));
+    }
+
+    #[test]
+    fn redteam_all_four_fields_tampered_nonstrict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "entropy_budget_bits": 256,
+            "contract_timing_class": "LONG",
+            "fixed_window_duration_seconds": 600,
+            "prompt_template_hash": "b".repeat(64),
+        }));
+        let contract = make_contract_json(&serde_json::json!({
+            "entropy_budget_bits": 8,
+            "timing_class": "FAST",
+            "prompt_template_hash": "a".repeat(64),
+        }));
+        let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
+        // All checks fail
+        assert_eq!(result.entropy_budget_matches, Some(false));
+        assert_eq!(result.timing_class_matches, Some(false));
+        assert_eq!(result.timing_window_consistent, Some(false));
+        assert_eq!(result.prompt_template_hash_matches, Some(false));
+        // All mismatches recorded as warnings
+        assert!(result.warnings.len() >= 4);
+    }
 }
