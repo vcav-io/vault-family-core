@@ -121,6 +121,8 @@ struct VerificationResult {
     manifest_policy_covered: Option<bool>,
     manifest_runtime_hash_match: Option<bool>,
     manifest_guardian_hash_match: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model_identity_matches_profile: Option<bool>,
     errors: Vec<String>,
 }
 
@@ -327,6 +329,9 @@ fn main() -> Result<()> {
                     .manifest
                     .as_ref()
                     .and_then(|m| m.guardian_hash_match),
+                model_identity_matches_profile: details
+                    .tier_result
+                    .model_identity_matches_profile,
                 errors: details.error.map(|e| vec![e]).unwrap_or_default(),
             };
             println!("{}", serde_json::to_string_pretty(&json_result)?);
@@ -534,6 +539,27 @@ fn verify(args: &Args) -> VerifyDetails {
                 match tiers::verify_profile_hash(Path::new(profile_path), declared_hash) {
                     Ok(true) => {
                         tier.profile_hash_valid = Some(true);
+
+                        // Cross-check: receipt model_identity vs profile provider/model_id
+                        // This is a detective control — records the result but does not
+                        // cause verification failure. Consumers inspect
+                        // model_identity_matches_profile to act on mismatches.
+                        if let Some(ref identity) = receipt.model_identity {
+                            if let Ok(profile_json) = fs::read_to_string(Path::new(profile_path)) {
+                                match tiers::verify_model_identity_against_profile(
+                                    identity,
+                                    &profile_json,
+                                ) {
+                                    Ok(matches) => {
+                                        tier.model_identity_matches_profile = Some(matches);
+                                    }
+                                    Err(_) => {
+                                        // Profile parsed for hash but not for identity fields —
+                                        // leave as None (inconclusive)
+                                    }
+                                }
+                            }
+                        }
                     }
                     Ok(false) => {
                         tier.profile_hash_valid = Some(false);
