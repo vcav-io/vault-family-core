@@ -25,6 +25,8 @@ pub mod ledger;
 pub mod manifest;
 pub mod receipt;
 pub mod signer;
+#[cfg(test)]
+mod tamper_tests;
 
 // Re-export key types
 pub use agreement::{

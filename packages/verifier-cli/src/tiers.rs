@@ -13,7 +13,9 @@ use std::fs;
 use std::path::Path;
 
 // Re-export manifest types from verifier-core (single source of truth for CLI + WASM)
-pub use verifier_core::{ManifestResult, ManifestVerifyError};
+pub use verifier_core::{
+    verify_model_identity_against_profile, ManifestResult, ManifestVerifyError,
+};
 
 // ============================================================================
 // Domain Prefixes (must match TypeScript and vault-runtime implementations)
@@ -215,6 +217,9 @@ pub struct TierResult {
     pub policy_hash_valid: Option<bool>,
     /// Contract hash verification result (None = not checked)
     pub contract_hash_valid: Option<bool>,
+    /// Whether the receipt's model_identity matches the profile's provider/model_id
+    /// None = not checked (receipt has no model_identity or no profile provided)
+    pub model_identity_matches_profile: Option<bool>,
     /// Manifest verification result (None = not checked)
     pub manifest: Option<ManifestResult>,
     /// Error message for the first failing check

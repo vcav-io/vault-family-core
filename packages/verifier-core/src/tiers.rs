@@ -254,6 +254,9 @@ pub struct TierResult {
     pub policy_hash_valid: Option<bool>,
     /// Contract hash verification result (None = not checked)
     pub contract_hash_valid: Option<bool>,
+    /// Whether the receipt's model_identity matches the profile's provider/model_id
+    /// None = not checked (receipt has no model_identity or no profile provided)
+    pub model_identity_matches_profile: Option<bool>,
     /// Manifest verification result (None = not checked)
     pub manifest: Option<ManifestResult>,
     /// Error message for the first failing check
@@ -316,6 +319,26 @@ pub fn verify_contract_hash_from_bytes(
     let recomputed = hex::encode(hasher.finalize());
 
     Ok(recomputed == declared_hash)
+}
+
+/// Cross-check a receipt's model_identity against a model profile's provider/model_id.
+///
+/// Returns `Ok(true)` if the receipt's model matches the profile, `Ok(false)` if mismatch.
+/// Returns `Err` if the profile JSON is unparseable.
+///
+/// Provider comparison is case-insensitive (e.g., "openai" matches "OPENAI").
+pub fn verify_model_identity_against_profile(
+    receipt_identity: &receipt_core::agreement::ModelIdentity,
+    profile_json: &str,
+) -> Result<bool, String> {
+    let profile: ModelProfile = serde_json::from_str(profile_json)
+        .map_err(|e| format!("Failed to parse profile JSON: {}", e))?;
+
+    let provider_matches =
+        receipt_identity.provider.eq_ignore_ascii_case(&profile.provider);
+    let model_id_matches = receipt_identity.model_id == profile.model_id;
+
+    Ok(provider_matches && model_id_matches)
 }
 
 /// Verify a signed publication manifest from a JSON string (Tier 3).
@@ -1186,5 +1209,86 @@ mod tests {
         .unwrap();
         // Signature should be invalid because runtime_hashes were tampered
         assert_eq!(result.signature_valid, Some(false));
+    }
+
+    // =========================================================================
+    // Model identity vs profile cross-check tests
+    // =========================================================================
+
+    fn test_profile_json_str() -> String {
+        let hex64 = "a".repeat(64);
+        serde_json::json!({
+            "profile_id": "test-profile",
+            "profile_version": 1,
+            "execution_lane": "api-mediated",
+            "provider": "OPENAI",
+            "model_id": "gpt-4.1",
+            "model_version": "2025-04-14",
+            "inference_params": {
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "top_k": 40,
+                "max_tokens": 1024
+            },
+            "prompt_template_hash": hex64,
+            "system_prompt_hash": hex64
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn test_identity_matches_profile() {
+        let identity = receipt_core::agreement::ModelIdentity {
+            provider: "OPENAI".to_string(),
+            model_id: "gpt-4.1".to_string(),
+            model_version: None,
+        };
+        let result = verify_model_identity_against_profile(&identity, &test_profile_json_str())
+            .unwrap();
+        assert!(result, "identity should match profile");
+    }
+
+    #[test]
+    fn test_identity_matches_profile_case_insensitive() {
+        let identity = receipt_core::agreement::ModelIdentity {
+            provider: "openai".to_string(),
+            model_id: "gpt-4.1".to_string(),
+            model_version: None,
+        };
+        let result = verify_model_identity_against_profile(&identity, &test_profile_json_str())
+            .unwrap();
+        assert!(result, "provider comparison should be case-insensitive");
+    }
+
+    #[test]
+    fn test_identity_mismatch_provider() {
+        let identity = receipt_core::agreement::ModelIdentity {
+            provider: "MOCK".to_string(),
+            model_id: "gpt-4.1".to_string(),
+            model_version: None,
+        };
+        let result = verify_model_identity_against_profile(&identity, &test_profile_json_str())
+            .unwrap();
+        assert!(!result, "mismatched provider should fail");
+    }
+
+    #[test]
+    fn test_identity_mismatch_model_id() {
+        let identity = receipt_core::agreement::ModelIdentity {
+            provider: "OPENAI".to_string(),
+            model_id: "gpt-4o".to_string(),
+            model_version: None,
+        };
+        let result = verify_model_identity_against_profile(&identity, &test_profile_json_str())
+            .unwrap();
+        assert!(!result, "mismatched model_id should fail");
+    }
+
+    #[test]
+    fn test_identity_check_with_tier_result() {
+        let mut result = TierResult::default();
+        assert!(result.model_identity_matches_profile.is_none());
+        result.model_identity_matches_profile = Some(true);
+        assert_eq!(result.model_identity_matches_profile, Some(true));
     }
 }
