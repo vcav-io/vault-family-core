@@ -6,7 +6,7 @@
 //! Usage:
 //!   vcav-generate-vectors [--output-dir <path>]
 //!
-//! Default output directory: `test-vectors/` (relative to workspace root).
+//! Default output directory: `data/test-vectors/` (relative to workspace root).
 
 use chrono::{TimeZone, Utc};
 use ed25519_dalek::Signer;
@@ -1625,13 +1625,14 @@ fn main() {
     let output_dir = if args.len() > 2 && args[1] == "--output-dir" {
         PathBuf::from(&args[2])
     } else {
-        // Default: workspace root test-vectors/
+        // Default: workspace root data/test-vectors/
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         manifest_dir
             .parent() // packages/
             .unwrap()
             .parent() // workspace root
             .unwrap()
+            .join("data")
             .join("test-vectors")
     };
 

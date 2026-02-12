@@ -1,0 +1,143 @@
+{
+  "description": "Tier 3 positive: receipt + key + manifest (with runtime hashes matching)",
+  "expected": {
+    "error": null,
+    "guardian_hash_match": true,
+    "manifest_signature_valid": true,
+    "policy_covered": true,
+    "policy_hash_valid": true,
+    "profile_covered": true,
+    "profile_hash_valid": true,
+    "runtime_hash_match": true,
+    "schema_valid": true,
+    "signature_valid": true,
+    "tier_achieved": 3
+  },
+  "input": {
+    "manifest": {
+      "artefacts": {
+        "contracts": [
+          {
+            "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "filename": "contracts/dating-compat.json"
+          }
+        ],
+        "policies": [
+          {
+            "content_hash": "42dd07f49412b45152eb2606eebea44ebf48a4c0a27756703a74e7e50efb78c8",
+            "filename": "policies/golden-test-policy-v1.json"
+          }
+        ],
+        "profiles": [
+          {
+            "content_hash": "ff3d0a51ec51540bc5b6dc2e12d804c93f1e56612c4f18d0e0c9a3774a398cfe",
+            "filename": "profiles/sealed-demo-v1.json"
+          }
+        ]
+      },
+      "manifest_version": "1.0.0",
+      "operator_id": "operator-test-001",
+      "operator_key_id": "opkey-55066f010533eb2e14eccef875d1c92a0b243308c17e83cd726778290bb329d1",
+      "operator_public_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+      "protocol_version": "1.0.0",
+      "published_at": "2026-01-15T00:00:00Z",
+      "runtime_hashes": {
+        "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "signature": "0ca8bb7c313acea049496f481de6ede09946c5230769816672f0b3207b34caefdc1d868eaacb6f8e5e70ad127d8b9a5a05560466418ae57283b2d1de83c3ff00"
+    },
+    "policy": {
+      "allowed_lanes": [
+        "sealed-local",
+        "api-mediated"
+      ],
+      "allowed_provenance": [
+        "SYMMETRIC_CONSTRUCTION",
+        "ORCHESTRATOR_GENERATED",
+        "PUBLIC_REGISTRY"
+      ],
+      "asymmetry_rule": "SYMMETRIC",
+      "entropy_budget_bits": 16,
+      "policy_id": "golden-test-policy-v1",
+      "policy_version": "1.0.0",
+      "ttl_bounds": {
+        "max_seconds": 300,
+        "min_seconds": 30
+      }
+    },
+    "profile": {
+      "engine_version": "llama.cpp-b2901",
+      "execution_lane": "sealed-local",
+      "grammar_constraint_hash": "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+      "inference_params": {
+        "max_tokens": 1024,
+        "seed": 42,
+        "temperature": 0.7,
+        "top_k": 40,
+        "top_p": 0.95
+      },
+      "model_id": "phi-3-mini-4k-instruct",
+      "model_version": "1.0.0",
+      "model_weights_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+      "profile_id": "sealed-demo-v1",
+      "profile_version": 1,
+      "prompt_template_hash": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      "provider": "local-gguf",
+      "system_prompt_hash": "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+      "tokenizer_hash": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"
+    },
+    "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "receipt": {
+      "agreement_hash": "a300b85a0b73527522fb26942f59472322dec391fd4f6bff4cd7bc7e9a951b28",
+      "budget_chain": {
+        "chain_id": "chain-1111111111111111111111111111111111111111111111111111111111111111",
+        "prev_receipt_hash": null,
+        "receipt_hash": "9d4b06ba6f073ffcfae59967cdfd5d9fe9a24a3ec1bdd37c97563400cb0c3b55"
+      },
+      "budget_usage": {
+        "bits_used_after": 8,
+        "bits_used_before": 0,
+        "budget_limit": 128,
+        "budget_tier": "DEFAULT",
+        "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "window_start": "2025-05-01T00:00:00Z"
+      },
+      "execution_lane": "SEALED_LOCAL",
+      "fixed_window_duration_seconds": 120,
+      "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "llama_cpp_version": "0.1.0",
+      "mitigations_applied": [],
+      "model_identity": {
+        "model_id": "llama-3.2-3b",
+        "model_version": "2025-06-01",
+        "provider": "LOCAL"
+      },
+      "model_profile_hash": "ff3d0a51ec51540bc5b6dc2e12d804c93f1e56612c4f18d0e0c9a3774a398cfe",
+      "model_weights_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "output": {
+        "confidence_bucket": "HIGH",
+        "decision": "PROCEED",
+        "reason_code": "MUTUAL_INTEREST_UNCLEAR"
+      },
+      "output_entropy_bits": 8,
+      "output_schema_version": "1.0.0",
+      "participant_ids": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "policy_bundle_hash": "42dd07f49412b45152eb2606eebea44ebf48a4c0a27756703a74e7e50efb78c8",
+      "purpose_code": "COMPATIBILITY",
+      "receipt_key_id": "kid-95bbfbb1f0ef8f2305be069a9a2d7d9d3e9ac0f2b326fa9ed6d9dafc66d2a111",
+      "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "schema_version": "1.0.0",
+      "session_end": "2025-06-01T12:02:00Z",
+      "session_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "session_start": "2025-06-01T12:00:00Z",
+      "signature": "3ad167e2face0eb906ae941fb6ec93deb92b60aff14e093dd2b115a5a37ce95ec3bdf3a1345e79b196ff8e82bd9abc3ea64cacbb7fd7dbfdab9ded5b21517300",
+      "status": "COMPLETED"
+    }
+  },
+  "tier": 3
+}

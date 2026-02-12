@@ -1,0 +1,19 @@
+{
+  "description": "Pair ID MUST be order-independent: same result regardless of input order",
+  "expected": {
+    "must_be_equal": true,
+    "pair_id_forward": "d05673298b0a684a4a13dba4107815174b7daf9153396dde3f4974ba000576e3",
+    "pair_id_reverse": "d05673298b0a684a4a13dba4107815174b7daf9153396dde3f4974ba000576e3"
+  },
+  "input": {
+    "participant_ids_forward": [
+      "agent-alice",
+      "agent-bob"
+    ],
+    "participant_ids_reverse": [
+      "agent-bob",
+      "agent-alice"
+    ]
+  },
+  "schemas": []
+}

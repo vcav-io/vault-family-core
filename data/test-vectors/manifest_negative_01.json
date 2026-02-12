@@ -1,0 +1,42 @@
+{
+  "description": "Tampered manifest: operator_id changed after signing -- verifier MUST reject",
+  "expected": {
+    "error_class": "SIGNATURE_MISMATCH",
+    "verification_result": "FAIL"
+  },
+  "input": {
+    "original_value": "operator-test-001",
+    "signed_manifest": {
+      "artefacts": {
+        "contracts": [
+          {
+            "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "filename": "contracts/dating-compat.json"
+          }
+        ],
+        "policies": [
+          {
+            "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "filename": "policies/default-guardrails.json"
+          }
+        ],
+        "profiles": [
+          {
+            "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "filename": "profiles/llama-3.1-8b.json"
+          }
+        ]
+      },
+      "manifest_version": "1.0.0",
+      "operator_id": "operator-evil-001",
+      "operator_key_id": "opkey-55066f010533eb2e14eccef875d1c92a0b243308c17e83cd726778290bb329d1",
+      "operator_public_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+      "protocol_version": "1.0.0",
+      "published_at": "2026-01-01T00:00:00Z",
+      "signature": "c3fe3b8662de490e377824f534ec16d46e1f1fe5eb48af5dccf04b2e47eaaf14c82f5f564c9538cad5d64c01076641b7a46229f2cd787a6647ac3e0990c3b206"
+    },
+    "tampered_field": "operator_id",
+    "tampered_value": "operator-evil-001",
+    "verifying_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+  }
+}

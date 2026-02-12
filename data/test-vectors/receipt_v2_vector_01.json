@@ -1,0 +1,54 @@
+{
+  "description": "Standalone signed receipt for verifier-cli integration testing (COMPLETED, Ed25519)",
+  "expected": {
+    "signature_hex": "28b1ff33b7d9f164a19567761b603097c686e31a39d4ca1d651ae72b735c5da46358f816ecd3091975ee126b16ade8a895c4b77e033d4de0679ca5e226bc6305",
+    "verification_result": "PASS"
+  },
+  "input": {
+    "signed_receipt": {
+      "budget_chain": {
+        "chain_id": "chain-1111111111111111111111111111111111111111111111111111111111111111",
+        "prev_receipt_hash": null,
+        "receipt_hash": "441db37f7fd470d496f528cf50c84a5676ce502632f03004186a18ab8334b636"
+      },
+      "budget_usage": {
+        "bits_used_after": 8,
+        "bits_used_before": 0,
+        "budget_limit": 128,
+        "budget_tier": "DEFAULT",
+        "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "window_start": "2025-05-01T00:00:00Z"
+      },
+      "execution_lane": "GLASS_LOCAL",
+      "fixed_window_duration_seconds": 120,
+      "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "llama_cpp_version": "0.1.0",
+      "mitigations_applied": [],
+      "model_weights_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "output": {
+        "confidence_bucket": "HIGH",
+        "decision": "PROCEED",
+        "reason_code": "MUTUAL_INTEREST_UNCLEAR"
+      },
+      "output_entropy_bits": 8,
+      "output_schema_version": "1.0.0",
+      "participant_ids": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "purpose_code": "COMPATIBILITY",
+      "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "schema_version": "1.0.0",
+      "session_end": "2025-06-01T12:02:00Z",
+      "session_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "session_start": "2025-06-01T12:00:00Z",
+      "signature": "28b1ff33b7d9f164a19567761b603097c686e31a39d4ca1d651ae72b735c5da46358f816ecd3091975ee126b16ade8a895c4b77e033d4de0679ca5e226bc6305",
+      "status": "COMPLETED"
+    },
+    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/receipt.v2.schema.json"
+  ]
+}

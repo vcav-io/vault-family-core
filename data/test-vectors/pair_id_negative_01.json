@@ -1,0 +1,20 @@
+{
+  "description": "Pair ID with non-ASCII agent_id produces a different pair_id -- implementations must handle Unicode consistently",
+  "expected": {
+    "must_differ": true,
+    "pair_id_ascii": "d05673298b0a684a4a13dba4107815174b7daf9153396dde3f4974ba000576e3",
+    "pair_id_unicode": "accc882aba71e2ffe197810e32dca8ed221ca45e112149c0777a94222f356e02"
+  },
+  "input": {
+    "note": "agent-b\\u00f6b contains U+00F6 LATIN SMALL LETTER O WITH DIAERESIS",
+    "participant_ids_ascii": [
+      "agent-alice",
+      "agent-bob"
+    ],
+    "participant_ids_unicode": [
+      "agent-alice",
+      "agent-böb"
+    ]
+  },
+  "schemas": []
+}

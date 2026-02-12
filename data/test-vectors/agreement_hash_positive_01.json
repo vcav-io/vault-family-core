@@ -1,0 +1,52 @@
+{
+  "description": "Agreement hash with model_version present (VCAV-AGREEMENT-V1 domain separation)",
+  "expected": {
+    "agreement_hash": "567a37f4fe67fe0cafbb81bfc0f8ba64d02f9c85e7722224643bed4f2c3fdd81",
+    "pre_agreement_hash": "5610ee8171b1b4259db3c06aca4a638016bbe3eff53ca27cce6c2cbcecb4c29a"
+  },
+  "input": {
+    "pre_agreement_fields": {
+      "contract_id": "SCHEDULING_COMPAT_V1",
+      "expiry": "2025-06-01T00:00:00Z",
+      "input_schema_hashes": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "model_identity": {
+        "model_id": "gpt-4.1",
+        "model_version": "2025-04-14",
+        "provider": "OPENAI"
+      },
+      "output_budget": 4,
+      "participants": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "purpose_code": "SCHEDULING_COMPAT_V1",
+      "symmetry_rule": "SYMMETRIC"
+    },
+    "session_agreement_fields": {
+      "contract_id": "SCHEDULING_COMPAT_V1",
+      "expiry": "2025-06-01T00:00:00Z",
+      "input_schema_hashes": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "model_identity": {
+        "model_id": "gpt-4.1",
+        "model_version": "2025-04-14",
+        "provider": "OPENAI"
+      },
+      "output_budget": 4,
+      "participants": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "pre_agreement_hash": "5610ee8171b1b4259db3c06aca4a638016bbe3eff53ca27cce6c2cbcecb4c29a",
+      "purpose_code": "SCHEDULING_COMPAT_V1",
+      "session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "symmetry_rule": "SYMMETRIC"
+    }
+  },
+  "schemas": []
+}

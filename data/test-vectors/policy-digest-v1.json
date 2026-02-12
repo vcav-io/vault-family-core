@@ -1,0 +1,26 @@
+{
+  "description": "Golden test vector for PolicyDigestV1 and policy bundle hash computation",
+  "input": {
+    "bundle": {
+      "policy_id": "golden-test-policy-v1",
+      "policy_version": "1.0.0",
+      "entropy_budget_bits": 16,
+      "allowed_lanes": ["sealed-local", "api-mediated"],
+      "asymmetry_rule": "SYMMETRIC",
+      "allowed_provenance": ["SYMMETRIC_CONSTRUCTION", "ORCHESTRATOR_GENERATED", "PUBLIC_REGISTRY"],
+      "ttl_bounds": { "min_seconds": 30, "max_seconds": 300 },
+      "metadata": { "description": "Golden test vector for policy digest", "author": "vcav-test" }
+    }
+  },
+  "expected": {
+    "verification_result": "PASS",
+    "digest": {
+      "allowed_lanes": ["api-mediated", "sealed-local"],
+      "allowed_provenance": ["ORCHESTRATOR_GENERATED", "PUBLIC_REGISTRY", "SYMMETRIC_CONSTRUCTION"],
+      "asymmetry_rule": "SYMMETRIC",
+      "entropy_budget_bits": 16,
+      "ttl_bounds": { "min_seconds": 30, "max_seconds": 300 }
+    },
+    "policy_bundle_hash": "42dd07f49412b45152eb2606eebea44ebf48a4c0a27756703a74e7e50efb78c8"
+  }
+}

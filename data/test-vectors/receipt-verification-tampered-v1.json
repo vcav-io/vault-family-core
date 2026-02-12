@@ -1,0 +1,66 @@
+{
+  "description": "Receipt with output_entropy_bits tampered (8→16) after signing. Original signature preserved. Verifier MUST reject with FAIL_SIGNATURE.",
+  "expected": {
+    "error_class": "FAIL_SIGNATURE",
+    "verification_result": "FAIL"
+  },
+  "input": {
+    "original_value": 8,
+    "signature_hex": "e2073b436288aade62792ddf3fbe6a50c662377ecab03cdc2bfb478e1e6cc9a86b607ef54e572c8943216ecadd0656a03c5a0f5928bd1993751851e569c73d04",
+    "tampered_field": "output_entropy_bits",
+    "tampered_value": 16,
+    "unsigned_receipt": {
+      "agreement_hash": "a300b85a0b73527522fb26942f59472322dec391fd4f6bff4cd7bc7e9a951b28",
+      "budget_chain": {
+        "chain_id": "chain-1111111111111111111111111111111111111111111111111111111111111111",
+        "prev_receipt_hash": null,
+        "receipt_hash": "d33560c614049ff3286d92b8bfcc06482edc08d2a77c88bb93d4e532895a7c46"
+      },
+      "budget_usage": {
+        "bits_used_after": 8,
+        "bits_used_before": 0,
+        "budget_limit": 128,
+        "budget_tier": "DEFAULT",
+        "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "window_start": "2025-05-01T00:00:00Z"
+      },
+      "execution_lane": "SEALED_LOCAL",
+      "fixed_window_duration_seconds": 120,
+      "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "llama_cpp_version": "0.1.0",
+      "mitigations_applied": [],
+      "model_identity": {
+        "model_id": "llama-3.2-3b",
+        "model_version": "2025-06-01",
+        "provider": "LOCAL"
+      },
+      "model_profile_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "model_weights_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "output": {
+        "confidence_bucket": "HIGH",
+        "decision": "PROCEED",
+        "reason_code": "MUTUAL_INTEREST_UNCLEAR"
+      },
+      "output_entropy_bits": 16,
+      "output_schema_version": "1.0.0",
+      "participant_ids": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "policy_bundle_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "purpose_code": "COMPATIBILITY",
+      "receipt_key_id": "kid-95bbfbb1f0ef8f2305be069a9a2d7d9d3e9ac0f2b326fa9ed6d9dafc66d2a111",
+      "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "schema_version": "1.0.0",
+      "session_end": "2025-06-01T12:02:00Z",
+      "session_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "session_start": "2025-06-01T12:00:00Z",
+      "status": "COMPLETED"
+    },
+    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/receipt.v2.schema.json"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "description": "Pair ID derivation: hex(SHA-256(sort(participant_ids).join('\\n')))",
+  "expected": {
+    "joined_string": "agent-alice\nagent-bob",
+    "pair_id": "d05673298b0a684a4a13dba4107815174b7daf9153396dde3f4974ba000576e3",
+    "sorted_ids": [
+      "agent-alice",
+      "agent-bob"
+    ]
+  },
+  "input": {
+    "algorithm": "sort lexicographically, join with newline, SHA-256, hex-encode",
+    "participant_ids": [
+      "agent-alice",
+      "agent-bob"
+    ]
+  },
+  "schemas": []
+}

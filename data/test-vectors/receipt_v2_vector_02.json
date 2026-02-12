@@ -1,0 +1,56 @@
+{
+  "description": "Signed receipt with contract_hash and output_schema_id fields (COMPLETED, Ed25519)",
+  "expected": {
+    "signature_hex": "138e1eb75d5d9bb66fb25eb3fe8e7fd887eb5a5c2568ebb8ba9b0b19fc0298afff56f5690ffc0a7285629d7670f50744070be4dd66dd6f508ad4c10c3b2e620d",
+    "verification_result": "PASS"
+  },
+  "input": {
+    "signed_receipt": {
+      "budget_chain": {
+        "chain_id": "chain-1111111111111111111111111111111111111111111111111111111111111111",
+        "prev_receipt_hash": null,
+        "receipt_hash": "722fc7b5695a9076a92ebe6e938721feafac5a220801ece1e831d9032c53f37b"
+      },
+      "budget_usage": {
+        "bits_used_after": 11,
+        "bits_used_before": 0,
+        "budget_limit": 128,
+        "budget_tier": "DEFAULT",
+        "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "window_start": "2025-01-01T00:00:00Z"
+      },
+      "contract_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "execution_lane": "GLASS_LOCAL",
+      "fixed_window_duration_seconds": 120,
+      "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "llama_cpp_version": "0.1.0",
+      "mitigations_applied": [],
+      "model_weights_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "output": {
+        "confidence_bucket": "HIGH",
+        "decision": "PROCEED",
+        "reason_code": "MUTUAL_INTEREST_UNCLEAR"
+      },
+      "output_entropy_bits": 8,
+      "output_schema_id": "vault_result_compatibility",
+      "output_schema_version": "1.0.0",
+      "participant_ids": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "purpose_code": "COMPATIBILITY",
+      "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "schema_version": "1.0.0",
+      "session_end": "2025-06-01T12:02:00Z",
+      "session_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "session_start": "2025-06-01T12:00:00Z",
+      "signature": "138e1eb75d5d9bb66fb25eb3fe8e7fd887eb5a5c2568ebb8ba9b0b19fc0298afff56f5690ffc0a7285629d7670f50744070be4dd66dd6f508ad4c10c3b2e620d",
+      "status": "COMPLETED"
+    },
+    "verifying_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/receipt.v2.schema.json"
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "description": "Agreement hash with model_version=null (key omitted from canonical JSON per serde skip_serializing_if)",
+  "expected": {
+    "agreement_hash": "dc4493c42146e6093572635c185fbc6a502b4d643a831871d040d8d97017f0e9",
+    "pre_agreement_hash": "1267010d2ddd993efac5125eecd9c88dd99859036a13191483ab0179671e4ede"
+  },
+  "input": {
+    "note": "model_version is None/null -- the key MUST be omitted from canonical JSON, not serialized as null",
+    "pre_agreement_fields": {
+      "contract_id": "COMPATIBILITY",
+      "expiry": "2025-12-31T23:59:59Z",
+      "input_schema_hashes": [
+        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "model_identity": {
+        "model_id": "llama-3.2-3b",
+        "provider": "LOCAL"
+      },
+      "output_budget": 8,
+      "participants": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "purpose_code": "COMPATIBILITY",
+      "symmetry_rule": "SYMMETRIC"
+    },
+    "session_agreement_fields": {
+      "contract_id": "COMPATIBILITY",
+      "expiry": "2025-12-31T23:59:59Z",
+      "input_schema_hashes": [
+        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "model_identity": {
+        "model_id": "llama-3.2-3b",
+        "provider": "LOCAL"
+      },
+      "output_budget": 8,
+      "participants": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "pre_agreement_hash": "1267010d2ddd993efac5125eecd9c88dd99859036a13191483ab0179671e4ede",
+      "purpose_code": "COMPATIBILITY",
+      "session_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "symmetry_rule": "SYMMETRIC"
+    }
+  },
+  "schemas": []
+}

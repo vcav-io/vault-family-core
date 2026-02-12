@@ -1,0 +1,49 @@
+{
+  "description": "Golden test vector for ProfileDigestV1 and profile hash computation (sealed-local lane)",
+  "input": {
+    "profile": {
+      "profile_id": "sealed-demo-v1",
+      "profile_version": 1,
+      "execution_lane": "sealed-local",
+      "provider": "local-gguf",
+      "model_id": "phi-3-mini-4k-instruct",
+      "model_version": "1.0.0",
+      "model_weights_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+      "tokenizer_hash": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+      "engine_version": "llama.cpp-b2901",
+      "inference_params": {
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_tokens": 1024,
+        "seed": 42
+      },
+      "prompt_template_hash": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      "system_prompt_hash": "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+      "grammar_constraint_hash": "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6"
+    }
+  },
+  "expected": {
+    "verification_result": "PASS",
+    "digest": {
+      "execution_lane": "sealed-local",
+      "provider": "local-gguf",
+      "model_id": "phi-3-mini-4k-instruct",
+      "model_version": "1.0.0",
+      "inference_params": {
+        "temperature_bp": 700,
+        "top_p_bp": 950,
+        "top_k": 40,
+        "max_tokens": 1024,
+        "seed": 42
+      },
+      "prompt_template_hash": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      "system_prompt_hash": "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+      "model_weights_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+      "tokenizer_hash": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+      "engine_version": "llama.cpp-b2901",
+      "grammar_constraint_hash": "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6"
+    },
+    "model_profile_hash": "ff3d0a51ec51540bc5b6dc2e12d804c93f1e56612c4f18d0e0c9a3774a398cfe"
+  }
+}

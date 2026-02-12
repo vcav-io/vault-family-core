@@ -1882,6 +1882,7 @@ mod tests {
             .unwrap()
             .parent()
             .unwrap()
+            .join("data")
             .join("test-vectors")
     }
 

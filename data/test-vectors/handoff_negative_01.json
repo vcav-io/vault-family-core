@@ -1,0 +1,34 @@
+{
+  "description": "Handoff signed with RECEIPT domain prefix -- verifier MUST reject",
+  "expected": {
+    "error_class": "DOMAIN_PREFIX_MISMATCH",
+    "verification_result": "FAIL"
+  },
+  "input": {
+    "correct_domain_prefix": "VCAV-HANDOFF-V1:",
+    "signature_hex": "5b87960cbb4d821aabb4c67525461e36b12abc6f4130ff12914e55546f97176983c6d9e2ad51ed6c5db88c3ce9626893710f9ed367673a163340e1d98b57af01",
+    "unsigned_handoff": {
+      "budget_tier": "SMALL",
+      "capability_tokens": [],
+      "contract_hash": {
+        "hash_alg": "sha256",
+        "hash_b64": "dGVzdC1jb250cmFjdC1oYXNo"
+      },
+      "contract_id": "dating.v1.d2",
+      "contract_version": 1,
+      "handoff_id": "handoff-test-vector-001",
+      "intended_spend_bits": 11,
+      "operator_endpoint_id": "operator-test-001",
+      "participants": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "ttl_seconds": 120
+    },
+    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "wrong_domain_prefix": "VCAV-RECEIPT-V1:"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/session_handoff.schema.json"
+  ]
+}

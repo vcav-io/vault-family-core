@@ -1,0 +1,118 @@
+{
+  "description": "Known-good receipt with all Seq 14/15 fields: agreement_hash, model_profile_hash, policy_bundle_hash, receipt_key_id, execution_lane=SEALED_LOCAL. Verifier MUST accept.",
+  "expected": {
+    "agreement_hash": "a300b85a0b73527522fb26942f59472322dec391fd4f6bff4cd7bc7e9a951b28",
+    "receipt_key_id": "kid-95bbfbb1f0ef8f2305be069a9a2d7d9d3e9ac0f2b326fa9ed6d9dafc66d2a111",
+    "signature_hex": "e2073b436288aade62792ddf3fbe6a50c662377ecab03cdc2bfb478e1e6cc9a86b607ef54e572c8943216ecadd0656a03c5a0f5928bd1993751851e569c73d04",
+    "verification_result": "PASS"
+  },
+  "input": {
+    "agreement_fields": {
+      "note": "Verifiers can recompute agreement_hash from these fields to confirm internal consistency",
+      "pre_agreement_fields": {
+        "contract_id": "COMPATIBILITY",
+        "expiry": "2025-12-31T23:59:59Z",
+        "input_schema_hashes": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "model_identity": {
+          "model_id": "llama-3.2-3b",
+          "model_version": "2025-06-01",
+          "provider": "LOCAL"
+        },
+        "model_profile_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "output_budget": 8,
+        "participants": [
+          "agent-alice",
+          "agent-bob"
+        ],
+        "policy_bundle_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "purpose_code": "COMPATIBILITY",
+        "symmetry_rule": "SYMMETRIC"
+      },
+      "pre_agreement_hash": "41401074e243514d79fe1ba5a746d61a3f0f7fe2f49b79f5ded2182f161553f4",
+      "session_agreement_fields": {
+        "contract_id": "COMPATIBILITY",
+        "expiry": "2025-12-31T23:59:59Z",
+        "input_schema_hashes": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "model_identity": {
+          "model_id": "llama-3.2-3b",
+          "model_version": "2025-06-01",
+          "provider": "LOCAL"
+        },
+        "model_profile_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "output_budget": 8,
+        "participants": [
+          "agent-alice",
+          "agent-bob"
+        ],
+        "policy_bundle_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "pre_agreement_hash": "41401074e243514d79fe1ba5a746d61a3f0f7fe2f49b79f5ded2182f161553f4",
+        "purpose_code": "COMPATIBILITY",
+        "session_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "symmetry_rule": "SYMMETRIC"
+      }
+    },
+    "canonical_json": "{\"agreement_hash\":\"a300b85a0b73527522fb26942f59472322dec391fd4f6bff4cd7bc7e9a951b28\",\"budget_chain\":{\"chain_id\":\"chain-1111111111111111111111111111111111111111111111111111111111111111\",\"prev_receipt_hash\":null,\"receipt_hash\":\"d33560c614049ff3286d92b8bfcc06482edc08d2a77c88bb93d4e532895a7c46\"},\"budget_usage\":{\"bits_used_after\":8,\"bits_used_before\":0,\"budget_limit\":128,\"budget_tier\":\"DEFAULT\",\"pair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"window_start\":\"2025-05-01T00:00:00Z\"},\"execution_lane\":\"SEALED_LOCAL\",\"fixed_window_duration_seconds\":120,\"guardian_policy_hash\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"inference_config_hash\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"llama_cpp_version\":\"0.1.0\",\"mitigations_applied\":[],\"model_identity\":{\"model_id\":\"llama-3.2-3b\",\"model_version\":\"2025-06-01\",\"provider\":\"LOCAL\"},\"model_profile_hash\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"model_weights_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"output\":{\"confidence_bucket\":\"HIGH\",\"decision\":\"PROCEED\",\"reason_code\":\"MUTUAL_INTEREST_UNCLEAR\"},\"output_entropy_bits\":8,\"output_schema_version\":\"1.0.0\",\"participant_ids\":[\"agent-alice\",\"agent-bob\"],\"policy_bundle_hash\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"purpose_code\":\"COMPATIBILITY\",\"receipt_key_id\":\"kid-95bbfbb1f0ef8f2305be069a9a2d7d9d3e9ac0f2b326fa9ed6d9dafc66d2a111\",\"runtime_hash\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"schema_version\":\"1.0.0\",\"session_end\":\"2025-06-01T12:02:00Z\",\"session_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"session_start\":\"2025-06-01T12:00:00Z\",\"status\":\"COMPLETED\"}",
+    "domain_prefix": "VCAV-RECEIPT-V1:",
+    "sha256_digest_hex": "62d9ef04adfebab4eaf5cec1c298cd306a9c1235927deb41f7670d2f6fe963e0",
+    "signing_key_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "unsigned_receipt": {
+      "agreement_hash": "a300b85a0b73527522fb26942f59472322dec391fd4f6bff4cd7bc7e9a951b28",
+      "budget_chain": {
+        "chain_id": "chain-1111111111111111111111111111111111111111111111111111111111111111",
+        "prev_receipt_hash": null,
+        "receipt_hash": "d33560c614049ff3286d92b8bfcc06482edc08d2a77c88bb93d4e532895a7c46"
+      },
+      "budget_usage": {
+        "bits_used_after": 8,
+        "bits_used_before": 0,
+        "budget_limit": 128,
+        "budget_tier": "DEFAULT",
+        "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "window_start": "2025-05-01T00:00:00Z"
+      },
+      "execution_lane": "SEALED_LOCAL",
+      "fixed_window_duration_seconds": 120,
+      "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "llama_cpp_version": "0.1.0",
+      "mitigations_applied": [],
+      "model_identity": {
+        "model_id": "llama-3.2-3b",
+        "model_version": "2025-06-01",
+        "provider": "LOCAL"
+      },
+      "model_profile_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "model_weights_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "output": {
+        "confidence_bucket": "HIGH",
+        "decision": "PROCEED",
+        "reason_code": "MUTUAL_INTEREST_UNCLEAR"
+      },
+      "output_entropy_bits": 8,
+      "output_schema_version": "1.0.0",
+      "participant_ids": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "policy_bundle_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "purpose_code": "COMPATIBILITY",
+      "receipt_key_id": "kid-95bbfbb1f0ef8f2305be069a9a2d7d9d3e9ac0f2b326fa9ed6d9dafc66d2a111",
+      "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "schema_version": "1.0.0",
+      "session_end": "2025-06-01T12:02:00Z",
+      "session_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "session_start": "2025-06-01T12:00:00Z",
+      "status": "COMPLETED"
+    },
+    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/receipt.v2.schema.json"
+  ]
+}

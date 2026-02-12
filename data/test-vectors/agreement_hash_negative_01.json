@@ -1,0 +1,47 @@
+{
+  "description": "Agreement hash differs when participants are not sorted -- callers MUST sort before hashing",
+  "expected": {
+    "hash_sorted": "c364d20510b87039e6548ae13380d03aa61951bcec6ed634f6e4ad1550c99100",
+    "hash_unsorted": "7272de4e4beb148ab7dbd745afd639c342e8e36116e00797508874f2eb89f5b3",
+    "hashes_must_differ": true
+  },
+  "input": {
+    "fields_sorted_participants": {
+      "contract_id": "COMPATIBILITY",
+      "expiry": "2025-12-31T23:59:59Z",
+      "input_schema_hashes": [],
+      "model_identity": {
+        "model_id": "llama-3.2-3b",
+        "provider": "LOCAL"
+      },
+      "output_budget": 8,
+      "participants": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "pre_agreement_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "purpose_code": "COMPATIBILITY",
+      "session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "symmetry_rule": "SYMMETRIC"
+    },
+    "fields_unsorted_participants": {
+      "contract_id": "COMPATIBILITY",
+      "expiry": "2025-12-31T23:59:59Z",
+      "input_schema_hashes": [],
+      "model_identity": {
+        "model_id": "llama-3.2-3b",
+        "provider": "LOCAL"
+      },
+      "output_budget": 8,
+      "participants": [
+        "agent-bob",
+        "agent-alice"
+      ],
+      "pre_agreement_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "purpose_code": "COMPATIBILITY",
+      "session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "symmetry_rule": "SYMMETRIC"
+    }
+  },
+  "schemas": []
+}

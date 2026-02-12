@@ -1,0 +1,66 @@
+{
+  "description": "Valid signed publication manifest with Ed25519 signature and operator_key_id",
+  "expected": {
+    "canonical_json": "{\"artefacts\":{\"contracts\":[{\"content_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"filename\":\"contracts/dating-compat.json\"}],\"policies\":[{\"content_hash\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"filename\":\"policies/default-guardrails.json\"}],\"profiles\":[{\"content_hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"filename\":\"profiles/llama-3.1-8b.json\"}]},\"manifest_version\":\"1.0.0\",\"operator_id\":\"operator-test-001\",\"operator_key_id\":\"opkey-55066f010533eb2e14eccef875d1c92a0b243308c17e83cd726778290bb329d1\",\"operator_public_key_hex\":\"ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1\",\"protocol_version\":\"1.0.0\",\"published_at\":\"2026-01-01T00:00:00Z\"}",
+    "signature": "c3fe3b8662de490e377824f534ec16d46e1f1fe5eb48af5dccf04b2e47eaaf14c82f5f564c9538cad5d64c01076641b7a46229f2cd787a6647ac3e0990c3b206",
+    "signed_manifest": {
+      "artefacts": {
+        "contracts": [
+          {
+            "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "filename": "contracts/dating-compat.json"
+          }
+        ],
+        "policies": [
+          {
+            "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "filename": "policies/default-guardrails.json"
+          }
+        ],
+        "profiles": [
+          {
+            "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "filename": "profiles/llama-3.1-8b.json"
+          }
+        ]
+      },
+      "manifest_version": "1.0.0",
+      "operator_id": "operator-test-001",
+      "operator_key_id": "opkey-55066f010533eb2e14eccef875d1c92a0b243308c17e83cd726778290bb329d1",
+      "operator_public_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+      "protocol_version": "1.0.0",
+      "published_at": "2026-01-01T00:00:00Z",
+      "signature": "c3fe3b8662de490e377824f534ec16d46e1f1fe5eb48af5dccf04b2e47eaaf14c82f5f564c9538cad5d64c01076641b7a46229f2cd787a6647ac3e0990c3b206"
+    },
+    "signing_message_hash": "9b30b45318c242983a11f3aad784842fae2f48de537806f0db0c3203fd8a95ea"
+  },
+  "input": {
+    "artefacts": {
+      "contracts": [
+        {
+          "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "filename": "contracts/dating-compat.json"
+        }
+      ],
+      "policies": [
+        {
+          "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "filename": "policies/default-guardrails.json"
+        }
+      ],
+      "profiles": [
+        {
+          "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "filename": "profiles/llama-3.1-8b.json"
+        }
+      ]
+    },
+    "domain_prefix": "VCAV-MANIFEST-V1:",
+    "operator_id": "operator-test-001",
+    "operator_key_id": "opkey-55066f010533eb2e14eccef875d1c92a0b243308c17e83cd726778290bb329d1",
+    "operator_public_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+    "protocol_version": "1.0.0",
+    "published_at": "2026-01-01T00:00:00Z",
+    "signing_key_seed_hex": "0303030303030303030303030303030303030303030303030303030303030303"
+  }
+}

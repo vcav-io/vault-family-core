@@ -1,0 +1,19 @@
+{
+  "description": "Non-canonical JSON forms produce different SHA-256 hashes -- implementations MUST canonicalize before hashing",
+  "expected": {
+    "all_must_differ": true,
+    "sha256_canonical": "43258cff783fe7036d8a43033f830adfc60ec037382473548ac742b888292777",
+    "sha256_pretty": "c81ded0f93b4c797225630516d7e3e02ada5e65cd20b7e91736767d4496793d3",
+    "sha256_spaced": "d8497d9d82770a70729261095aa98f7ef5154d7af499f8037b6ca250296785a6"
+  },
+  "input": {
+    "canonical_form": "{\"a\":1,\"b\":2}",
+    "json_object": {
+      "a": 1,
+      "b": 2
+    },
+    "pretty_form": "{\n  \"a\": 1,\n  \"b\": 2\n}",
+    "spaced_form": "{\"a\": 1, \"b\": 2}"
+  },
+  "schemas": []
+}

@@ -1,0 +1,48 @@
+{
+  "description": "Valid ABORTED receipt with null output and Ed25519 signature",
+  "expected": {
+    "signature_hex": "2f3530cf69332ac489b2b92800ef464f2a2589748515fa6072b3d631dafcbb0c2123e0318bf61665f1090c90c8e881441c1c1ac03f495abdefea5b3cf550240b",
+    "verification_result": "PASS"
+  },
+  "input": {
+    "canonical_json": "{\"budget_usage\":{\"bits_used_after\":8,\"bits_used_before\":8,\"budget_limit\":128,\"budget_tier\":\"DEFAULT\",\"pair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"window_start\":\"2025-05-01T00:00:00Z\"},\"execution_lane\":\"GLASS_LOCAL\",\"fixed_window_duration_seconds\":120,\"guardian_policy_hash\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"inference_config_hash\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"llama_cpp_version\":\"0.1.0\",\"mitigations_applied\":[],\"model_weights_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"output\":null,\"output_entropy_bits\":0,\"output_schema_version\":\"1.0.0\",\"participant_ids\":[\"agent-alice\",\"agent-bob\"],\"purpose_code\":\"SCHEDULING\",\"runtime_hash\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"schema_version\":\"1.0.0\",\"session_end\":\"2025-06-01T14:02:00Z\",\"session_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"session_start\":\"2025-06-01T14:00:00Z\",\"status\":\"ABORTED\"}",
+    "domain_prefix": "VCAV-RECEIPT-V1:",
+    "sha256_digest_hex": "53b9fc09ab9e4cfc4d0cc07de1542f828403ab342bffaecd462a47ec05f8b0e5",
+    "signing_key_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "unsigned_receipt": {
+      "budget_usage": {
+        "bits_used_after": 8,
+        "bits_used_before": 8,
+        "budget_limit": 128,
+        "budget_tier": "DEFAULT",
+        "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "window_start": "2025-05-01T00:00:00Z"
+      },
+      "execution_lane": "GLASS_LOCAL",
+      "fixed_window_duration_seconds": 120,
+      "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "llama_cpp_version": "0.1.0",
+      "mitigations_applied": [],
+      "model_weights_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "output": null,
+      "output_entropy_bits": 0,
+      "output_schema_version": "1.0.0",
+      "participant_ids": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "purpose_code": "SCHEDULING",
+      "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "schema_version": "1.0.0",
+      "session_end": "2025-06-01T14:02:00Z",
+      "session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "session_start": "2025-06-01T14:00:00Z",
+      "status": "ABORTED"
+    },
+    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/receipt.v2.schema.json"
+  ]
+}
