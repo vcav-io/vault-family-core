@@ -1658,4 +1658,32 @@ mod tests {
         tier.contract_enforcement = Some(ContractEnforcementResult::default());
         assert!(tier.contract_enforcement.is_some());
     }
+
+    // =========================================================================
+    // Timing class drift detection (verifier-core vs guardian-core)
+    // =========================================================================
+
+    #[test]
+    fn test_timing_class_windows_match_guardian_core() {
+        // verifier-core inlines timing class window values for WASM compat.
+        // This test ensures they stay in sync with guardian-core's canonical values.
+        use guardian_core::TimingClass;
+
+        for (name, canonical) in [
+            ("FAST", TimingClass::Fast),
+            ("SHORT", TimingClass::Short),
+            ("STANDARD", TimingClass::Standard),
+            ("EXTENDED", TimingClass::Extended),
+            ("LONG", TimingClass::Long),
+        ] {
+            let inlined = timing_class_window_seconds(name)
+                .unwrap_or_else(|| panic!("verifier-core missing timing class: {name}"));
+            assert_eq!(
+                inlined,
+                canonical.window_seconds(),
+                "timing class {name}: verifier-core has {inlined}s but guardian-core has {}s",
+                canonical.window_seconds()
+            );
+        }
+    }
 }
