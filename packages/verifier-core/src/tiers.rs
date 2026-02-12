@@ -1015,6 +1015,10 @@ mod tests {
             contract_hash: receipt.contract_hash,
             output_schema_id: receipt.output_schema_id,
             signal_class: receipt.signal_class,
+            entropy_budget_bits: receipt.entropy_budget_bits,
+            schema_entropy_ceiling_bits: receipt.schema_entropy_ceiling_bits,
+            prompt_template_hash: receipt.prompt_template_hash,
+            contract_timing_class: receipt.contract_timing_class,
             attestation: receipt.attestation,
         };
         (unsigned, sig)

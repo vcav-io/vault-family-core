@@ -263,6 +263,22 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signal_class: Option<SignalClass>,
 
+    /// Contract-selected entropy budget in bits (optional, Seq 31+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_budget_bits: Option<u32>,
+
+    /// Schema-level entropy ceiling in bits (optional, Seq 31+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema_entropy_ceiling_bits: Option<u32>,
+
+    /// Content-addressed hash of the prompt template bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_template_hash: Option<String>,
+
+    /// Contract-selected timing class (e.g. "FAST", "STANDARD") (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract_timing_class: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -396,6 +412,22 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signal_class: Option<SignalClass>,
 
+    /// Contract-selected entropy budget in bits (optional, Seq 31+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_budget_bits: Option<u32>,
+
+    /// Schema-level entropy ceiling in bits (optional, Seq 31+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema_entropy_ceiling_bits: Option<u32>,
+
+    /// Content-addressed hash of the prompt template bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_template_hash: Option<String>,
+
+    /// Contract-selected timing class (e.g. "FAST", "STANDARD") (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract_timing_class: Option<String>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -433,6 +465,10 @@ impl UnsignedReceipt {
             contract_hash: self.contract_hash,
             output_schema_id: self.output_schema_id,
             signal_class: self.signal_class,
+            entropy_budget_bits: self.entropy_budget_bits,
+            schema_entropy_ceiling_bits: self.schema_entropy_ceiling_bits,
+            prompt_template_hash: self.prompt_template_hash,
+            contract_timing_class: self.contract_timing_class,
             attestation: self.attestation,
             signature,
         }
@@ -473,6 +509,10 @@ pub struct ReceiptBuilder {
     contract_hash: Option<String>,
     output_schema_id: Option<String>,
     signal_class: Option<SignalClass>,
+    entropy_budget_bits: Option<u32>,
+    schema_entropy_ceiling_bits: Option<u32>,
+    prompt_template_hash: Option<String>,
+    contract_timing_class: Option<String>,
     attestation: Option<Attestation>,
 }
 
@@ -645,6 +685,54 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the contract-selected entropy budget in bits
+    pub fn entropy_budget_bits(mut self, v: u32) -> Self {
+        self.entropy_budget_bits = Some(v);
+        self
+    }
+
+    /// Set the contract-selected entropy budget in bits (optional)
+    pub fn entropy_budget_bits_opt(mut self, v: Option<u32>) -> Self {
+        self.entropy_budget_bits = v;
+        self
+    }
+
+    /// Set the schema-level entropy ceiling in bits
+    pub fn schema_entropy_ceiling_bits(mut self, v: u32) -> Self {
+        self.schema_entropy_ceiling_bits = Some(v);
+        self
+    }
+
+    /// Set the schema-level entropy ceiling in bits (optional)
+    pub fn schema_entropy_ceiling_bits_opt(mut self, v: Option<u32>) -> Self {
+        self.schema_entropy_ceiling_bits = v;
+        self
+    }
+
+    /// Set the prompt template hash
+    pub fn prompt_template_hash_val(mut self, v: String) -> Self {
+        self.prompt_template_hash = Some(v);
+        self
+    }
+
+    /// Set the prompt template hash (optional)
+    pub fn prompt_template_hash(mut self, v: Option<String>) -> Self {
+        self.prompt_template_hash = v;
+        self
+    }
+
+    /// Set the contract timing class
+    pub fn contract_timing_class_val(mut self, v: String) -> Self {
+        self.contract_timing_class = Some(v);
+        self
+    }
+
+    /// Set the contract timing class (optional)
+    pub fn contract_timing_class(mut self, v: Option<String>) -> Self {
+        self.contract_timing_class = v;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
         self.attestation = attestation;
@@ -684,6 +772,10 @@ impl ReceiptBuilder {
             contract_hash: self.contract_hash,
             output_schema_id: self.output_schema_id,
             signal_class: self.signal_class,
+            entropy_budget_bits: self.entropy_budget_bits,
+            schema_entropy_ceiling_bits: self.schema_entropy_ceiling_bits,
+            prompt_template_hash: self.prompt_template_hash,
+            contract_timing_class: self.contract_timing_class,
             attestation: self.attestation,
         })
     }
@@ -748,6 +840,10 @@ mod tests {
             contract_hash: None,
             output_schema_id: None,
             signal_class: None,
+            entropy_budget_bits: None,
+            schema_entropy_ceiling_bits: None,
+            prompt_template_hash: None,
+            contract_timing_class: None,
             attestation: None,
         }
     }
@@ -1273,6 +1369,202 @@ mod tests {
         assert_eq!(signed.output_schema_id, Some("vault_result_compatibility".to_string()));
     }
 
+    // ==================== Contract Enforcement Binding Tests ====================
+
+    #[test]
+    fn test_receipt_without_contract_enforcement_fields_omits_them() {
+        let unsigned = sample_unsigned_receipt();
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(!json.contains("entropy_budget_bits"));
+        assert!(!json.contains("schema_entropy_ceiling_bits"));
+        assert!(!json.contains("prompt_template_hash"));
+        assert!(!json.contains("contract_timing_class"));
+    }
+
+    #[test]
+    fn test_receipt_with_all_contract_enforcement_fields_roundtrip() {
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.entropy_budget_bits = Some(4);
+        unsigned.schema_entropy_ceiling_bits = Some(8);
+        unsigned.prompt_template_hash = Some("a".repeat(64));
+        unsigned.contract_timing_class = Some("FAST".to_string());
+
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(json.contains("entropy_budget_bits"));
+        assert!(json.contains("schema_entropy_ceiling_bits"));
+        assert!(json.contains("prompt_template_hash"));
+        assert!(json.contains("contract_timing_class"));
+
+        let parsed: UnsignedReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(unsigned, parsed);
+    }
+
+    #[test]
+    fn test_old_receipt_without_contract_enforcement_fields_deserializes() {
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.entropy_budget_bits = Some(4);
+        let mut value = serde_json::to_value(&unsigned).unwrap();
+        let obj = value.as_object_mut().unwrap();
+        obj.remove("entropy_budget_bits");
+        obj.remove("schema_entropy_ceiling_bits");
+        obj.remove("prompt_template_hash");
+        obj.remove("contract_timing_class");
+
+        let parsed: UnsignedReceipt = serde_json::from_value(value).unwrap();
+        assert_eq!(parsed.entropy_budget_bits, None);
+        assert_eq!(parsed.schema_entropy_ceiling_bits, None);
+        assert_eq!(parsed.prompt_template_hash, None);
+        assert_eq!(parsed.contract_timing_class, None);
+    }
+
+    #[test]
+    fn test_receipt_each_contract_enforcement_field_individually() {
+        // entropy_budget_bits only
+        let mut r = sample_unsigned_receipt();
+        r.entropy_budget_bits = Some(4);
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(json.contains("\"entropy_budget_bits\":4"));
+        assert!(!json.contains("schema_entropy_ceiling_bits"));
+
+        // schema_entropy_ceiling_bits only
+        let mut r = sample_unsigned_receipt();
+        r.schema_entropy_ceiling_bits = Some(8);
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(json.contains("\"schema_entropy_ceiling_bits\":8"));
+        assert!(!json.contains("entropy_budget_bits"));
+
+        // prompt_template_hash only
+        let mut r = sample_unsigned_receipt();
+        r.prompt_template_hash = Some("abc123".to_string());
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(json.contains("\"prompt_template_hash\":\"abc123\""));
+        assert!(!json.contains("contract_timing_class"));
+
+        // contract_timing_class only
+        let mut r = sample_unsigned_receipt();
+        r.contract_timing_class = Some("STANDARD".to_string());
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(json.contains("\"contract_timing_class\":\"STANDARD\""));
+        assert!(!json.contains("prompt_template_hash"));
+    }
+
+    #[test]
+    fn test_receipt_sign_transfers_contract_enforcement_fields() {
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.entropy_budget_bits = Some(4);
+        unsigned.schema_entropy_ceiling_bits = Some(8);
+        unsigned.prompt_template_hash = Some("hash123".to_string());
+        unsigned.contract_timing_class = Some("FAST".to_string());
+
+        let signed = unsigned.sign("e".repeat(128));
+        assert_eq!(signed.entropy_budget_bits, Some(4));
+        assert_eq!(signed.schema_entropy_ceiling_bits, Some(8));
+        assert_eq!(signed.prompt_template_hash, Some("hash123".to_string()));
+        assert_eq!(signed.contract_timing_class, Some("FAST".to_string()));
+    }
+
+    #[test]
+    fn test_receipt_builder_with_contract_enforcement_fields() {
+        let usage = sample_budget_usage();
+        let start = Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap();
+
+        let unsigned = Receipt::builder()
+            .session_id("b".repeat(64))
+            .purpose_code(Purpose::Compatibility)
+            .participant_ids(vec!["agent-a".to_string(), "agent-b".to_string()])
+            .runtime_hash("c".repeat(64))
+            .guardian_policy_hash("d".repeat(64))
+            .model_weights_hash("e".repeat(64))
+            .llama_cpp_version("0.1.0")
+            .inference_config_hash("f".repeat(64))
+            .output_schema_version("1.0.0")
+            .session_start(start)
+            .session_end(end)
+            .fixed_window_duration_seconds(120)
+            .status(ReceiptStatus::Completed)
+            .execution_lane(ExecutionLane::GlassLocal)
+            .output_entropy_bits(8)
+            .budget_usage(usage)
+            .entropy_budget_bits(4)
+            .schema_entropy_ceiling_bits(8)
+            .prompt_template_hash_val("template_hash".to_string())
+            .contract_timing_class_val("FAST".to_string())
+            .build_unsigned()
+            .expect("Builder should succeed");
+
+        assert_eq!(unsigned.entropy_budget_bits, Some(4));
+        assert_eq!(unsigned.schema_entropy_ceiling_bits, Some(8));
+        assert_eq!(unsigned.prompt_template_hash, Some("template_hash".to_string()));
+        assert_eq!(unsigned.contract_timing_class, Some("FAST".to_string()));
+
+        let signed = unsigned.sign("e".repeat(128));
+        assert_eq!(signed.entropy_budget_bits, Some(4));
+        assert_eq!(signed.schema_entropy_ceiling_bits, Some(8));
+        assert_eq!(signed.prompt_template_hash, Some("template_hash".to_string()));
+        assert_eq!(signed.contract_timing_class, Some("FAST".to_string()));
+    }
+
+    #[test]
+    fn test_receipt_builder_opt_methods() {
+        let usage = sample_budget_usage();
+        let start = Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap();
+
+        let unsigned = Receipt::builder()
+            .session_id("b".repeat(64))
+            .purpose_code(Purpose::Compatibility)
+            .participant_ids(vec!["agent-a".to_string(), "agent-b".to_string()])
+            .runtime_hash("c".repeat(64))
+            .guardian_policy_hash("d".repeat(64))
+            .model_weights_hash("e".repeat(64))
+            .llama_cpp_version("0.1.0")
+            .inference_config_hash("f".repeat(64))
+            .output_schema_version("1.0.0")
+            .session_start(start)
+            .session_end(end)
+            .fixed_window_duration_seconds(120)
+            .status(ReceiptStatus::Completed)
+            .execution_lane(ExecutionLane::GlassLocal)
+            .output_entropy_bits(8)
+            .budget_usage(usage)
+            .entropy_budget_bits_opt(Some(4))
+            .schema_entropy_ceiling_bits_opt(None)
+            .prompt_template_hash(Some("hash".to_string()))
+            .contract_timing_class(None)
+            .build_unsigned()
+            .expect("Builder should succeed");
+
+        assert_eq!(unsigned.entropy_budget_bits, Some(4));
+        assert_eq!(unsigned.schema_entropy_ceiling_bits, None);
+        assert_eq!(unsigned.prompt_template_hash, Some("hash".to_string()));
+        assert_eq!(unsigned.contract_timing_class, None);
+    }
+
+    #[test]
+    fn test_signed_receipt_with_contract_enforcement_fields_serde() {
+        use crate::{sign_receipt, verify_receipt, SigningKey};
+
+        let signing_key = SigningKey::from_bytes(&[0x05u8; 32]);
+        let verifying_key = signing_key.verifying_key();
+
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.entropy_budget_bits = Some(4);
+        unsigned.schema_entropy_ceiling_bits = Some(8);
+        unsigned.prompt_template_hash = Some("a".repeat(64));
+        unsigned.contract_timing_class = Some("FAST".to_string());
+        unsigned.budget_chain = None;
+
+        let signature = sign_receipt(&unsigned, &signing_key).expect("sign");
+        verify_receipt(&unsigned, &signature, &verifying_key)
+            .expect("signature must verify with contract enforcement fields");
+
+        let signed = unsigned.sign(signature);
+        let json = serde_json::to_string(&signed).unwrap();
+        let parsed: Receipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(signed, parsed);
+    }
+
     // ==================== Test Vector Generation ====================
 
     #[test]
@@ -1322,6 +1614,10 @@ mod tests {
             contract_hash: Some("a".repeat(64)),
             output_schema_id: Some("vault_result_compatibility".to_string()),
             signal_class: None,
+            entropy_budget_bits: None,
+            schema_entropy_ceiling_bits: None,
+            prompt_template_hash: None,
+            contract_timing_class: None,
             receipt_key_id: None,
             attestation: None,
         };

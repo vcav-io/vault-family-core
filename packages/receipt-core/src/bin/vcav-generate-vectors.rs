@@ -93,6 +93,10 @@ fn sample_unsigned_receipt() -> UnsignedReceipt {
         contract_hash: None,
         output_schema_id: None,
         signal_class: None,
+        entropy_budget_bits: None,
+        schema_entropy_ceiling_bits: None,
+        prompt_template_hash: None,
+        contract_timing_class: None,
         receipt_key_id: None,
         attestation: None,
     }
@@ -134,6 +138,10 @@ fn sample_aborted_receipt() -> UnsignedReceipt {
         contract_hash: None,
         output_schema_id: None,
         signal_class: None,
+        entropy_budget_bits: None,
+        schema_entropy_ceiling_bits: None,
+        prompt_template_hash: None,
+        contract_timing_class: None,
         receipt_key_id: None,
         attestation: None,
     }
@@ -867,6 +875,10 @@ fn sample_full_receipt(vault_pub_hex: &str) -> UnsignedReceipt {
         contract_hash: None,
         output_schema_id: None,
         signal_class: None,
+        entropy_budget_bits: None,
+        schema_entropy_ceiling_bits: None,
+        prompt_template_hash: None,
+        contract_timing_class: None,
         receipt_key_id: Some(key_id),
         attestation: None,
     }
