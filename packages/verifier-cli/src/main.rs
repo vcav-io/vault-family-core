@@ -91,6 +91,10 @@ struct Args {
     /// Strict runtime hash checking: mismatches are hard failures instead of warnings
     #[arg(long, default_value = "false")]
     strict_runtime: bool,
+
+    /// Strict contract enforcement: receipt vs contract field mismatches are hard failures
+    #[arg(long, default_value = "false")]
+    strict: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -123,6 +127,16 @@ struct VerificationResult {
     manifest_guardian_hash_match: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     model_identity_matches_profile: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contract_enforcement_entropy_matches: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contract_enforcement_timing_matches: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contract_enforcement_timing_window_consistent: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contract_enforcement_prompt_template_matches: Option<bool>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    contract_enforcement_warnings: Vec<String>,
     errors: Vec<String>,
 }
 
@@ -143,6 +157,10 @@ enum VerificationStatus {
     FailManifestProfileNotCovered,
     FailManifestPolicyNotCovered,
     FailManifestRuntimeHash,
+    FailContractEnforcementEntropy,
+    FailContractEnforcementTiming,
+    FailContractEnforcementPromptTemplate,
+    FailContractEnforcement,
 }
 
 impl std::fmt::Display for VerificationStatus {
@@ -167,6 +185,18 @@ impl std::fmt::Display for VerificationStatus {
             }
             VerificationStatus::FailManifestRuntimeHash => {
                 write!(f, "FAIL_MANIFEST_RUNTIME_HASH")
+            }
+            VerificationStatus::FailContractEnforcementEntropy => {
+                write!(f, "FAIL_CONTRACT_ENFORCEMENT_ENTROPY")
+            }
+            VerificationStatus::FailContractEnforcementTiming => {
+                write!(f, "FAIL_CONTRACT_ENFORCEMENT_TIMING")
+            }
+            VerificationStatus::FailContractEnforcementPromptTemplate => {
+                write!(f, "FAIL_CONTRACT_ENFORCEMENT_PROMPT_TEMPLATE")
+            }
+            VerificationStatus::FailContractEnforcement => {
+                write!(f, "FAIL_CONTRACT_ENFORCEMENT")
             }
         }
     }
@@ -259,6 +289,25 @@ fn main() -> Result<()> {
                         }
                     }
 
+                    // Contract enforcement results
+                    if let Some(ref ce) = details.tier_result.contract_enforcement {
+                        if let Some(matches) = ce.entropy_budget_matches {
+                            println!("Contract enforcement entropy matches: {}", matches);
+                        }
+                        if let Some(matches) = ce.timing_class_matches {
+                            println!("Contract enforcement timing matches: {}", matches);
+                        }
+                        if let Some(consistent) = ce.timing_window_consistent {
+                            println!("Contract enforcement timing window consistent: {}", consistent);
+                        }
+                        if let Some(matches) = ce.prompt_template_hash_matches {
+                            println!("Contract enforcement prompt template matches: {}", matches);
+                        }
+                        for warning in &ce.warnings {
+                            eprintln!("WARNING: {}", warning);
+                        }
+                    }
+
                     if let Some(schema_id) = &details.output_schema_id {
                         println!("Output schema: {}", schema_id);
                         if let Some(valid) = details.output_schema_valid {
@@ -332,6 +381,32 @@ fn main() -> Result<()> {
                 model_identity_matches_profile: details
                     .tier_result
                     .model_identity_matches_profile,
+                contract_enforcement_entropy_matches: details
+                    .tier_result
+                    .contract_enforcement
+                    .as_ref()
+                    .and_then(|ce| ce.entropy_budget_matches),
+                contract_enforcement_timing_matches: details
+                    .tier_result
+                    .contract_enforcement
+                    .as_ref()
+                    .and_then(|ce| ce.timing_class_matches),
+                contract_enforcement_timing_window_consistent: details
+                    .tier_result
+                    .contract_enforcement
+                    .as_ref()
+                    .and_then(|ce| ce.timing_window_consistent),
+                contract_enforcement_prompt_template_matches: details
+                    .tier_result
+                    .contract_enforcement
+                    .as_ref()
+                    .and_then(|ce| ce.prompt_template_hash_matches),
+                contract_enforcement_warnings: details
+                    .tier_result
+                    .contract_enforcement
+                    .as_ref()
+                    .map(|ce| ce.warnings.clone())
+                    .unwrap_or_default(),
                 errors: details.error.map(|e| vec![e]).unwrap_or_default(),
             };
             println!("{}", serde_json::to_string_pretty(&json_result)?);
@@ -677,6 +752,68 @@ fn verify(args: &Args) -> VerifyDetails {
                         tier_result: tier,
                         error: err,
                     };
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Contract enforcement cross-check (when --contract provided)
+    // ---------------------------------------------------------------
+    if let Some(ref contract_path) = args.contract {
+        match fs::read_to_string(Path::new(contract_path)) {
+            Ok(contract_content) => {
+                match verifier_core::verify_contract_enforcement(
+                    &receipt_content,
+                    &contract_content,
+                    args.strict,
+                ) {
+                    Ok(ce_result) => {
+                        tier.contract_enforcement = Some(ce_result);
+                    }
+                    Err(msg) => {
+                        // In strict mode, mismatch returns Err — determine which field failed
+                        let status = if msg.contains("entropy_budget_bits") {
+                            VerificationStatus::FailContractEnforcementEntropy
+                        } else if msg.contains("timing") {
+                            VerificationStatus::FailContractEnforcementTiming
+                        } else if msg.contains("prompt_template_hash") {
+                            VerificationStatus::FailContractEnforcementPromptTemplate
+                        } else {
+                            VerificationStatus::FailContractEnforcement
+                        };
+                        tier.error = Some(format!("Contract enforcement: {}", msg));
+                        let err = tier.error.clone();
+                        return VerifyDetails {
+                            receipt: Some(receipt),
+                            status,
+                            schema_skipped: false,
+                            output_schema_valid: None,
+                            output_schema_id: None,
+                            tier_result: tier,
+                            error: err,
+                        };
+                    }
+                }
+            }
+            Err(e) => {
+                let msg = format!(
+                    "Failed to re-read contract file for enforcement cross-check: {}",
+                    e
+                );
+                if args.strict {
+                    tier.error = Some(msg.clone());
+                    return VerifyDetails {
+                        receipt: Some(receipt),
+                        status: VerificationStatus::FailContractEnforcement,
+                        schema_skipped: false,
+                        output_schema_valid: None,
+                        output_schema_id: None,
+                        tier_result: tier,
+                        error: Some(msg),
+                    };
+                } else {
+                    eprintln!("WARNING: {}", msg);
                 }
             }
         }
@@ -1345,6 +1482,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1374,6 +1512,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1411,6 +1550,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1447,6 +1587,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1493,6 +1634,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1531,6 +1673,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1572,6 +1715,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1610,6 +1754,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1645,6 +1790,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1670,6 +1816,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1700,6 +1847,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1755,6 +1903,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1786,6 +1935,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1814,6 +1964,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1957,6 +2108,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -1991,6 +2143,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2074,6 +2227,7 @@ mod tests {
                             contract: None,
                             manifest: None,
                             strict_runtime: false,
+                            strict: false,
                         };
 
                         let details = verify(&args);
@@ -2141,6 +2295,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2191,6 +2346,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2219,6 +2375,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2449,6 +2606,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2491,6 +2649,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2576,6 +2735,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2654,6 +2814,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2681,6 +2842,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2751,6 +2913,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2808,6 +2971,7 @@ mod tests {
             contract: None,
             manifest: None,
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2925,6 +3089,7 @@ mod tests {
             contract: None,
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -2975,6 +3140,7 @@ mod tests {
             contract: None,
             manifest: Some(tampered_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -3073,6 +3239,7 @@ mod tests {
             contract: None,
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -3174,6 +3341,7 @@ mod tests {
             contract: None,
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);
@@ -3314,6 +3482,7 @@ mod tests {
             contract: None,
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
+            strict: false,
         };
 
         let details = verify(&args);

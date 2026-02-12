@@ -10,9 +10,10 @@ pub mod tiers;
 // Re-export key types for convenience
 pub use tiers::{
     build_policy_digest, build_profile_digest, compute_policy_bundle_hash, compute_profile_hash,
-    verify_model_identity_against_profile, InferenceParamsDigest, InferenceParamsRaw,
-    ManifestResult, ManifestVerifyError, ModelProfile, PolicyBundle, PolicyDigestV1,
-    ProfileDigestV1, TierResult, TtlBounds,
+    verify_contract_enforcement, verify_model_identity_against_profile,
+    ContractEnforcementResult, InferenceParamsDigest, InferenceParamsRaw, ManifestResult,
+    ManifestVerifyError, ModelProfile, PolicyBundle, PolicyDigestV1, ProfileDigestV1, TierResult,
+    TtlBounds,
 };
 
 pub use schema_validator::{EmbeddedSchemaEntry, SCHEMAS};

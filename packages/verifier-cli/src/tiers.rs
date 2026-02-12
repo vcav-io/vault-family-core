@@ -12,9 +12,10 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 
-// Re-export manifest types from verifier-core (single source of truth for CLI + WASM)
+// Re-export types from verifier-core (single source of truth for CLI + WASM)
 pub use verifier_core::{
-    verify_model_identity_against_profile, ManifestResult, ManifestVerifyError,
+    verify_model_identity_against_profile, ContractEnforcementResult, ManifestResult,
+    ManifestVerifyError,
 };
 
 // ============================================================================
@@ -222,6 +223,8 @@ pub struct TierResult {
     pub model_identity_matches_profile: Option<bool>,
     /// Manifest verification result (None = not checked)
     pub manifest: Option<ManifestResult>,
+    /// Contract enforcement cross-check result (None = not checked)
+    pub contract_enforcement: Option<ContractEnforcementResult>,
     /// Error message for the first failing check
     pub error: Option<String>,
 }

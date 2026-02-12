@@ -198,6 +198,147 @@ pub fn build_policy_digest(bundle: &PolicyBundle) -> PolicyDigestV1 {
 }
 
 // ============================================================================
+// Contract Enforcement
+// ============================================================================
+
+/// Timing class window lookup (mirrors guardian_core::kernel_limits::TimingClass).
+/// Kept inline to avoid pulling guardian-core (with jsonschema, chrono, etc.)
+/// into the WASM-compatible verifier-core crate.
+fn timing_class_window_seconds(class: &str) -> Option<u64> {
+    match class.to_uppercase().as_str() {
+        "FAST" => Some(30),
+        "SHORT" => Some(60),
+        "STANDARD" => Some(120),
+        "EXTENDED" => Some(300),
+        "LONG" => Some(600),
+        _ => None,
+    }
+}
+
+/// Result of cross-checking receipt fields against contract fields.
+#[derive(Debug, Clone, Default)]
+pub struct ContractEnforcementResult {
+    /// Whether the receipt's entropy_budget_bits matches the contract's
+    pub entropy_budget_matches: Option<bool>,
+    /// Whether the receipt's contract_timing_class matches the contract's timing_class
+    pub timing_class_matches: Option<bool>,
+    /// Whether the receipt's fixed_window_duration_seconds is consistent with the timing class
+    pub timing_window_consistent: Option<bool>,
+    /// Whether the receipt's prompt_template_hash matches the contract's
+    pub prompt_template_hash_matches: Option<bool>,
+    /// Warnings for non-strict mode (empty in strict mode since mismatches are errors)
+    pub warnings: Vec<String>,
+}
+
+/// Cross-check receipt fields against contract fields for enforcement verification.
+///
+/// In strict mode, any mismatch returns `Err`. In non-strict mode, mismatches
+/// are recorded in warnings and the result fields.
+///
+/// Fields that are absent from the receipt are not checked (None = not checked, not failure).
+pub fn verify_contract_enforcement(
+    receipt_json: &str,
+    contract_json: &str,
+    strict: bool,
+) -> Result<ContractEnforcementResult, String> {
+    let receipt: serde_json::Value = serde_json::from_str(receipt_json)
+        .map_err(|e| format!("Failed to parse receipt JSON: {}", e))?;
+    let contract: serde_json::Value = serde_json::from_str(contract_json)
+        .map_err(|e| format!("Failed to parse contract JSON: {}", e))?;
+
+    let mut result = ContractEnforcementResult::default();
+
+    // 1. Entropy budget: receipt.entropy_budget_bits == contract.entropy_budget_bits
+    if let Some(receipt_entropy) = receipt.get("entropy_budget_bits").and_then(|v| v.as_u64()) {
+        if let Some(contract_entropy) = contract.get("entropy_budget_bits").and_then(|v| v.as_u64()) {
+            let matches = receipt_entropy == contract_entropy;
+            result.entropy_budget_matches = Some(matches);
+            if !matches {
+                let msg = format!(
+                    "entropy_budget_bits mismatch: receipt={} contract={}",
+                    receipt_entropy, contract_entropy
+                );
+                if strict {
+                    return Err(msg);
+                }
+                result.warnings.push(msg);
+            }
+        }
+    }
+
+    // 2. Timing class: receipt.contract_timing_class == contract.timing_class
+    let receipt_timing = receipt.get("contract_timing_class").and_then(|v| v.as_str());
+    let contract_timing = contract.get("timing_class").and_then(|v| v.as_str());
+    if let (Some(r_tc), Some(c_tc)) = (receipt_timing, contract_timing) {
+        let matches = r_tc.eq_ignore_ascii_case(c_tc);
+        result.timing_class_matches = Some(matches);
+        if !matches {
+            let msg = format!(
+                "timing_class mismatch: receipt={} contract={}",
+                r_tc, c_tc
+            );
+            if strict {
+                return Err(msg);
+            }
+            result.warnings.push(msg);
+        }
+    }
+
+    // 3. Timing window consistency: receipt.fixed_window_duration_seconds matches
+    //    the expected window for the contract's timing class
+    if let Some(c_tc) = contract_timing {
+        match timing_class_window_seconds(c_tc) {
+            Some(expected_window) => {
+                if let Some(receipt_window) = receipt.get("fixed_window_duration_seconds").and_then(|v| v.as_u64()) {
+                    let consistent = receipt_window == expected_window;
+                    result.timing_window_consistent = Some(consistent);
+                    if !consistent {
+                        let msg = format!(
+                            "timing window inconsistent: receipt fixed_window={}s but contract timing_class={} expects {}s",
+                            receipt_window, c_tc, expected_window
+                        );
+                        if strict {
+                            return Err(msg);
+                        }
+                        result.warnings.push(msg);
+                    }
+                }
+            }
+            None => {
+                let msg = format!(
+                    "unrecognized timing_class '{}' in contract — cannot verify window consistency",
+                    c_tc
+                );
+                if strict {
+                    return Err(msg);
+                }
+                result.warnings.push(msg);
+            }
+        }
+    }
+
+    // 4. Prompt template hash: receipt.prompt_template_hash == contract.prompt_template_hash
+    let receipt_pth = receipt.get("prompt_template_hash").and_then(|v| v.as_str());
+    let contract_pth = contract.get("prompt_template_hash").and_then(|v| v.as_str());
+    if let (Some(r_pth), Some(c_pth)) = (receipt_pth, contract_pth) {
+        let matches = r_pth == c_pth;
+        result.prompt_template_hash_matches = Some(matches);
+        if !matches {
+            let msg = format!(
+                "prompt_template_hash mismatch: receipt={} contract={}",
+                r_pth, c_pth
+            );
+            if strict {
+                return Err(msg);
+            }
+            result.warnings.push(msg);
+        }
+    }
+
+    Ok(result)
+}
+
+// ============================================================================
 // Manifest verification error
 // ============================================================================
 
@@ -259,6 +400,8 @@ pub struct TierResult {
     pub model_identity_matches_profile: Option<bool>,
     /// Manifest verification result (None = not checked)
     pub manifest: Option<ManifestResult>,
+    /// Contract enforcement cross-check result (None = not checked)
+    pub contract_enforcement: Option<ContractEnforcementResult>,
     /// Error message for the first failing check
     pub error: Option<String>,
 }
@@ -1294,5 +1437,225 @@ mod tests {
         assert!(result.model_identity_matches_profile.is_none());
         result.model_identity_matches_profile = Some(true);
         assert_eq!(result.model_identity_matches_profile, Some(true));
+    }
+
+    // =========================================================================
+    // Contract enforcement cross-check tests
+    // =========================================================================
+
+    fn make_receipt_json(overrides: &serde_json::Value) -> String {
+        let mut base = serde_json::json!({
+            "entropy_budget_bits": 8,
+            "contract_timing_class": "STANDARD",
+            "fixed_window_duration_seconds": 120,
+            "prompt_template_hash": "a".repeat(64)
+        });
+        if let Some(obj) = overrides.as_object() {
+            for (k, v) in obj {
+                base[k] = v.clone();
+            }
+        }
+        serde_json::to_string(&base).unwrap()
+    }
+
+    fn make_contract_json(overrides: &serde_json::Value) -> String {
+        let mut base = serde_json::json!({
+            "entropy_budget_bits": 8,
+            "timing_class": "STANDARD",
+            "prompt_template_hash": "a".repeat(64)
+        });
+        if let Some(obj) = overrides.as_object() {
+            for (k, v) in obj {
+                base[k] = v.clone();
+            }
+        }
+        serde_json::to_string(&base).unwrap()
+    }
+
+    #[test]
+    fn test_contract_enforcement_all_match() {
+        let receipt = make_receipt_json(&serde_json::json!({}));
+        let contract = make_contract_json(&serde_json::json!({}));
+        let result = verify_contract_enforcement(&receipt, &contract, true).unwrap();
+        assert_eq!(result.entropy_budget_matches, Some(true));
+        assert_eq!(result.timing_class_matches, Some(true));
+        assert_eq!(result.timing_window_consistent, Some(true));
+        assert_eq!(result.prompt_template_hash_matches, Some(true));
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn test_contract_enforcement_entropy_mismatch_strict() {
+        let receipt = make_receipt_json(&serde_json::json!({"entropy_budget_bits": 16}));
+        let contract = make_contract_json(&serde_json::json!({}));
+        let err = verify_contract_enforcement(&receipt, &contract, true).unwrap_err();
+        assert!(err.contains("entropy_budget_bits mismatch"));
+    }
+
+    #[test]
+    fn test_contract_enforcement_entropy_mismatch_nonstrict() {
+        let receipt = make_receipt_json(&serde_json::json!({"entropy_budget_bits": 16}));
+        let contract = make_contract_json(&serde_json::json!({}));
+        let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
+        assert_eq!(result.entropy_budget_matches, Some(false));
+        assert_eq!(result.warnings.len(), 1);
+        assert!(result.warnings[0].contains("entropy_budget_bits"));
+    }
+
+    #[test]
+    fn test_contract_enforcement_timing_class_mismatch_strict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "contract_timing_class": "FAST",
+            "fixed_window_duration_seconds": 30
+        }));
+        let contract = make_contract_json(&serde_json::json!({}));
+        let err = verify_contract_enforcement(&receipt, &contract, true).unwrap_err();
+        assert!(err.contains("timing_class mismatch"));
+    }
+
+    #[test]
+    fn test_contract_enforcement_timing_class_mismatch_nonstrict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "contract_timing_class": "FAST",
+            "fixed_window_duration_seconds": 30
+        }));
+        let contract = make_contract_json(&serde_json::json!({}));
+        let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
+        assert_eq!(result.timing_class_matches, Some(false));
+        assert!(result.warnings.iter().any(|w| w.contains("timing_class")));
+    }
+
+    #[test]
+    fn test_contract_enforcement_timing_window_inconsistent_strict() {
+        // Receipt says FAST but window is 120 (STANDARD's window)
+        let receipt = make_receipt_json(&serde_json::json!({
+            "contract_timing_class": "FAST",
+            "fixed_window_duration_seconds": 120
+        }));
+        let contract = make_contract_json(&serde_json::json!({"timing_class": "FAST"}));
+        let err = verify_contract_enforcement(&receipt, &contract, true).unwrap_err();
+        assert!(err.contains("timing window inconsistent"));
+    }
+
+    #[test]
+    fn test_contract_enforcement_timing_window_inconsistent_nonstrict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "contract_timing_class": "FAST",
+            "fixed_window_duration_seconds": 120
+        }));
+        let contract = make_contract_json(&serde_json::json!({"timing_class": "FAST"}));
+        let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
+        assert_eq!(result.timing_class_matches, Some(true));
+        assert_eq!(result.timing_window_consistent, Some(false));
+        assert!(result.warnings.iter().any(|w| w.contains("timing window")));
+    }
+
+    #[test]
+    fn test_contract_enforcement_prompt_hash_mismatch_strict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "prompt_template_hash": "b".repeat(64)
+        }));
+        let contract = make_contract_json(&serde_json::json!({}));
+        let err = verify_contract_enforcement(&receipt, &contract, true).unwrap_err();
+        assert!(err.contains("prompt_template_hash mismatch"));
+    }
+
+    #[test]
+    fn test_contract_enforcement_prompt_hash_mismatch_nonstrict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "prompt_template_hash": "b".repeat(64)
+        }));
+        let contract = make_contract_json(&serde_json::json!({}));
+        let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
+        assert_eq!(result.prompt_template_hash_matches, Some(false));
+        assert!(result.warnings.iter().any(|w| w.contains("prompt_template_hash")));
+    }
+
+    #[test]
+    fn test_contract_enforcement_missing_fields_graceful() {
+        // Receipt has none of the optional fields
+        let receipt = serde_json::json!({
+            "session_id": "test",
+            "fixed_window_duration_seconds": 120
+        });
+        let contract = make_contract_json(&serde_json::json!({}));
+        let result = verify_contract_enforcement(
+            &serde_json::to_string(&receipt).unwrap(),
+            &contract,
+            true,
+        )
+        .unwrap();
+        // Nothing checked = no failures
+        assert_eq!(result.entropy_budget_matches, None);
+        assert_eq!(result.timing_class_matches, None);
+        // timing_window_consistent is still checked because contract has timing_class
+        // and receipt has fixed_window_duration_seconds
+        assert_eq!(result.timing_window_consistent, Some(true));
+        assert_eq!(result.prompt_template_hash_matches, None);
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn test_contract_enforcement_missing_contract_fields() {
+        // Contract has no optional fields — nothing to cross-check
+        let receipt = make_receipt_json(&serde_json::json!({}));
+        let contract = serde_json::json!({"contract_id": "test"});
+        let result = verify_contract_enforcement(
+            &receipt,
+            &serde_json::to_string(&contract).unwrap(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(result.entropy_budget_matches, None);
+        assert_eq!(result.timing_class_matches, None);
+        assert_eq!(result.timing_window_consistent, None);
+        assert_eq!(result.prompt_template_hash_matches, None);
+    }
+
+    #[test]
+    fn test_contract_enforcement_timing_class_case_insensitive() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "contract_timing_class": "standard"
+        }));
+        let contract = make_contract_json(&serde_json::json!({"timing_class": "STANDARD"}));
+        let result = verify_contract_enforcement(&receipt, &contract, true).unwrap();
+        assert_eq!(result.timing_class_matches, Some(true));
+    }
+
+    #[test]
+    fn test_contract_enforcement_unrecognized_timing_class_strict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "contract_timing_class": "ULTRA_FAST",
+            "fixed_window_duration_seconds": 15
+        }));
+        let contract = make_contract_json(&serde_json::json!({"timing_class": "ULTRA_FAST"}));
+        // Strict mode: unrecognized timing class is an error
+        let err = verify_contract_enforcement(&receipt, &contract, true).unwrap_err();
+        assert!(err.contains("unrecognized timing_class"));
+        assert!(err.contains("ULTRA_FAST"));
+    }
+
+    #[test]
+    fn test_contract_enforcement_unrecognized_timing_class_nonstrict() {
+        let receipt = make_receipt_json(&serde_json::json!({
+            "contract_timing_class": "ULTRA_FAST",
+            "fixed_window_duration_seconds": 15
+        }));
+        let contract = make_contract_json(&serde_json::json!({"timing_class": "ULTRA_FAST"}));
+        // Non-strict: unrecognized timing class produces a warning
+        let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
+        // timing_class_matches should still be checked (both present, case-insensitive match)
+        assert_eq!(result.timing_class_matches, Some(true));
+        // But window consistency could not be verified → warning
+        assert!(result.warnings.iter().any(|w| w.contains("unrecognized timing_class")));
+        assert_eq!(result.timing_window_consistent, None);
+    }
+
+    #[test]
+    fn test_contract_enforcement_tier_result_field() {
+        let mut tier = TierResult::default();
+        assert!(tier.contract_enforcement.is_none());
+        tier.contract_enforcement = Some(ContractEnforcementResult::default());
+        assert!(tier.contract_enforcement.is_some());
     }
 }

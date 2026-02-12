@@ -220,6 +220,10 @@ fn write_receipt_file(
         output_schema_id: unsigned.output_schema_id.clone(),
         attestation: unsigned.attestation.clone(),
         signal_class: unsigned.signal_class.clone(),
+        entropy_budget_bits: unsigned.entropy_budget_bits,
+        schema_entropy_ceiling_bits: unsigned.schema_entropy_ceiling_bits,
+        prompt_template_hash: unsigned.prompt_template_hash.clone(),
+        contract_timing_class: unsigned.contract_timing_class.clone(),
         signature: signature.to_string(),
     };
     let path = dir.join("receipt.json");
