@@ -88,11 +88,14 @@ pub enum ExecutionLane {
 }
 
 impl std::fmt::Display for ExecutionLane {
+    /// Display uses wire-format values because `.to_string()` feeds into
+    /// `compute_budget_chain_id` (SHA-256 hash). Changing these strings
+    /// would silently break budget chain continuity.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ExecutionLane::SealedLocal => write!(f, "SEALED_LOCAL"),
-            ExecutionLane::SoftwareLocal => write!(f, "SOFTWARE_LOCAL"),
-            ExecutionLane::ApiMediated => write!(f, "API_MEDIATED"),
+            ExecutionLane::SoftwareLocal => write!(f, "GLASS_LOCAL"),
+            ExecutionLane::ApiMediated => write!(f, "GLASS_REMOTE"),
         }
     }
 }
@@ -1067,8 +1070,9 @@ mod tests {
         assert_eq!(sealed, "\"SEALED_LOCAL\"");
         let parsed: ExecutionLane = serde_json::from_str("\"GLASS_REMOTE\"").unwrap();
         assert_eq!(parsed, ExecutionLane::ApiMediated);
-        assert_eq!(ExecutionLane::SoftwareLocal.to_string(), "SOFTWARE_LOCAL");
-        assert_eq!(ExecutionLane::ApiMediated.to_string(), "API_MEDIATED");
+        // Display must emit wire-format values (used by compute_budget_chain_id)
+        assert_eq!(ExecutionLane::SoftwareLocal.to_string(), "GLASS_LOCAL");
+        assert_eq!(ExecutionLane::ApiMediated.to_string(), "GLASS_REMOTE");
     }
 
     #[test]
