@@ -86,7 +86,7 @@ fn sample_unsigned_receipt() -> UnsignedReceipt {
             prev_receipt_hash: None,
             receipt_hash: "0".repeat(64), // placeholder, will be filled
         }),
-        execution_lane: receipt_core::ExecutionLane::GlassLocal,
+        execution_lane: receipt_core::ExecutionLane::SoftwareLocal,
         model_identity: None,
         agreement_hash: None,
         model_profile_hash: None,
@@ -132,7 +132,7 @@ fn sample_aborted_receipt() -> UnsignedReceipt {
             budget_enforcement: None,
         },
         budget_chain: None,
-        execution_lane: receipt_core::ExecutionLane::GlassLocal,
+        execution_lane: receipt_core::ExecutionLane::SoftwareLocal,
         model_identity: None,
         agreement_hash: None,
         model_profile_hash: None,

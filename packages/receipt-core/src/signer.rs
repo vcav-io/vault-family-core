@@ -330,7 +330,7 @@ mod tests {
             session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
             fixed_window_duration_seconds: 120,
             status: ReceiptStatus::Completed,
-            execution_lane: ExecutionLane::GlassLocal,
+            execution_lane: ExecutionLane::SoftwareLocal,
             output: Some(serde_json::json!({
                 "decision": "PROCEED",
                 "confidence_bucket": "HIGH",
