@@ -75,28 +75,30 @@ impl std::fmt::Display for SignalClass {
 
 /// Execution lane for this session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ExecutionLane {
     /// Sealed topology with local inference only.
+    #[serde(rename = "SEALED_LOCAL")]
     SealedLocal,
-    /// Glass topology with local inference.
-    GlassLocal,
-    /// Glass topology with remote/network inference.
-    GlassRemote,
+    /// Software-attested local inference (auditable runtime, software signing).
+    #[serde(rename = "GLASS_LOCAL")]
+    SoftwareLocal,
+    /// API-mediated inference via external provider.
+    #[serde(rename = "GLASS_REMOTE")]
+    ApiMediated,
 }
 
 impl std::fmt::Display for ExecutionLane {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ExecutionLane::SealedLocal => write!(f, "SEALED_LOCAL"),
-            ExecutionLane::GlassLocal => write!(f, "GLASS_LOCAL"),
-            ExecutionLane::GlassRemote => write!(f, "GLASS_REMOTE"),
+            ExecutionLane::SoftwareLocal => write!(f, "SOFTWARE_LOCAL"),
+            ExecutionLane::ApiMediated => write!(f, "API_MEDIATED"),
         }
     }
 }
 
 fn default_execution_lane() -> ExecutionLane {
-    ExecutionLane::GlassLocal
+    ExecutionLane::SoftwareLocal
 }
 
 // ============================================================================
@@ -828,7 +830,7 @@ mod tests {
             session_end: Utc.with_ymd_and_hms(2025, 1, 15, 10, 2, 0).unwrap(),
             fixed_window_duration_seconds: 120,
             status: ReceiptStatus::Completed,
-            execution_lane: ExecutionLane::GlassLocal,
+            execution_lane: ExecutionLane::SoftwareLocal,
             output: Some(serde_json::json!({
                 "decision": "PROCEED",
                 "confidence_bucket": "HIGH",
@@ -903,11 +905,11 @@ mod tests {
     }
 
     #[test]
-    fn test_unsigned_receipt_deserialize_without_execution_lane_defaults_to_glass_local() {
+    fn test_unsigned_receipt_deserialize_without_execution_lane_defaults_to_software_local() {
         let mut value = serde_json::to_value(sample_unsigned_receipt()).unwrap();
         value.as_object_mut().unwrap().remove("execution_lane");
         let parsed: UnsignedReceipt = serde_json::from_value(value).unwrap();
-        assert_eq!(parsed.execution_lane, ExecutionLane::GlassLocal);
+        assert_eq!(parsed.execution_lane, ExecutionLane::SoftwareLocal);
     }
 
     #[test]
@@ -943,12 +945,12 @@ mod tests {
     }
 
     #[test]
-    fn test_receipt_deserialize_without_execution_lane_defaults_to_glass_local() {
+    fn test_receipt_deserialize_without_execution_lane_defaults_to_software_local() {
         let signed = sample_unsigned_receipt().sign("e".repeat(128));
         let mut value = serde_json::to_value(signed).unwrap();
         value.as_object_mut().unwrap().remove("execution_lane");
         let parsed: Receipt = serde_json::from_value(value).unwrap();
-        assert_eq!(parsed.execution_lane, ExecutionLane::GlassLocal);
+        assert_eq!(parsed.execution_lane, ExecutionLane::SoftwareLocal);
     }
 
     #[test]
@@ -991,7 +993,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
-            .execution_lane(ExecutionLane::GlassLocal)
+            .execution_lane(ExecutionLane::SoftwareLocal)
             .output(Some(serde_json::json!({"decision": "PROCEED"})))
             .output_entropy_bits(8)
             .budget_usage(usage)
@@ -1035,7 +1037,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
-            .execution_lane(ExecutionLane::GlassLocal)
+            .execution_lane(ExecutionLane::SoftwareLocal)
             .output_entropy_bits(16)
             .budget_usage(usage)
             .build_unsigned()
@@ -1064,8 +1066,28 @@ mod tests {
         let sealed = serde_json::to_string(&ExecutionLane::SealedLocal).unwrap();
         assert_eq!(sealed, "\"SEALED_LOCAL\"");
         let parsed: ExecutionLane = serde_json::from_str("\"GLASS_REMOTE\"").unwrap();
-        assert_eq!(parsed, ExecutionLane::GlassRemote);
-        assert_eq!(ExecutionLane::GlassLocal.to_string(), "GLASS_LOCAL");
+        assert_eq!(parsed, ExecutionLane::ApiMediated);
+        assert_eq!(ExecutionLane::SoftwareLocal.to_string(), "SOFTWARE_LOCAL");
+        assert_eq!(ExecutionLane::ApiMediated.to_string(), "API_MEDIATED");
+    }
+
+    #[test]
+    fn test_execution_lane_wire_compat_glass_local_deserializes_to_software_local() {
+        let parsed: ExecutionLane = serde_json::from_str("\"GLASS_LOCAL\"").unwrap();
+        assert_eq!(parsed, ExecutionLane::SoftwareLocal);
+    }
+
+    #[test]
+    fn test_execution_lane_wire_compat_glass_remote_deserializes_to_api_mediated() {
+        let parsed: ExecutionLane = serde_json::from_str("\"GLASS_REMOTE\"").unwrap();
+        assert_eq!(parsed, ExecutionLane::ApiMediated);
+    }
+
+    #[test]
+    fn test_execution_lane_serializes_to_wire_format() {
+        assert_eq!(serde_json::to_string(&ExecutionLane::SoftwareLocal).unwrap(), "\"GLASS_LOCAL\"");
+        assert_eq!(serde_json::to_string(&ExecutionLane::ApiMediated).unwrap(), "\"GLASS_REMOTE\"");
+        assert_eq!(serde_json::to_string(&ExecutionLane::SealedLocal).unwrap(), "\"SEALED_LOCAL\"");
     }
 
     #[test]
@@ -1126,7 +1148,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
-            .execution_lane(ExecutionLane::GlassLocal)
+            .execution_lane(ExecutionLane::SoftwareLocal)
             .output_entropy_bits(8)
             .budget_usage(usage)
             .model_profile_hash(Some("a".repeat(64)))
@@ -1180,7 +1202,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
-            .execution_lane(ExecutionLane::GlassLocal)
+            .execution_lane(ExecutionLane::SoftwareLocal)
             .output_entropy_bits(8)
             .budget_usage(usage)
             .policy_bundle_hash(Some("b".repeat(64)))
@@ -1306,7 +1328,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
-            .execution_lane(ExecutionLane::GlassLocal)
+            .execution_lane(ExecutionLane::SoftwareLocal)
             .output_entropy_bits(8)
             .budget_usage(usage)
             .signal_class(Some(SignalClass::BudgetExhausted))
@@ -1359,7 +1381,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
-            .execution_lane(ExecutionLane::GlassLocal)
+            .execution_lane(ExecutionLane::SoftwareLocal)
             .output_entropy_bits(8)
             .budget_usage(usage)
             .contract_hash(Some("a".repeat(64)))
@@ -1489,7 +1511,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
-            .execution_lane(ExecutionLane::GlassLocal)
+            .execution_lane(ExecutionLane::SoftwareLocal)
             .output_entropy_bits(8)
             .budget_usage(usage)
             .entropy_budget_bits(4)
@@ -1531,7 +1553,7 @@ mod tests {
             .session_end(end)
             .fixed_window_duration_seconds(120)
             .status(ReceiptStatus::Completed)
-            .execution_lane(ExecutionLane::GlassLocal)
+            .execution_lane(ExecutionLane::SoftwareLocal)
             .output_entropy_bits(8)
             .budget_usage(usage)
             .entropy_budget_bits_opt(Some(4))
@@ -1599,7 +1621,7 @@ mod tests {
             session_end: Utc.with_ymd_and_hms(2025, 6, 1, 12, 2, 0).unwrap(),
             fixed_window_duration_seconds: 120,
             status: ReceiptStatus::Completed,
-            execution_lane: ExecutionLane::GlassLocal,
+            execution_lane: ExecutionLane::SoftwareLocal,
             output: Some(serde_json::json!({
                 "decision": "PROCEED",
                 "confidence_bucket": "HIGH",
