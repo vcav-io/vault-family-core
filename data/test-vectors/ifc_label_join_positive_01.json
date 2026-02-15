@@ -1,0 +1,32 @@
+{
+  "description": "Label join with overlapping confidentiality sets, mixed integrity and type tags. L1 = ({alice, bob}, Trusted, Bool) joined with L2 = ({bob, carol}, Untrusted, Enum(10)) results in ({bob}, Untrusted, Enum(10)).",
+  "input": {
+    "operation": "label_join",
+    "label_a": {
+      "confidentiality": ["alice", "bob"],
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bool"
+      }
+    },
+    "label_b": {
+      "confidentiality": ["bob", "carol"],
+      "integrity": "UNTRUSTED",
+      "type_tag": {
+        "kind": "Enum",
+        "value": 10
+      }
+    }
+  },
+  "expected": {
+    "joined_label": {
+      "confidentiality": ["bob"],
+      "integrity": "UNTRUSTED",
+      "type_tag": {
+        "kind": "Enum",
+        "value": 10
+      }
+    }
+  },
+  "schemas": []
+}
