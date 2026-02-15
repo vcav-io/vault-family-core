@@ -255,7 +255,12 @@ impl IfcPolicy for DefaultPolicy {
                 return PolicyDecision::Escalate {
                     to_tier: Tier::Tier3,
                     reason: EscalationReason::PurposeOverride { purpose },
-                    label_receipt: self.make_receipt(outbound_label, recipient, Tier::Tier3, sequence),
+                    label_receipt: self.make_receipt(
+                        outbound_label,
+                        recipient,
+                        Tier::Tier3,
+                        sequence,
+                    ),
                 };
             }
             Purpose::Compatibility | Purpose::Scheduling => {}
@@ -275,7 +280,12 @@ impl IfcPolicy for DefaultPolicy {
                 // Rule 2: Authorized + Trusted → Allow Tier 1
                 IntegrityLevel::Trusted => PolicyDecision::Allow {
                     tier: Tier::Tier1,
-                    label_receipt: self.make_receipt(outbound_label, recipient, Tier::Tier1, sequence),
+                    label_receipt: self.make_receipt(
+                        outbound_label,
+                        recipient,
+                        Tier::Tier1,
+                        sequence,
+                    ),
                 },
                 IntegrityLevel::Untrusted => {
                     match &outbound_label.type_tag {
@@ -474,8 +484,7 @@ mod tests {
             IntegrityLevel::Trusted,
             TypeTag::Enum(100),
         );
-        let decision =
-            policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Allow { tier, .. } => assert_eq!(tier, Tier::Tier1),
             other => panic!("Expected Allow, got {:?}", other),
@@ -493,8 +502,7 @@ mod tests {
             IntegrityLevel::Untrusted,
             TypeTag::Bool,
         );
-        let decision =
-            policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Allow { tier, .. } => assert_eq!(tier, Tier::Tier1),
             other => panic!("Expected Allow, got {:?}", other),
@@ -512,8 +520,7 @@ mod tests {
             IntegrityLevel::Untrusted,
             TypeTag::Enum(256), // exactly at threshold
         );
-        let decision =
-            policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Allow { tier, .. } => assert_eq!(tier, Tier::Tier1),
             other => panic!("Expected Allow, got {:?}", other),
@@ -531,8 +538,7 @@ mod tests {
             IntegrityLevel::Untrusted,
             TypeTag::Enum(257), // just above threshold
         );
-        let decision =
-            policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Escalate { to_tier, .. } => assert_eq!(to_tier, Tier::Tier2),
             other => panic!("Expected Escalate to Tier2, got {:?}", other),
@@ -550,8 +556,7 @@ mod tests {
             IntegrityLevel::Untrusted,
             TypeTag::String,
         );
-        let decision =
-            policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Escalate { to_tier, .. } => assert_eq!(to_tier, Tier::Tier3),
             other => panic!("Expected Escalate to Tier3, got {:?}", other),
@@ -571,8 +576,7 @@ mod tests {
             TypeTag::Bool,
         );
         // Bob is not in the confidentiality set
-        let decision =
-            policy.evaluate(&label, &bob, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &bob, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Escalate { to_tier, .. } => assert_eq!(to_tier, Tier::Tier2),
             other => panic!("Expected Escalate to Tier2, got {:?}", other),
@@ -591,8 +595,7 @@ mod tests {
             IntegrityLevel::Trusted,
             TypeTag::String,
         );
-        let decision =
-            policy.evaluate(&label, &bob, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &bob, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Escalate { to_tier, .. } => assert_eq!(to_tier, Tier::Tier3),
             other => panic!("Expected Escalate to Tier3, got {:?}", other),
@@ -610,8 +613,7 @@ mod tests {
             IntegrityLevel::Trusted,
             TypeTag::Bool,
         );
-        let decision =
-            policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Block { reason } => {
                 assert_eq!(reason, BlockReason::NoReaders);
@@ -631,8 +633,7 @@ mod tests {
             IntegrityLevel::Trusted,
             TypeTag::Bool,
         );
-        let decision =
-            policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Allow { tier, .. } => assert_eq!(tier, Tier::Tier1),
             other => panic!("Expected Allow Tier1, got {:?}", other),
@@ -650,8 +651,7 @@ mod tests {
             IntegrityLevel::Untrusted,
             TypeTag::Enum(3),
         );
-        let decision =
-            policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
+        let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Allow { label_receipt, .. } => {
                 assert_eq!(
@@ -682,6 +682,116 @@ mod tests {
                 assert_eq!(label_receipt.sequence, 42);
             }
             other => panic!("Expected Allow, got {:?}", other),
+        }
+    }
+
+    // -- Property-based tests --
+
+    #[cfg(test)]
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        fn arb_principal_id() -> impl Strategy<Value = PrincipalId> {
+            "[a-z][a-z0-9_]{0,9}".prop_map(|s| PrincipalId::new(s).unwrap())
+        }
+
+        fn arb_confidentiality() -> impl Strategy<Value = Confidentiality> {
+            prop_oneof![
+                Just(Confidentiality::public()),
+                proptest::collection::btree_set(arb_principal_id(), 0..4)
+                    .prop_map(Confidentiality::restricted),
+            ]
+        }
+
+        fn arb_integrity() -> impl Strategy<Value = IntegrityLevel> {
+            prop_oneof![
+                Just(IntegrityLevel::Trusted),
+                Just(IntegrityLevel::Untrusted),
+            ]
+        }
+
+        fn arb_type_tag() -> impl Strategy<Value = TypeTag> {
+            prop_oneof![
+                Just(TypeTag::Bot),
+                Just(TypeTag::Bool),
+                (1u32..500).prop_map(TypeTag::Enum),
+                Just(TypeTag::String),
+                Just(TypeTag::Top),
+            ]
+        }
+
+        fn arb_label() -> impl Strategy<Value = Label> {
+            (arb_confidentiality(), arb_integrity(), arb_type_tag())
+                .prop_map(|(c, i, t)| Label::new(c, i, t))
+        }
+
+        proptest! {
+            // Trusted + authorized → always Allow Tier 1 (when purpose is Compat/Scheduling)
+            #[test]
+            fn prop_trusted_authorized_always_tier1(
+                type_tag in arb_type_tag(),
+                principals in proptest::collection::btree_set(arb_principal_id(), 1..4),
+            ) {
+                let policy = DefaultPolicy::with_defaults();
+                // Pick a recipient from the set
+                let recipient = principals.iter().next().unwrap().clone();
+                let label = Label::new(
+                    Confidentiality::restricted(principals),
+                    IntegrityLevel::Trusted,
+                    type_tag,
+                );
+                let decision = policy.evaluate(&label, &recipient, &Label::bottom(), Purpose::Compatibility, 1);
+                match decision {
+                    PolicyDecision::Allow { tier, .. } => prop_assert_eq!(tier, Tier::Tier1),
+                    other => return Err(TestCaseError::fail(format!(
+                        "Expected Allow Tier1, got {:?}", other
+                    ))),
+                }
+            }
+
+            // Mediation/Negotiation → always Escalate Tier 3
+            #[test]
+            fn prop_mediation_always_tier3(
+                label in arb_label(),
+                principal in arb_principal_id(),
+            ) {
+                let policy = DefaultPolicy::with_defaults();
+                let decision = policy.evaluate(&label, &principal, &Label::bottom(), Purpose::Mediation, 1);
+                match decision {
+                    PolicyDecision::Escalate { to_tier, .. } => prop_assert_eq!(to_tier, Tier::Tier3),
+                    other => return Err(TestCaseError::fail(format!(
+                        "Expected Escalate Tier3, got {:?}", other
+                    ))),
+                }
+            }
+
+            // Entropy binding: receipt.type_tag_bits == label.type_tag.entropy_bits()
+            #[test]
+            fn prop_entropy_binding(
+                type_tag in arb_type_tag(),
+                principals in proptest::collection::btree_set(arb_principal_id(), 1..4),
+            ) {
+                let policy = DefaultPolicy::with_defaults();
+                let recipient = principals.iter().next().unwrap().clone();
+                let label = Label::new(
+                    Confidentiality::restricted(principals),
+                    IntegrityLevel::Trusted,
+                    type_tag.clone(),
+                );
+                let decision = policy.evaluate(&label, &recipient, &Label::bottom(), Purpose::Compatibility, 1);
+                match decision {
+                    PolicyDecision::Allow { label_receipt, .. } |
+                    PolicyDecision::Escalate { label_receipt, .. } => {
+                        prop_assert_eq!(
+                            label_receipt.type_tag_bits,
+                            type_tag.entropy_bits(),
+                            "Receipt entropy must match label entropy"
+                        );
+                    }
+                    PolicyDecision::Block { .. } => {} // No receipt for blocks
+                }
+            }
         }
     }
 }

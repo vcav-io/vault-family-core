@@ -1,0 +1,30 @@
+{
+  "description": "Public label (bottom element) joined with restricted label. L1 = (public, Trusted, Bot) joined with L2 = ({alice}, Trusted, Bool) results in ({alice}, Trusted, Bool).",
+  "input": {
+    "operation": "label_join",
+    "label_a": {
+      "confidentiality": null,
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bot"
+      }
+    },
+    "label_b": {
+      "confidentiality": ["alice"],
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bool"
+      }
+    }
+  },
+  "expected": {
+    "joined_label": {
+      "confidentiality": ["alice"],
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bool"
+      }
+    }
+  },
+  "schemas": []
+}

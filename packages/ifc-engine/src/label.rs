@@ -189,7 +189,11 @@ pub struct Label {
 
 impl Label {
     /// Create a new label from its components.
-    pub fn new(confidentiality: Confidentiality, integrity: IntegrityLevel, type_tag: TypeTag) -> Self {
+    pub fn new(
+        confidentiality: Confidentiality,
+        integrity: IntegrityLevel,
+        type_tag: TypeTag,
+    ) -> Self {
         Label {
             confidentiality,
             integrity,
@@ -634,5 +638,115 @@ mod tests {
         assert_eq!(label, parsed);
         // Public should serialize as null
         assert!(json.contains("null"));
+    }
+
+    // -- Property-based tests --
+
+    #[cfg(test)]
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        fn arb_principal_id() -> impl Strategy<Value = PrincipalId> {
+            "[a-z][a-z0-9_]{0,9}".prop_map(|s| PrincipalId::new(s).unwrap())
+        }
+
+        fn arb_confidentiality() -> impl Strategy<Value = Confidentiality> {
+            prop_oneof![
+                Just(Confidentiality::public()),
+                proptest::collection::btree_set(arb_principal_id(), 0..4)
+                    .prop_map(Confidentiality::restricted),
+            ]
+        }
+
+        fn arb_integrity() -> impl Strategy<Value = IntegrityLevel> {
+            prop_oneof![
+                Just(IntegrityLevel::Trusted),
+                Just(IntegrityLevel::Untrusted),
+            ]
+        }
+
+        fn arb_type_tag() -> impl Strategy<Value = TypeTag> {
+            prop_oneof![
+                Just(TypeTag::Bot),
+                Just(TypeTag::Bool),
+                (1u32..500).prop_map(TypeTag::Enum),
+                Just(TypeTag::String),
+                Just(TypeTag::Top),
+            ]
+        }
+
+        fn arb_label() -> impl Strategy<Value = Label> {
+            (arb_confidentiality(), arb_integrity(), arb_type_tag())
+                .prop_map(|(c, i, t)| Label::new(c, i, t))
+        }
+
+        proptest! {
+            // 1. Associativity: join(join(a,b),c) = join(a,join(b,c))
+            #[test]
+            fn prop_label_join_associative(a in arb_label(), b in arb_label(), c in arb_label()) {
+                prop_assert_eq!(a.join(&b).join(&c), a.join(&b.join(&c)));
+            }
+
+            // 2. Commutativity: join(a,b) = join(b,a)
+            #[test]
+            fn prop_label_join_commutative(a in arb_label(), b in arb_label()) {
+                prop_assert_eq!(a.join(&b), b.join(&a));
+            }
+
+            // 3. Idempotency: join(a,a) = a
+            #[test]
+            fn prop_label_join_idempotent(a in arb_label()) {
+                prop_assert_eq!(a.join(&a), a);
+            }
+
+            // 4. Bottom identity: join(a, bottom) = a
+            #[test]
+            fn prop_label_join_bottom_identity(a in arb_label()) {
+                prop_assert_eq!(a.join(&Label::bottom()), a.clone());
+                prop_assert_eq!(Label::bottom().join(&a), a);
+            }
+
+            // 5. Top absorption: join(a, top) = top
+            #[test]
+            fn prop_label_join_top_absorption(a in arb_label()) {
+                prop_assert_eq!(a.join(&Label::top()), Label::top());
+                prop_assert_eq!(Label::top().join(&a), Label::top());
+            }
+
+            // 6. Monotonicity: a.flows_to(b) => join(a,c).flows_to(join(b,c))
+            #[test]
+            fn prop_label_join_monotone(a in arb_label(), b in arb_label(), c in arb_label()) {
+                if a.flows_to(&b) {
+                    prop_assert!(a.join(&c).flows_to(&b.join(&c)));
+                }
+            }
+
+            // Join is upper bound: a.flows_to(join(a,b)) && b.flows_to(join(a,b))
+            #[test]
+            fn prop_label_join_is_upper_bound(a in arb_label(), b in arb_label()) {
+                let joined = a.join(&b);
+                prop_assert!(a.flows_to(&joined));
+                prop_assert!(b.flows_to(&joined));
+            }
+
+            // flows_to is reflexive
+            #[test]
+            fn prop_label_flows_to_reflexive(a in arb_label()) {
+                prop_assert!(a.flows_to(&a));
+            }
+
+            // Everything flows to top
+            #[test]
+            fn prop_label_flows_to_top(a in arb_label()) {
+                prop_assert!(a.flows_to(&Label::top()));
+            }
+
+            // Bottom flows to everything
+            #[test]
+            fn prop_label_bottom_flows_to_all(a in arb_label()) {
+                prop_assert!(Label::bottom().flows_to(&a));
+            }
+        }
     }
 }

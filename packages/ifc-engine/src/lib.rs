@@ -24,8 +24,8 @@ pub mod type_tag;
 pub use error::IfcError;
 pub use label::{Confidentiality, IntegrityLevel, Label, PrincipalId, MAX_PRINCIPAL_ID_LEN};
 pub use policy::{
-    BlockReason, DefaultPolicy, EscalationReason, IfcPolicy, PolicyConfig, PolicyDecision,
-    Purpose, Tier,
+    BlockReason, DefaultPolicy, EscalationReason, IfcPolicy, PolicyConfig, PolicyDecision, Purpose,
+    Tier,
 };
 pub use receipt::LabelReceipt;
 pub use type_tag::TypeTag;
