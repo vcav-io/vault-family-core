@@ -23,9 +23,18 @@ pub const MAX_PRINCIPAL_ID_LEN: usize = 256;
 ///
 /// Non-empty, at most [`MAX_PRINCIPAL_ID_LEN`] bytes. Used to identify
 /// agents or services in confidentiality sets.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct PrincipalId(String);
+
+impl<'de> Deserialize<'de> for PrincipalId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        PrincipalId::new(s).map_err(serde::de::Error::custom)
+    }
+}
 
 impl PrincipalId {
     /// Create a new `PrincipalId`, validating non-empty and length constraints.
@@ -297,6 +306,25 @@ mod tests {
         assert_eq!(json, "\"alice\"");
         let parsed: PrincipalId = serde_json::from_str(&json).unwrap();
         assert_eq!(id, parsed);
+    }
+
+    #[test]
+    fn test_principal_id_serde_rejects_empty() {
+        let result: Result<PrincipalId, _> = serde_json::from_str("\"\"");
+        assert!(
+            result.is_err(),
+            "empty string must be rejected on deserialize"
+        );
+    }
+
+    #[test]
+    fn test_principal_id_serde_rejects_too_long() {
+        let long = format!("\"{}\"", "a".repeat(MAX_PRINCIPAL_ID_LEN + 1));
+        let result: Result<PrincipalId, _> = serde_json::from_str(&long);
+        assert!(
+            result.is_err(),
+            "overlong string must be rejected on deserialize"
+        );
     }
 
     // -- IntegrityLevel tests --

@@ -74,7 +74,6 @@ enum ReasonEnum {
     SealedVault,
     PurposeOverride { purpose: Purpose },
     NoReaders,
-    ExceedsThreshold { cardinality: u32, threshold: u32 },
 }
 
 // ============================================================================
@@ -120,13 +119,6 @@ fn decision_to_expected(decision: PolicyDecision) -> PolicyEvaluateExpected {
         PolicyDecision::Block { reason } => {
             let reason_enum = match reason {
                 BlockReason::NoReaders => ReasonEnum::NoReaders,
-                BlockReason::ExceedsThreshold {
-                    cardinality,
-                    threshold,
-                } => ReasonEnum::ExceedsThreshold {
-                    cardinality,
-                    threshold,
-                },
             };
             PolicyEvaluateExpected {
                 decision: DecisionKind::Block,

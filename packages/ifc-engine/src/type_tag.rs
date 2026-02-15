@@ -20,7 +20,7 @@ use crate::error::IfcError;
 /// `Bot(0) < Bool(1) < Enum(2, sub-ordered by N) < String(3) < Top(4)`
 ///
 /// This is lattice ordering: higher = more information content.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(tag = "kind", content = "value")]
 pub enum TypeTag {
     /// Zero entropy — constant, no information content.
@@ -34,6 +34,33 @@ pub enum TypeTag {
     String,
     /// Unbounded, unclassified — top of the lattice.
     Top,
+}
+
+/// Raw helper for deserialization — mirrors `TypeTag` without invariant checks.
+#[derive(Deserialize)]
+#[serde(tag = "kind", content = "value")]
+enum TypeTagRaw {
+    Bot,
+    Bool,
+    Enum(u32),
+    String,
+    Top,
+}
+
+impl<'de> Deserialize<'de> for TypeTag {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = TypeTagRaw::deserialize(deserializer)?;
+        match raw {
+            TypeTagRaw::Bot => Ok(TypeTag::Bot),
+            TypeTagRaw::Bool => Ok(TypeTag::Bool),
+            TypeTagRaw::Enum(n) => TypeTag::enum_checked(n).map_err(serde::de::Error::custom),
+            TypeTagRaw::String => Ok(TypeTag::String),
+            TypeTagRaw::Top => Ok(TypeTag::Top),
+        }
+    }
 }
 
 impl TypeTag {
@@ -239,6 +266,13 @@ mod tests {
         let json = serde_json::to_string(&tag).unwrap();
         let parsed: TypeTag = serde_json::from_str(&json).unwrap();
         assert_eq!(tag, parsed);
+    }
+
+    #[test]
+    fn test_serde_rejects_enum_zero() {
+        let json = r#"{"kind":"Enum","value":0}"#;
+        let result: Result<TypeTag, _> = serde_json::from_str(json);
+        assert!(result.is_err(), "Enum(0) must be rejected on deserialize");
     }
 
     #[test]

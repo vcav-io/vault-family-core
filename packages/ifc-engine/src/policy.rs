@@ -100,13 +100,6 @@ pub enum EscalationReason {
 pub enum BlockReason {
     /// Confidentiality set is empty — no one can read.
     NoReaders,
-    /// Enum cardinality exceeds the declassification threshold.
-    ExceedsThreshold {
-        /// Actual cardinality of the enum type.
-        cardinality: u32,
-        /// Configured threshold.
-        threshold: u32,
-    },
 }
 
 /// Policy engine judgment for an information flow.
@@ -320,7 +313,7 @@ impl IfcPolicy for DefaultPolicy {
                                         entropy_bits: outbound_label
                                             .type_tag
                                             .entropy_bits()
-                                            .unwrap_or(0),
+                                            .expect("BUG: Enum type must have entropy bits"),
                                     },
                                     label_receipt: self.make_receipt(
                                         outbound_label,
@@ -352,7 +345,10 @@ impl IfcPolicy for DefaultPolicy {
                 TypeTag::Bot | TypeTag::Bool | TypeTag::Enum(_) => PolicyDecision::Escalate {
                     to_tier: Tier::Tier2,
                     reason: EscalationReason::BoundedExchange {
-                        entropy_bits: outbound_label.type_tag.entropy_bits().unwrap_or(0),
+                        entropy_bits: outbound_label
+                            .type_tag
+                            .entropy_bits()
+                            .expect("BUG: bounded type must have entropy bits"),
                     },
                     label_receipt: self.make_receipt(
                         outbound_label,
