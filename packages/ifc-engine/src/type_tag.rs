@@ -94,11 +94,17 @@ impl TypeTag {
 
 impl Ord for TypeTag {
     fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            // Same-family Enum: compare by cardinality
-            (TypeTag::Enum(a), TypeTag::Enum(b)) => a.cmp(b),
-            // Cross-family: compare by rank
-            _ => self.rank().cmp(&other.rank()),
+        match self.rank().cmp(&other.rank()) {
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => {
+                // Only Enum has intra-rank sub-ordering by cardinality
+                if let (TypeTag::Enum(a), TypeTag::Enum(b)) = (self, other) {
+                    a.cmp(b)
+                } else {
+                    Ordering::Equal
+                }
+            }
         }
     }
 }
