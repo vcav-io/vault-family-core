@@ -1,0 +1,27 @@
+{
+  "description": "HIDE scenario: message with restricted label ({bob}, Untrusted, String) received into public (bottom) context. Label does NOT flow_to context, so receiver must HIDE the message as a variable.",
+  "expected": {
+    "context_label_unchanged": true,
+    "decision": "HIDE",
+    "variable_stored": true
+  },
+  "input": {
+    "message_label": {
+      "confidentiality": [
+        "bob"
+      ],
+      "integrity": "UNTRUSTED",
+      "type_tag": {
+        "kind": "String"
+      }
+    },
+    "payload": "secret data",
+    "receiver_context_label": {
+      "confidentiality": null,
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bot"
+      }
+    }
+  }
+}
