@@ -1,0 +1,19 @@
+[package]
+name = "label-registry"
+description = "IFC label registry with HIDE semantics for inter-agent variable management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ifc-engine = { path = "../ifc-engine" }
+receipt-core = { path = "../receipt-core" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
