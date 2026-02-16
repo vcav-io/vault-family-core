@@ -1,0 +1,27 @@
+{
+  "description": "Vault declassification: String inputs with same confidentiality/integrity → Enum(256) output (8-bit schema)",
+  "input": {
+    "operation": "vault_declassification",
+    "input_labels": [
+      {
+        "confidentiality": ["alice", "bob"],
+        "integrity": "TRUSTED",
+        "type_tag": { "kind": "String" }
+      },
+      {
+        "confidentiality": ["alice", "bob"],
+        "integrity": "TRUSTED",
+        "type_tag": { "kind": "String" }
+      }
+    ],
+    "schema_entropy_bits": 8
+  },
+  "expected": {
+    "output_label": {
+      "confidentiality": ["alice", "bob"],
+      "integrity": "TRUSTED",
+      "type_tag": { "kind": "Enum", "value": 256 }
+    }
+  },
+  "schemas": []
+}

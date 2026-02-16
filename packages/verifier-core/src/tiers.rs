@@ -1162,6 +1162,9 @@ mod tests {
             schema_entropy_ceiling_bits: receipt.schema_entropy_ceiling_bits,
             prompt_template_hash: receipt.prompt_template_hash,
             contract_timing_class: receipt.contract_timing_class,
+            ifc_output_label: receipt.ifc_output_label,
+            ifc_policy_hash: receipt.ifc_policy_hash,
+            ifc_label_receipt: receipt.ifc_label_receipt,
             attestation: receipt.attestation,
         };
         (unsigned, sig)

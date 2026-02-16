@@ -28,4 +28,4 @@ pub use policy::{
     Tier,
 };
 pub use receipt::LabelReceipt;
-pub use type_tag::TypeTag;
+pub use type_tag::{entropy_bits_to_type_tag, TypeTag, MAX_ENUM_ENTROPY_BITS};

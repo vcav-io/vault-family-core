@@ -289,6 +289,18 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_timing_class: Option<String>,
 
+    /// IFC output label (serialized `Label`) for declassified vault output (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_output_label: Option<serde_json::Value>,
+
+    /// SHA-256 hash of the IFC policy configuration (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_policy_hash: Option<String>,
+
+    /// IFC label receipt recording the declassification decision (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_label_receipt: Option<serde_json::Value>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -438,6 +450,18 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_timing_class: Option<String>,
 
+    /// IFC output label (serialized `Label`) for declassified vault output (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_output_label: Option<serde_json::Value>,
+
+    /// SHA-256 hash of the IFC policy configuration (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_policy_hash: Option<String>,
+
+    /// IFC label receipt recording the declassification decision (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_label_receipt: Option<serde_json::Value>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -479,6 +503,9 @@ impl UnsignedReceipt {
             schema_entropy_ceiling_bits: self.schema_entropy_ceiling_bits,
             prompt_template_hash: self.prompt_template_hash,
             contract_timing_class: self.contract_timing_class,
+            ifc_output_label: self.ifc_output_label,
+            ifc_policy_hash: self.ifc_policy_hash,
+            ifc_label_receipt: self.ifc_label_receipt,
             attestation: self.attestation,
             signature,
         }
@@ -523,6 +550,9 @@ pub struct ReceiptBuilder {
     schema_entropy_ceiling_bits: Option<u32>,
     prompt_template_hash: Option<String>,
     contract_timing_class: Option<String>,
+    ifc_output_label: Option<serde_json::Value>,
+    ifc_policy_hash: Option<String>,
+    ifc_label_receipt: Option<serde_json::Value>,
     attestation: Option<Attestation>,
 }
 
@@ -743,6 +773,24 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the IFC output label (optional)
+    pub fn ifc_output_label(mut self, v: Option<serde_json::Value>) -> Self {
+        self.ifc_output_label = v;
+        self
+    }
+
+    /// Set the IFC policy hash (optional)
+    pub fn ifc_policy_hash(mut self, v: Option<String>) -> Self {
+        self.ifc_policy_hash = v;
+        self
+    }
+
+    /// Set the IFC label receipt (optional)
+    pub fn ifc_label_receipt(mut self, v: Option<serde_json::Value>) -> Self {
+        self.ifc_label_receipt = v;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
         self.attestation = attestation;
@@ -786,6 +834,9 @@ impl ReceiptBuilder {
             schema_entropy_ceiling_bits: self.schema_entropy_ceiling_bits,
             prompt_template_hash: self.prompt_template_hash,
             contract_timing_class: self.contract_timing_class,
+            ifc_output_label: self.ifc_output_label,
+            ifc_policy_hash: self.ifc_policy_hash,
+            ifc_label_receipt: self.ifc_label_receipt,
             attestation: self.attestation,
         })
     }
@@ -855,6 +906,9 @@ mod tests {
             schema_entropy_ceiling_bits: None,
             prompt_template_hash: None,
             contract_timing_class: None,
+            ifc_output_label: None,
+            ifc_policy_hash: None,
+            ifc_label_receipt: None,
             attestation: None,
         }
     }
@@ -1650,6 +1704,9 @@ mod tests {
             schema_entropy_ceiling_bits: None,
             prompt_template_hash: None,
             contract_timing_class: None,
+            ifc_output_label: None,
+            ifc_policy_hash: None,
+            ifc_label_receipt: None,
             receipt_key_id: None,
             attestation: None,
         };
