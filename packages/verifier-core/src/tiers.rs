@@ -20,6 +20,7 @@ use std::collections::HashSet;
 
 const PROFILE_HASH_DOMAIN_PREFIX: &str = "vcav/model_profile/v1";
 const POLICY_BUNDLE_DOMAIN_PREFIX: &str = "vcav/policy_bundle/v1";
+const BUDGET_KEY_V2_DOMAIN_PREFIX: &str = "vcav/budget_key/v2";
 
 // ============================================================================
 // Profile Digest (mirrors vault-runtime::config::ProfileDigestV1)
@@ -605,6 +606,111 @@ pub fn verify_manifest_from_str(
     })
 }
 
+// ============================================================================
+// Compartment ID Verification
+// ============================================================================
+
+/// Result of compartment ID verification.
+#[derive(Debug, Clone, Default)]
+pub struct CompartmentResult {
+    /// Whether the compartment_id has valid 64-char hex format
+    pub format_valid: Option<bool>,
+    /// Whether the compartment_id matches the recomputed value from
+    /// pair_id + ifc_joined_confidentiality. None if confidentiality data
+    /// was not available for recomputation.
+    pub derivation_valid: Option<bool>,
+    /// Warnings (e.g., compartment present but no confidentiality to verify against)
+    pub warnings: Vec<String>,
+}
+
+/// Validate that a string is a well-formed 64-char lowercase hex compartment ID.
+fn is_valid_compartment_hex(s: &str) -> bool {
+    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+}
+
+/// Recompute a compartment ID from pair_id and a JCS-canonicalized confidentiality value.
+///
+/// This mirrors `guardian_core::budget::generate_compartment_id` but operates on
+/// a `serde_json::Value` (from the receipt) rather than a `BTreeSet<String>`.
+/// The hash is: `SHA-256("vcav/budget_key/v2" || pair_id || JCS(confidentiality))`.
+///
+/// `confidentiality` should be either `Value::Null` (public) or a JSON array
+/// of sorted principal strings (restricted).
+fn recompute_compartment_id(
+    pair_id: &str,
+    confidentiality: &serde_json::Value,
+) -> Result<String, String> {
+    use receipt_core::canonicalize::canonicalize;
+
+    let jcs_bytes = if confidentiality.is_null() {
+        b"null".to_vec()
+    } else {
+        canonicalize(confidentiality).into_bytes()
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(BUDGET_KEY_V2_DOMAIN_PREFIX.as_bytes());
+    hasher.update(pair_id.as_bytes());
+    hasher.update(&jcs_bytes);
+
+    Ok(hex::encode(hasher.finalize()))
+}
+
+/// Verify a compartment ID from a receipt's budget usage record.
+///
+/// - If `compartment_id` is `None`, returns a default (no-op) result.
+/// - If present, validates 64-char hex format.
+/// - If `ifc_joined_confidentiality` is also present, recomputes the expected
+///   compartment ID and verifies it matches.
+/// - If `compartment_id` is present but `ifc_joined_confidentiality` is absent,
+///   format is validated but derivation cannot be verified (warning issued).
+pub fn verify_compartment_id(
+    pair_id: &str,
+    compartment_id: Option<&str>,
+    ifc_joined_confidentiality: Option<&serde_json::Value>,
+) -> CompartmentResult {
+    let mut result = CompartmentResult::default();
+
+    let cid = match compartment_id {
+        Some(c) => c,
+        None => return result,
+    };
+
+    // Validate format
+    let format_ok = is_valid_compartment_hex(cid);
+    result.format_valid = Some(format_ok);
+
+    if !format_ok {
+        return result;
+    }
+
+    // Recompute and verify derivation if confidentiality data is available
+    match ifc_joined_confidentiality {
+        Some(conf) => {
+            match recompute_compartment_id(pair_id, conf) {
+                Ok(expected) => {
+                    result.derivation_valid = Some(cid == expected);
+                }
+                Err(e) => {
+                    result.derivation_valid = Some(false);
+                    result.warnings.push(format!(
+                        "Failed to recompute compartment_id: {}", e
+                    ));
+                }
+            }
+        }
+        None => {
+            result.warnings.push(
+                "compartment_id present but ifc_joined_confidentiality absent; \
+                 cannot verify derivation"
+                    .to_string(),
+            );
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1165,6 +1271,7 @@ mod tests {
             ifc_output_label: receipt.ifc_output_label,
             ifc_policy_hash: receipt.ifc_policy_hash,
             ifc_label_receipt: receipt.ifc_label_receipt,
+            ifc_joined_confidentiality: receipt.ifc_joined_confidentiality,
             attestation: receipt.attestation,
         };
         (unsigned, sig)
@@ -1923,5 +2030,207 @@ mod tests {
         assert_eq!(result.prompt_template_hash_matches, Some(false));
         // All mismatches recorded as warnings
         assert!(result.warnings.len() >= 4);
+    }
+
+    // ========================================================================
+    // Compartment ID verification tests
+    // ========================================================================
+
+    #[test]
+    fn compartment_none_returns_default_result() {
+        let result = verify_compartment_id("a".repeat(64).as_str(), None, None);
+        assert!(result.format_valid.is_none());
+        assert!(result.derivation_valid.is_none());
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn compartment_valid_format_64_hex() {
+        let cid = "a".repeat(64);
+        let result = verify_compartment_id("b".repeat(64).as_str(), Some(&cid), None);
+        assert_eq!(result.format_valid, Some(true));
+        // Can't verify derivation without confidentiality
+        assert!(result.derivation_valid.is_none());
+        assert!(!result.warnings.is_empty());
+    }
+
+    #[test]
+    fn compartment_rejects_short_hex() {
+        let result = verify_compartment_id(
+            "a".repeat(64).as_str(),
+            Some("abcdef1234"),
+            None,
+        );
+        assert_eq!(result.format_valid, Some(false));
+    }
+
+    #[test]
+    fn compartment_rejects_uppercase_hex() {
+        let mut cid = "a".repeat(63);
+        cid.push('A');
+        let result = verify_compartment_id("b".repeat(64).as_str(), Some(&cid), None);
+        assert_eq!(result.format_valid, Some(false));
+    }
+
+    #[test]
+    fn compartment_rejects_non_hex() {
+        let mut cid = "a".repeat(63);
+        cid.push('g');
+        let result = verify_compartment_id("b".repeat(64).as_str(), Some(&cid), None);
+        assert_eq!(result.format_valid, Some(false));
+    }
+
+    #[test]
+    fn compartment_recompute_matches_guardian_core_public() {
+        use guardian_core::budget::generate_compartment_id;
+
+        let pair_id = "a".repeat(64);
+        let expected = generate_compartment_id(&pair_id, None).unwrap();
+
+        let result = verify_compartment_id(
+            &pair_id,
+            Some(&expected),
+            Some(&serde_json::Value::Null),
+        );
+        assert_eq!(result.format_valid, Some(true));
+        assert_eq!(result.derivation_valid, Some(true));
+    }
+
+    #[test]
+    fn compartment_recompute_matches_guardian_core_restricted() {
+        use guardian_core::budget::generate_compartment_id;
+        use std::collections::BTreeSet;
+
+        let pair_id = "b".repeat(64);
+        let mut principals = BTreeSet::new();
+        principals.insert("alice".to_string());
+        principals.insert("bob".to_string());
+
+        let expected = generate_compartment_id(&pair_id, Some(&principals)).unwrap();
+
+        let conf_value = serde_json::json!(["alice", "bob"]);
+        let result = verify_compartment_id(
+            &pair_id,
+            Some(&expected),
+            Some(&conf_value),
+        );
+        assert_eq!(result.format_valid, Some(true));
+        assert_eq!(result.derivation_valid, Some(true));
+    }
+
+    #[test]
+    fn compartment_mismatch_derivation_fails() {
+        use guardian_core::budget::generate_compartment_id;
+
+        let pair_id = "c".repeat(64);
+        // Generate compartment for public
+        let cid = generate_compartment_id(&pair_id, None).unwrap();
+
+        // But claim restricted confidentiality — should mismatch
+        let conf_value = serde_json::json!(["alice"]);
+        let result = verify_compartment_id(&pair_id, Some(&cid), Some(&conf_value));
+        assert_eq!(result.format_valid, Some(true));
+        assert_eq!(result.derivation_valid, Some(false));
+    }
+
+    #[test]
+    fn compartment_present_without_confidentiality_warns() {
+        let cid = "d".repeat(64);
+        let result = verify_compartment_id("e".repeat(64).as_str(), Some(&cid), None);
+        assert_eq!(result.format_valid, Some(true));
+        assert!(result.derivation_valid.is_none());
+        assert!(result.warnings.iter().any(|w| w.contains("cannot verify derivation")));
+    }
+
+    #[test]
+    fn compartment_recompute_single_principal() {
+        use guardian_core::budget::generate_compartment_id;
+        use std::collections::BTreeSet;
+
+        let pair_id = "f".repeat(64);
+        let mut principals = BTreeSet::new();
+        principals.insert("eve".to_string());
+
+        let expected = generate_compartment_id(&pair_id, Some(&principals)).unwrap();
+
+        let conf_value = serde_json::json!(["eve"]);
+        let result = verify_compartment_id(
+            &pair_id,
+            Some(&expected),
+            Some(&conf_value),
+        );
+        assert_eq!(result.format_valid, Some(true));
+        assert_eq!(result.derivation_valid, Some(true));
+    }
+
+    #[test]
+    fn test_vector_compartment_derivation() {
+        let v = load_vector("ifc_budget_compartment_01.json");
+        let vectors = v["vectors"].as_array().unwrap();
+
+        for vec in vectors {
+            let label = vec["label"].as_str().unwrap();
+            let pair_id = vec["pair_id"].as_str().unwrap();
+            let expected_cid = vec["expected_compartment_id"].as_str().unwrap();
+
+            let conf = &vec["confidentiality"];
+            let result = verify_compartment_id(pair_id, Some(expected_cid), Some(conf));
+
+            assert_eq!(
+                result.format_valid,
+                Some(true),
+                "format_valid failed for vector: {}",
+                label
+            );
+            assert_eq!(
+                result.derivation_valid,
+                Some(true),
+                "derivation_valid failed for vector: {}",
+                label
+            );
+        }
+    }
+
+    #[test]
+    fn test_vector_compartment_adversarial_format() {
+        let v = load_vector("ifc_budget_compartment_02.json");
+        let vectors = v["vectors"].as_array().unwrap();
+
+        for vec in vectors {
+            let label = vec["label"].as_str().unwrap();
+
+            // Skip guardian-core validation tests (no compartment_id field)
+            if vec.get("compartment_id").is_none() {
+                continue;
+            }
+
+            let cid = vec["compartment_id"].as_str().unwrap();
+            let expected_format = vec["expected_format_valid"].as_bool().unwrap();
+
+            let default_pair = "a".repeat(64);
+            let pair_id = vec
+                .get("pair_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&default_pair);
+            let conf = vec.get("confidentiality");
+
+            let result = verify_compartment_id(pair_id, Some(cid), conf);
+
+            assert_eq!(
+                result.format_valid,
+                Some(expected_format),
+                "format_valid failed for vector: {}",
+                label
+            );
+
+            if let Some(expected_derivation) = vec.get("expected_derivation_valid") {
+                assert_eq!(
+                    result.derivation_valid,
+                    Some(expected_derivation.as_bool().unwrap()),
+                    "derivation_valid failed for vector: {}",
+                    label
+                );
+            }
+        }
     }
 }

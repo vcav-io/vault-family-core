@@ -133,6 +133,11 @@ pub struct BudgetUsageRecord {
     /// Absent for legacy receipts (treated as enforced).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub budget_enforcement: Option<String>,
+
+    /// Budget compartment identifier (64-char hex SHA-256, Seq 38+).
+    /// Absent for legacy receipts (treated as default compartment).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compartment_id: Option<String>,
 }
 
 /// Receipt-chain linkage for budget integrity verification.
@@ -301,6 +306,11 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ifc_label_receipt: Option<serde_json::Value>,
 
+    /// IFC joined confidentiality set for budget compartment verification (optional, Seq 38+).
+    /// Canonical JSON form; verifier can recompute compartment_id from this.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_joined_confidentiality: Option<serde_json::Value>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -462,6 +472,11 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ifc_label_receipt: Option<serde_json::Value>,
 
+    /// IFC joined confidentiality set for budget compartment verification (optional, Seq 38+).
+    /// Canonical JSON form; verifier can recompute compartment_id from this.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_joined_confidentiality: Option<serde_json::Value>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<Attestation>,
@@ -506,6 +521,7 @@ impl UnsignedReceipt {
             ifc_output_label: self.ifc_output_label,
             ifc_policy_hash: self.ifc_policy_hash,
             ifc_label_receipt: self.ifc_label_receipt,
+            ifc_joined_confidentiality: self.ifc_joined_confidentiality,
             attestation: self.attestation,
             signature,
         }
@@ -553,6 +569,7 @@ pub struct ReceiptBuilder {
     ifc_output_label: Option<serde_json::Value>,
     ifc_policy_hash: Option<String>,
     ifc_label_receipt: Option<serde_json::Value>,
+    ifc_joined_confidentiality: Option<serde_json::Value>,
     attestation: Option<Attestation>,
 }
 
@@ -791,6 +808,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the IFC joined confidentiality set (optional, Seq 38+)
+    pub fn ifc_joined_confidentiality(mut self, v: Option<serde_json::Value>) -> Self {
+        self.ifc_joined_confidentiality = v;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
         self.attestation = attestation;
@@ -837,6 +860,7 @@ impl ReceiptBuilder {
             ifc_output_label: self.ifc_output_label,
             ifc_policy_hash: self.ifc_policy_hash,
             ifc_label_receipt: self.ifc_label_receipt,
+            ifc_joined_confidentiality: self.ifc_joined_confidentiality,
             attestation: self.attestation,
         })
     }
@@ -857,6 +881,7 @@ mod tests {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
             budget_enforcement: None,
+            compartment_id: None,
         }
     }
 
@@ -909,6 +934,7 @@ mod tests {
             ifc_output_label: None,
             ifc_policy_hash: None,
             ifc_label_receipt: None,
+            ifc_joined_confidentiality: None,
             attestation: None,
         }
     }
@@ -1707,6 +1733,7 @@ mod tests {
             ifc_output_label: None,
             ifc_policy_hash: None,
             ifc_label_receipt: None,
+            ifc_joined_confidentiality: None,
             receipt_key_id: None,
             attestation: None,
         };

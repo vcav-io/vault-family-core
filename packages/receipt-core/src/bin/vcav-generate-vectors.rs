@@ -80,6 +80,7 @@ fn sample_unsigned_receipt() -> UnsignedReceipt {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
             budget_enforcement: None,
+            compartment_id: None,
         },
         budget_chain: Some(BudgetChainRecord {
             chain_id: format!("chain-{}", "1".repeat(64)),
@@ -101,6 +102,7 @@ fn sample_unsigned_receipt() -> UnsignedReceipt {
         ifc_output_label: None,
         ifc_policy_hash: None,
         ifc_label_receipt: None,
+        ifc_joined_confidentiality: None,
         receipt_key_id: None,
         attestation: None,
     }
@@ -133,6 +135,7 @@ fn sample_aborted_receipt() -> UnsignedReceipt {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
             budget_enforcement: None,
+            compartment_id: None,
         },
         budget_chain: None,
         execution_lane: receipt_core::ExecutionLane::SoftwareLocal,
@@ -150,6 +153,7 @@ fn sample_aborted_receipt() -> UnsignedReceipt {
         ifc_output_label: None,
         ifc_policy_hash: None,
         ifc_label_receipt: None,
+        ifc_joined_confidentiality: None,
         receipt_key_id: None,
         attestation: None,
     }
@@ -867,6 +871,7 @@ fn sample_full_receipt(vault_pub_hex: &str) -> UnsignedReceipt {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
             budget_enforcement: None,
+            compartment_id: None,
         },
         budget_chain: Some(BudgetChainRecord {
             chain_id: format!("chain-{}", "1".repeat(64)),
@@ -891,6 +896,7 @@ fn sample_full_receipt(vault_pub_hex: &str) -> UnsignedReceipt {
         ifc_output_label: None,
         ifc_policy_hash: None,
         ifc_label_receipt: None,
+        ifc_joined_confidentiality: None,
         receipt_key_id: Some(key_id),
         attestation: None,
     }

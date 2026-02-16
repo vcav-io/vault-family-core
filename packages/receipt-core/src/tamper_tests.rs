@@ -58,6 +58,7 @@ mod tests {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
             budget_enforcement: None,
+            compartment_id: None,
         }
     }
 
@@ -102,6 +103,7 @@ mod tests {
             ifc_output_label: None,
             ifc_policy_hash: None,
             ifc_label_receipt: None,
+            ifc_joined_confidentiality: None,
             attestation: None,
         }
     }

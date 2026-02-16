@@ -1,0 +1,58 @@
+{
+  "description": "Budget compartment adversarial cases: oversized sets, invalid principals, format validation failures. These test the guardian-core validation and verifier-core format checks.",
+  "vectors": [
+    {
+      "label": "reject_oversized_confidentiality_set",
+      "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "confidentiality": [
+        "p01", "p02", "p03", "p04", "p05", "p06", "p07", "p08",
+        "p09", "p10", "p11", "p12", "p13", "p14", "p15", "p16",
+        "p17"
+      ],
+      "expected_error": "ConfidentialitySetTooLarge",
+      "note": "17 principals exceeds MAX_CONFIDENTIALITY_SET_SIZE (16)"
+    },
+    {
+      "label": "reject_empty_principal",
+      "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "confidentiality": ["alice", ""],
+      "expected_error": "InvalidPrincipal",
+      "note": "Empty strings are rejected"
+    },
+    {
+      "label": "reject_non_ascii_principal",
+      "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "confidentiality": ["alice", "\u0001bob"],
+      "expected_error": "InvalidPrincipal",
+      "note": "Control characters (non-printable ASCII) are rejected"
+    },
+    {
+      "label": "verifier_rejects_short_compartment_id",
+      "compartment_id": "abcdef1234",
+      "expected_format_valid": false,
+      "note": "Compartment ID must be exactly 64 hex chars"
+    },
+    {
+      "label": "verifier_rejects_uppercase_compartment_id",
+      "compartment_id": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "expected_format_valid": false,
+      "note": "Compartment ID must be lowercase hex"
+    },
+    {
+      "label": "verifier_rejects_non_hex_compartment_id",
+      "compartment_id": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+      "expected_format_valid": false,
+      "note": "Compartment ID must contain only hex digits"
+    },
+    {
+      "label": "verifier_detects_mismatched_derivation",
+      "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compartment_id": "0000000000000000000000000000000000000000000000000000000000000000",
+      "confidentiality": null,
+      "expected_format_valid": true,
+      "expected_derivation_valid": false,
+      "note": "Compartment ID does not match SHA-256(prefix || pair_id || 'null')"
+    }
+  ],
+  "schemas": []
+}

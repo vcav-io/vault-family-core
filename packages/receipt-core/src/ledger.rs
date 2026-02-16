@@ -219,6 +219,7 @@ mod tests {
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
                 budget_enforcement: None,
+                compartment_id: None,
             },
             budget_chain: Some(BudgetChainRecord {
                 chain_id: chain_id(),
@@ -239,6 +240,7 @@ mod tests {
             ifc_output_label: None,
             ifc_policy_hash: None,
             ifc_label_receipt: None,
+            ifc_joined_confidentiality: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         };

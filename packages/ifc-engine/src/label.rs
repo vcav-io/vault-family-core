@@ -132,6 +132,11 @@ impl Confidentiality {
         self.0.is_none()
     }
 
+    /// Returns the set of authorized principals, or `None` if public.
+    pub fn principals(&self) -> Option<&BTreeSet<PrincipalId>> {
+        self.0.as_ref()
+    }
+
     /// Returns `true` if the given principal is authorized to read.
     ///
     /// Public labels authorize everyone. Restricted labels authorize only

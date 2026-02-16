@@ -540,6 +540,7 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         ifc_output_label: receipt.ifc_output_label.clone(),
         ifc_policy_hash: receipt.ifc_policy_hash.clone(),
         ifc_label_receipt: receipt.ifc_label_receipt.clone(),
+        ifc_joined_confidentiality: receipt.ifc_joined_confidentiality.clone(),
         receipt_key_id: receipt.receipt_key_id.clone(),
         attestation: receipt.attestation.clone(),
     }
@@ -792,6 +793,7 @@ mod tests {
                 budget_limit: 128,
                 budget_tier: BudgetTier::Default,
                 budget_enforcement: None,
+                compartment_id: None,
             },
             budget_chain: Some(BudgetChainRecord {
                 chain_id: chain_id(),
@@ -812,6 +814,7 @@ mod tests {
             ifc_output_label: None,
             ifc_policy_hash: None,
             ifc_label_receipt: None,
+            ifc_joined_confidentiality: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
         }
