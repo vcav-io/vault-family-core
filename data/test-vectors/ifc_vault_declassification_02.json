@@ -1,0 +1,27 @@
+{
+  "description": "Vault declassification: mixed confidentiality/integrity inputs → joined label with intersection + max integrity",
+  "input": {
+    "operation": "vault_declassification",
+    "input_labels": [
+      {
+        "confidentiality": ["alice", "bob"],
+        "integrity": "TRUSTED",
+        "type_tag": { "kind": "String" }
+      },
+      {
+        "confidentiality": ["bob", "carol"],
+        "integrity": "UNTRUSTED",
+        "type_tag": { "kind": "String" }
+      }
+    ],
+    "schema_entropy_bits": 8
+  },
+  "expected": {
+    "output_label": {
+      "confidentiality": ["bob"],
+      "integrity": "UNTRUSTED",
+      "type_tag": { "kind": "Enum", "value": 256 }
+    }
+  },
+  "schemas": []
+}

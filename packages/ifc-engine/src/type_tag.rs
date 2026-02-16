@@ -63,6 +63,25 @@ impl<'de> Deserialize<'de> for TypeTag {
     }
 }
 
+/// Maximum entropy bits that map to `TypeTag::Enum`.
+/// Above this threshold, `entropy_bits_to_type_tag` returns `TypeTag::Top`.
+pub const MAX_ENUM_ENTROPY_BITS: u16 = 20;
+
+/// Convert an entropy bit count to a TypeTag.
+///
+/// - 0 bits → `Bot` (constant, zero information)
+/// - 1 bit  → `Bool`
+/// - 2..=20 bits → `Enum(2^bits)` (bounded cardinality)
+/// - >20 bits → `Top` (too wide for bounded classification)
+pub fn entropy_bits_to_type_tag(bits: u16) -> TypeTag {
+    match bits {
+        0 => TypeTag::Bot,
+        1 => TypeTag::Bool,
+        2..=MAX_ENUM_ENTROPY_BITS => TypeTag::Enum(1u32 << bits),
+        _ => TypeTag::Top,
+    }
+}
+
 impl TypeTag {
     /// Create an `Enum` type tag, validating that cardinality is at least 1.
     pub fn enum_checked(cardinality: u32) -> Result<Self, IfcError> {
@@ -284,6 +303,72 @@ mod tests {
         assert_eq!(json, r#"{"kind":"Enum","value":3}"#);
     }
 
+    // -- entropy_bits_to_type_tag tests --
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_zero() {
+        assert_eq!(entropy_bits_to_type_tag(0), TypeTag::Bot);
+    }
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_one() {
+        assert_eq!(entropy_bits_to_type_tag(1), TypeTag::Bool);
+    }
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_eight() {
+        assert_eq!(entropy_bits_to_type_tag(8), TypeTag::Enum(256));
+    }
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_max_bounded() {
+        assert_eq!(entropy_bits_to_type_tag(20), TypeTag::Enum(1_048_576));
+    }
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_exceeds_cap() {
+        assert_eq!(entropy_bits_to_type_tag(21), TypeTag::Top);
+    }
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_31() {
+        assert_eq!(entropy_bits_to_type_tag(31), TypeTag::Top);
+    }
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_32() {
+        assert_eq!(entropy_bits_to_type_tag(32), TypeTag::Top);
+    }
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_u16_max() {
+        assert_eq!(entropy_bits_to_type_tag(u16::MAX), TypeTag::Top);
+    }
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_roundtrip_bounded() {
+        for n in 0..=MAX_ENUM_ENTROPY_BITS {
+            let tag = entropy_bits_to_type_tag(n);
+            assert_eq!(
+                tag.entropy_bits(),
+                Some(n),
+                "Round-trip failed for n={n}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_entropy_bits_to_type_tag_unbounded_has_no_entropy() {
+        for n in [21u16, 30, 31, 32, 100, u16::MAX] {
+            let tag = entropy_bits_to_type_tag(n);
+            assert_eq!(
+                tag.entropy_bits(),
+                None,
+                "n={n} should map to Top which has no entropy_bits"
+            );
+        }
+    }
+
     // -- Proptest: total order --
 
     #[cfg(test)]
@@ -328,5 +413,46 @@ mod tests {
                 }
             }
         }
+    }
+
+    // -- Test vector validation --
+
+    fn load_declassification_vector(filename: &str) -> serde_json::Value {
+        let path = format!(
+            "{}/../../data/test-vectors/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            filename
+        );
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
+        serde_json::from_str(&content)
+            .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
+    }
+
+    #[test]
+    fn test_vector_entropy_to_type_tag_01() {
+        let vector = load_declassification_vector("ifc_vault_declassification_01.json");
+        let bits = vector["input"]["schema_entropy_bits"].as_u64().unwrap() as u16;
+        let expected_tag: TypeTag =
+            serde_json::from_value(vector["expected"]["output_label"]["type_tag"].clone()).unwrap();
+        assert_eq!(entropy_bits_to_type_tag(bits), expected_tag);
+    }
+
+    #[test]
+    fn test_vector_entropy_to_type_tag_02() {
+        let vector = load_declassification_vector("ifc_vault_declassification_02.json");
+        let bits = vector["input"]["schema_entropy_bits"].as_u64().unwrap() as u16;
+        let expected_tag: TypeTag =
+            serde_json::from_value(vector["expected"]["output_label"]["type_tag"].clone()).unwrap();
+        assert_eq!(entropy_bits_to_type_tag(bits), expected_tag);
+    }
+
+    #[test]
+    fn test_vector_entropy_to_type_tag_03() {
+        let vector = load_declassification_vector("ifc_vault_declassification_03.json");
+        let bits = vector["input"]["schema_entropy_bits"].as_u64().unwrap() as u16;
+        let expected_tag: TypeTag =
+            serde_json::from_value(vector["expected"]["output_label"]["type_tag"].clone()).unwrap();
+        assert_eq!(entropy_bits_to_type_tag(bits), expected_tag);
     }
 }

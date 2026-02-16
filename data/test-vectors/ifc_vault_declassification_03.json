@@ -1,0 +1,27 @@
+{
+  "description": "Vault declassification: high entropy (21 bits) exceeds MAX_ENUM_ENTROPY_BITS → TypeTag::Top (no declassification)",
+  "input": {
+    "operation": "vault_declassification",
+    "input_labels": [
+      {
+        "confidentiality": ["alice"],
+        "integrity": "TRUSTED",
+        "type_tag": { "kind": "String" }
+      },
+      {
+        "confidentiality": ["alice"],
+        "integrity": "TRUSTED",
+        "type_tag": { "kind": "String" }
+      }
+    ],
+    "schema_entropy_bits": 21
+  },
+  "expected": {
+    "output_label": {
+      "confidentiality": ["alice"],
+      "integrity": "TRUSTED",
+      "type_tag": { "kind": "Top" }
+    }
+  },
+  "schemas": []
+}
