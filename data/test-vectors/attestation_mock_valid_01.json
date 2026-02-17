@@ -1,0 +1,18 @@
+{
+  "description": "Valid mock attestation evidence with correct structure",
+  "attestation": {
+    "version": "VCAV-ATTEST-V1",
+    "environment": "MOCK",
+    "measurement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "evidence": "bW9jay1ldmlkZW5jZS1kYXRh",
+    "claims": {
+      "measurement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "debug_mode": false,
+      "environment": "MOCK",
+      "freshness_nonce": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "challenge_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "timestamp": "2025-06-01T12:00:00Z"
+  },
+  "expected_valid": true
+}

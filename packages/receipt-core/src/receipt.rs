@@ -8,6 +8,7 @@ use guardian_core::{BudgetTier, Purpose};
 use serde::{Deserialize, Serialize};
 
 use crate::agreement::ModelIdentity;
+use crate::attestation::AttestationEvidence;
 
 // ============================================================================
 // Constants
@@ -154,23 +155,6 @@ pub struct BudgetChainRecord {
 }
 
 // ============================================================================
-// Attestation
-// ============================================================================
-
-/// Enclave attestation data (optional, null in dev mode)
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Attestation {
-    /// Enclave measurement hash (64-96 hex chars)
-    pub enclave_measurement: String,
-
-    /// Base64-encoded attestation document
-    pub attestation_document: String,
-
-    /// When attestation was generated
-    pub attestation_timestamp: DateTime<Utc>,
-}
-
-// ============================================================================
 // Receipt
 // ============================================================================
 
@@ -313,7 +297,7 @@ pub struct Receipt {
 
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attestation: Option<Attestation>,
+    pub attestation: Option<AttestationEvidence>,
 
     /// 64-byte hex-encoded Ed25519 signature over canonical receipt
     pub signature: String,
@@ -479,7 +463,7 @@ pub struct UnsignedReceipt {
 
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attestation: Option<Attestation>,
+    pub attestation: Option<AttestationEvidence>,
 }
 
 impl UnsignedReceipt {
@@ -570,7 +554,7 @@ pub struct ReceiptBuilder {
     ifc_policy_hash: Option<String>,
     ifc_label_receipt: Option<serde_json::Value>,
     ifc_joined_confidentiality: Option<serde_json::Value>,
-    attestation: Option<Attestation>,
+    attestation: Option<AttestationEvidence>,
 }
 
 impl ReceiptBuilder {
@@ -815,7 +799,7 @@ impl ReceiptBuilder {
     }
 
     /// Set the attestation (optional)
-    pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
+    pub fn attestation(mut self, attestation: Option<AttestationEvidence>) -> Self {
         self.attestation = attestation;
         self
     }
@@ -1132,16 +1116,35 @@ mod tests {
     // ==================== Attestation Tests ====================
 
     #[test]
-    fn test_attestation_serde() {
-        let attestation = Attestation {
-            enclave_measurement: "f".repeat(64),
-            attestation_document: "base64encodeddoc".to_string(),
-            attestation_timestamp: Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap(),
+    fn test_attestation_evidence_serde_in_receipt() {
+        // AttestationEvidence round-trip is covered in attestation.rs;
+        // this test verifies it works embedded in a receipt.
+        use crate::attestation::{
+            AttestationClaims, AttestationEnvironment, AttestationEvidence, AttestationVersion,
+        };
+        use base64::Engine;
+
+        let evidence_b64 =
+            base64::engine::general_purpose::STANDARD.encode(b"mock-evidence-data");
+        let evidence = AttestationEvidence {
+            version: AttestationVersion::V1,
+            environment: AttestationEnvironment::Mock,
+            measurement: "f".repeat(64),
+            evidence: evidence_b64,
+            claims: AttestationClaims {
+                measurement: "f".repeat(64),
+                signer_id: None,
+                debug_mode: false,
+                environment: AttestationEnvironment::Mock,
+                freshness_nonce: "a".repeat(64),
+            },
+            challenge_hash: "a".repeat(64),
+            timestamp: "2025-01-15T10:00:00Z".to_string(),
         };
 
-        let json = serde_json::to_string(&attestation).unwrap();
-        let parsed: Attestation = serde_json::from_str(&json).unwrap();
-        assert_eq!(attestation, parsed);
+        let json = serde_json::to_string(&evidence).unwrap();
+        let parsed: AttestationEvidence = serde_json::from_str(&json).unwrap();
+        assert_eq!(evidence, parsed);
     }
 
     #[test]
@@ -1176,11 +1179,28 @@ mod tests {
 
     #[test]
     fn test_receipt_with_attestation() {
+        use crate::attestation::{
+            AttestationClaims, AttestationEnvironment, AttestationEvidence, AttestationVersion,
+        };
+        use base64::Engine;
+
+        let evidence_b64 =
+            base64::engine::general_purpose::STANDARD.encode(b"mock-evidence");
         let mut unsigned = sample_unsigned_receipt();
-        unsigned.attestation = Some(Attestation {
-            enclave_measurement: "f".repeat(64),
-            attestation_document: "base64doc".to_string(),
-            attestation_timestamp: Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap(),
+        unsigned.attestation = Some(AttestationEvidence {
+            version: AttestationVersion::V1,
+            environment: AttestationEnvironment::Mock,
+            measurement: "f".repeat(64),
+            evidence: evidence_b64,
+            claims: AttestationClaims {
+                measurement: "f".repeat(64),
+                signer_id: None,
+                debug_mode: false,
+                environment: AttestationEnvironment::Mock,
+                freshness_nonce: "a".repeat(64),
+            },
+            challenge_hash: "a".repeat(64),
+            timestamp: "2025-01-15T10:00:00Z".to_string(),
         });
 
         let signed = unsigned.sign("e".repeat(128));
