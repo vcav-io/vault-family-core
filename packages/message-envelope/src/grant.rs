@@ -85,25 +85,21 @@ impl std::fmt::Display for GrantVersion {
 // Custom deserializers
 // ============================================================================
 
-/// Validate that a string is exactly 64 lowercase hex characters.
-fn validate_hex64(s: &str) -> Result<(), EnvelopeError> {
-    if s.len() != 64
-        || !s
-            .chars()
-            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
-    {
-        return Err(EnvelopeError::InvalidEnvelopeId);
-    }
-    Ok(())
-}
-
 /// Custom deserializer for 64-char lowercase hex strings.
 fn deserialize_hex64<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    validate_hex64(&s).map_err(serde::de::Error::custom)?;
+    if s.len() != 64
+        || !s
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    {
+        return Err(serde::de::Error::custom(
+            "expected 64 lowercase hex characters",
+        ));
+    }
     Ok(s)
 }
 

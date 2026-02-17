@@ -466,7 +466,7 @@ fn generate_grant_test_vectors() {
     let write_vector = |name: &str, value: &serde_json::Value| {
         let path = vectors_dir.join(name);
         let json = serde_json::to_string_pretty(value).unwrap();
-        std::fs::write(&path, json).unwrap_or_else(|e| {
+        std::fs::write(&path, format!("{json}\n")).unwrap_or_else(|e| {
             eprintln!("Warning: could not write {}: {}", path.display(), e);
         });
     };
