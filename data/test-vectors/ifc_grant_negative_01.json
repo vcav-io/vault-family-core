@@ -1,0 +1,237 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "shape_valid": false
+      },
+      "grant": {
+        "audience": "bob",
+        "expires_at": "2026-02-14T10:00:00Z",
+        "grant_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "issued_at": "2026-01-15T10:00:00Z",
+        "issuer": "alice",
+        "issuer_public_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "label": {
+          "confidentiality": [
+            "alice",
+            "bob"
+          ],
+          "integrity": "TRUSTED",
+          "type_tag": {
+            "kind": "Bool"
+          }
+        },
+        "permissions": {
+          "max_uses": 1
+        },
+        "provenance": {
+          "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "session_id": "12345678-1234-1234-1234-123456789abc"
+        },
+        "scope": {
+          "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "purposes": [
+            "COMPATIBILITY"
+          ]
+        },
+        "signature": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "version": "VCAV-GRANT-V99"
+      },
+      "name": "wrong_version"
+    },
+    {
+      "expected": {
+        "shape_valid": false
+      },
+      "grant": {
+        "audience": "bob",
+        "expires_at": "2026-02-14T10:00:00Z",
+        "grant_id": "abcd",
+        "issued_at": "2026-01-15T10:00:00Z",
+        "issuer": "alice",
+        "issuer_public_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "label": {
+          "confidentiality": [
+            "alice",
+            "bob"
+          ],
+          "integrity": "TRUSTED",
+          "type_tag": {
+            "kind": "Bool"
+          }
+        },
+        "permissions": {
+          "max_uses": 1
+        },
+        "provenance": {
+          "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "session_id": "12345678-1234-1234-1234-123456789abc"
+        },
+        "scope": {
+          "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "purposes": [
+            "COMPATIBILITY"
+          ]
+        },
+        "signature": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "version": "VCAV-GRANT-V1"
+      },
+      "name": "grant_id_too_short"
+    },
+    {
+      "expected": {
+        "shape_valid": false
+      },
+      "grant": {
+        "audience": "bob",
+        "expires_at": "2026-02-14T10:00:00Z",
+        "grant_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "issued_at": "2026-01-15T10:00:00Z",
+        "issuer": "alice",
+        "issuer_public_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "label": {
+          "confidentiality": [
+            "alice",
+            "bob"
+          ],
+          "integrity": "TRUSTED",
+          "type_tag": {
+            "kind": "Bool"
+          }
+        },
+        "permissions": {
+          "max_uses": 1
+        },
+        "provenance": {
+          "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "session_id": "12345678-1234-1234-1234-123456789abc"
+        },
+        "scope": {
+          "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "purposes": []
+        },
+        "signature": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "version": "VCAV-GRANT-V1"
+      },
+      "name": "empty_purposes"
+    },
+    {
+      "expected": {
+        "shape_valid": false
+      },
+      "grant": {
+        "audience": "bob",
+        "expires_at": "2026-02-14T10:00:00Z",
+        "grant_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "issued_at": "2026-01-15T10:00:00Z",
+        "issuer": "alice",
+        "issuer_public_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "label": {
+          "confidentiality": [
+            "alice",
+            "bob"
+          ],
+          "integrity": "TRUSTED",
+          "type_tag": {
+            "kind": "Bool"
+          }
+        },
+        "permissions": {
+          "max_uses": 0
+        },
+        "provenance": {
+          "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "session_id": "12345678-1234-1234-1234-123456789abc"
+        },
+        "scope": {
+          "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "purposes": [
+            "COMPATIBILITY"
+          ]
+        },
+        "signature": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "version": "VCAV-GRANT-V1"
+      },
+      "name": "max_uses_zero"
+    },
+    {
+      "expected": {
+        "shape_valid": false
+      },
+      "grant": {
+        "audience": "bob",
+        "expires_at": "2026-02-14T10:00:00Z",
+        "grant_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "issued_at": "2026-01-15T10:00:00Z",
+        "issuer": "alice",
+        "issuer_public_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "label": {
+          "confidentiality": [
+            "alice",
+            "bob"
+          ],
+          "integrity": "TRUSTED",
+          "type_tag": {
+            "kind": "Bool"
+          }
+        },
+        "permissions": {
+          "max_uses": 101
+        },
+        "provenance": {
+          "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "session_id": "12345678-1234-1234-1234-123456789abc"
+        },
+        "scope": {
+          "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "purposes": [
+            "COMPATIBILITY"
+          ]
+        },
+        "signature": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "version": "VCAV-GRANT-V1"
+      },
+      "name": "max_uses_over_100"
+    },
+    {
+      "expected": {
+        "shape_valid": false
+      },
+      "grant": {
+        "audience": "bob",
+        "expires_at": "2026-02-14T10:00:00Z",
+        "grant_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "issued_at": "2026-01-15T10:00:00Z",
+        "issuer": "alice",
+        "issuer_public_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "label": {
+          "confidentiality": [
+            "alice",
+            "bob"
+          ],
+          "integrity": "TRUSTED",
+          "type_tag": {
+            "kind": "Bool"
+          }
+        },
+        "permissions": {
+          "max_uses": 1
+        },
+        "provenance": {
+          "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "session_id": "not-a-uuid"
+        },
+        "scope": {
+          "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "purposes": [
+            "COMPATIBILITY"
+          ]
+        },
+        "signature": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "version": "VCAV-GRANT-V1"
+      },
+      "name": "invalid_session_id"
+    }
+  ],
+  "description": "Invalid grant shapes that must be rejected by both Rust deserialization and TypeScript isValidCapabilityGrant."
+}

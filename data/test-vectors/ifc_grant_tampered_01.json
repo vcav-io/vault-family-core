@@ -1,0 +1,43 @@
+{
+  "description": "Tampered IFC capability grant — audience changed from bob to mallory after signing. grant_id recomputation must fail.",
+  "expected": {
+    "grant_id_valid": false,
+    "shape_valid": true,
+    "signature_valid": false
+  },
+  "grant": {
+    "audience": "mallory",
+    "expires_at": "2026-02-14T10:00:00Z",
+    "grant_id": "212175430044a09d3724785aaa6b039f8809246a0f17fdc2464ba757821368b0",
+    "issued_at": "2026-01-15T10:00:00Z",
+    "issuer": "alice",
+    "issuer_public_key": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+    "label": {
+      "confidentiality": [
+        "alice",
+        "bob"
+      ],
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bool"
+      }
+    },
+    "permissions": {
+      "max_uses": 10
+    },
+    "provenance": {
+      "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "session_id": "12345678-1234-1234-1234-123456789abc"
+    },
+    "scope": {
+      "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "purposes": [
+        "COMPATIBILITY",
+        "SCHEDULING"
+      ]
+    },
+    "signature": "d05df2aa04561644d529ae32e961c86f8c1b19e152f12f4f140af23e52288bb5d757f4d0dd52173c58bed64a2765308cf899404455d2591a25ea54be91477004",
+    "version": "VCAV-GRANT-V1"
+  },
+  "issuer_public_key_hex": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664"
+}
