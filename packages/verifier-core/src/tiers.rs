@@ -6,9 +6,13 @@
 //! Tier 2 (Receipt + artefacts): Tier 1 + profile/policy/contract hash verification
 //! Tier 3 (Manifest): Tier 1/2 + manifest signature verification and artefact coverage
 
+use base64::Engine;
+use ed25519_dalek::Verifier;
 use receipt_core::{
     compute_agreement_hash, canonicalize::canonicalize_serializable,
     parse_public_key_hex, verify_manifest, PublicationManifest, SessionAgreementFields,
+    attestation::{AttestationEnvironment, AttestationEvidence, compute_challenge_hash},
+    hash_message,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -405,6 +409,16 @@ pub struct TierResult {
     pub contract_enforcement: Option<ContractEnforcementResult>,
     /// Error message for the first failing check
     pub error: Option<String>,
+    /// Attestation verification status.
+    /// None / "absent": no attestation present
+    /// "verified": attestation present and verified (Mock with valid signature)
+    /// "present_unverified": attestation present but environment not verifiable (TDX, CC)
+    /// "invalid": attestation present, checks failed
+    pub attestation_status: Option<String>,
+    /// Attestation environment (e.g. "MOCK", "INTEL_TDX", "NVIDIA_CC")
+    pub attestation_environment: Option<String>,
+    /// Whether the challenge hash was recomputed and matched
+    pub attestation_challenge_bound: Option<bool>,
 }
 
 // ============================================================================
@@ -709,6 +723,245 @@ pub fn verify_compartment_id(
     }
 
     result
+}
+
+// ============================================================================
+// Attestation Verification
+// ============================================================================
+
+/// Domain separation prefix for Mock attestation signing.
+const MOCK_ATTESTATION_DOMAIN_PREFIX: &str = "vcav/mock_attestation/v1";
+
+/// Configuration for attestation verification.
+#[derive(Debug, Clone, Default)]
+pub struct AttestationVerifyConfig {
+    /// Ed25519 public key hex (64 chars) for verifying Mock attestation.
+    /// Required to verify Mock evidence; if absent and Mock evidence is present, status = "invalid".
+    pub mock_root_public_key: Option<String>,
+
+    /// Optional allowlist of accepted measurement hashes.
+    /// If present and attestation measurement is not in list, status = "invalid".
+    pub measurement_allowlist: Option<Vec<String>>,
+}
+
+/// Result of attestation verification.
+#[derive(Debug, Clone, Default)]
+pub struct AttestationVerificationResult {
+    /// Attestation verification status: "absent", "verified", "present_unverified", or "invalid"
+    pub status: Option<String>,
+    /// Attestation environment (e.g. "MOCK", "INTEL_TDX", "NVIDIA_CC")
+    pub environment: Option<String>,
+    /// Whether the challenge hash was recomputed and matched
+    pub challenge_bound: Option<bool>,
+}
+
+/// Verify attestation evidence embedded in a receipt JSON string.
+///
+/// Parses the receipt, extracts the attestation field, and verifies:
+/// - Challenge hash binding (session_id, pair_id, contract_hash, session_start)
+/// - Mock attestation Ed25519 signature (if Mock environment)
+/// - Measurement allowlist (if configured)
+pub fn verify_attestation(
+    receipt_json: &str,
+    config: &AttestationVerifyConfig,
+) -> AttestationVerificationResult {
+    let receipt: serde_json::Value = match serde_json::from_str(receipt_json) {
+        Ok(v) => v,
+        Err(_) => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: None,
+                challenge_bound: None,
+            };
+        }
+    };
+
+    // Check if attestation is absent
+    let attestation_value = receipt.get("attestation");
+    if attestation_value.is_none() || attestation_value == Some(&serde_json::Value::Null) {
+        return AttestationVerificationResult {
+            status: Some("absent".to_string()),
+            environment: None,
+            challenge_bound: None,
+        };
+    }
+
+    // Parse attestation evidence
+    let evidence: AttestationEvidence =
+        match serde_json::from_value(attestation_value.unwrap().clone()) {
+            Ok(e) => e,
+            Err(_) => {
+                return AttestationVerificationResult {
+                    status: Some("invalid".to_string()),
+                    environment: None,
+                    challenge_bound: None,
+                };
+            }
+        };
+
+    let environment_str = evidence.environment.to_string();
+
+    // Extract session fields for challenge recomputation
+    let session_id = match receipt.get("session_id").and_then(|v| v.as_str()) {
+        Some(s) => s,
+        None => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                challenge_bound: None,
+            };
+        }
+    };
+
+    let pair_id = match receipt
+        .get("budget_usage")
+        .and_then(|v| v.get("pair_id"))
+        .and_then(|v| v.as_str())
+    {
+        Some(s) => s,
+        None => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                challenge_bound: None,
+            };
+        }
+    };
+
+    // Empty string is the canonical encoding of "no contract" for challenge hash
+    // computation. Both signer and verifier must agree on this convention.
+    let contract_hash = receipt
+        .get("contract_hash")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let session_start = match receipt.get("session_start").and_then(|v| v.as_str()) {
+        Some(s) => s,
+        None => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                challenge_bound: None,
+            };
+        }
+    };
+
+    // Recompute challenge hash and verify it matches
+    let expected_challenge = match compute_challenge_hash(session_id, pair_id, contract_hash, session_start) {
+        Ok(h) => h,
+        Err(_) => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                challenge_bound: None,
+            };
+        }
+    };
+
+    if expected_challenge != evidence.challenge_hash {
+        return AttestationVerificationResult {
+            status: Some("invalid".to_string()),
+            environment: Some(environment_str),
+            challenge_bound: Some(false),
+        };
+    }
+
+    // Check measurement allowlist before environment-specific verification
+    if let Some(allowlist) = &config.measurement_allowlist {
+        if !allowlist.contains(&evidence.measurement) {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                challenge_bound: Some(true),
+            };
+        }
+    }
+
+    match evidence.environment {
+        AttestationEnvironment::Mock => {
+            // Verify Ed25519 signature
+            let public_key_hex = match &config.mock_root_public_key {
+                Some(k) => k,
+                None => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                    };
+                }
+            };
+
+            let public_key = match parse_public_key_hex(public_key_hex) {
+                Ok(k) => k,
+                Err(_) => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                    };
+                }
+            };
+
+            // Reconstruct signing input: SHA-256(prefix_bytes || JCS(claims))
+            let claims_canonical = match canonicalize_serializable(&evidence.claims) {
+                Ok(c) => c,
+                Err(_) => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                    };
+                }
+            };
+
+            let mut signing_input = MOCK_ATTESTATION_DOMAIN_PREFIX.as_bytes().to_vec();
+            signing_input.extend(claims_canonical.as_bytes());
+            let signing_hash = hash_message(&signing_input);
+
+            // Decode evidence bytes from base64
+            let sig_bytes = match base64::engine::general_purpose::STANDARD.decode(&evidence.evidence) {
+                Ok(b) => b,
+                Err(_) => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                    };
+                }
+            };
+
+            let signature = match ed25519_dalek::Signature::from_slice(&sig_bytes) {
+                Ok(s) => s,
+                Err(_) => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                    };
+                }
+            };
+
+            match public_key.verify(&signing_hash, &signature) {
+                Ok(_) => AttestationVerificationResult {
+                    status: Some("verified".to_string()),
+                    environment: Some(environment_str),
+                    challenge_bound: Some(true),
+                },
+                Err(_) => AttestationVerificationResult {
+                    status: Some("invalid".to_string()),
+                    environment: Some(environment_str),
+                    challenge_bound: Some(true),
+                },
+            }
+        }
+        AttestationEnvironment::IntelTdx | AttestationEnvironment::NvidiaCC => {
+            AttestationVerificationResult {
+                status: Some("present_unverified".to_string()),
+                environment: Some(environment_str),
+                challenge_bound: Some(true),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2232,5 +2485,207 @@ mod tests {
                 );
             }
         }
+    }
+
+    // ========================================================================
+    // Attestation verification tests
+    // ========================================================================
+
+    use ed25519_dalek::Signer;
+    use receipt_core::attestation::{
+        AttestationClaims, AttestationEvidence, AttestationVersion,
+    };
+
+    /// Build a mock receipt JSON with a valid Mock attestation, returning (receipt_json, public_key_hex).
+    fn build_test_mock_evidence(
+        session_id: &str,
+        pair_id: &str,
+        contract_hash: &str,
+        timestamp: &str,
+    ) -> (String, String) {
+        // Deterministic signing key for tests
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&[0x07u8; 32]);
+        let verifying_key = signing_key.verifying_key();
+        let pub_hex = receipt_core::signer::public_key_to_hex(&verifying_key);
+
+        // Compute challenge hash
+        let challenge_hash = receipt_core::attestation::compute_challenge_hash(
+            session_id,
+            pair_id,
+            contract_hash,
+            timestamp,
+        )
+        .unwrap();
+
+        let measurement = "c".repeat(64);
+
+        // Build claims
+        let claims = AttestationClaims {
+            measurement: measurement.clone(),
+            signer_id: None,
+            debug_mode: false,
+            environment: receipt_core::attestation::AttestationEnvironment::Mock,
+            freshness_nonce: challenge_hash.clone(),
+        };
+
+        // Sign: SHA-256(prefix_bytes || JCS(claims))
+        let claims_canonical = canonicalize_serializable(&claims).unwrap();
+        let mut signing_input = MOCK_ATTESTATION_DOMAIN_PREFIX.as_bytes().to_vec();
+        signing_input.extend(claims_canonical.as_bytes());
+        let signing_hash = receipt_core::hash_message(&signing_input);
+
+        let signature = signing_key.sign(&signing_hash);
+        let sig_bytes = signature.to_bytes();
+        let evidence_b64 =
+            base64::engine::general_purpose::STANDARD.encode(sig_bytes.as_ref());
+
+        let evidence = AttestationEvidence {
+            version: AttestationVersion::V1,
+            environment: receipt_core::attestation::AttestationEnvironment::Mock,
+            measurement: measurement.clone(),
+            evidence: evidence_b64,
+            claims,
+            challenge_hash,
+            timestamp: timestamp.to_string(),
+        };
+
+        let receipt = serde_json::json!({
+            "session_id": session_id,
+            "budget_usage": { "pair_id": pair_id },
+            "contract_hash": contract_hash,
+            "session_start": timestamp,
+            "attestation": serde_json::to_value(&evidence).unwrap(),
+        });
+
+        (serde_json::to_string(&receipt).unwrap(), pub_hex)
+    }
+
+    #[test]
+    fn test_attestation_valid_mock_verified() {
+        let (receipt_json, pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: Some(pub_hex),
+            measurement_allowlist: None,
+        };
+        let result = verify_attestation(&receipt_json, &config);
+        assert_eq!(result.status.as_deref(), Some("verified"));
+        assert_eq!(result.environment.as_deref(), Some("MOCK"));
+        assert_eq!(result.challenge_bound, Some(true));
+    }
+
+    #[test]
+    fn test_attestation_challenge_hash_mismatch_invalid() {
+        let (receipt_json, pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        // Tamper: change session_id in the receipt so challenge hash recomputation fails
+        let mut receipt: serde_json::Value = serde_json::from_str(&receipt_json).unwrap();
+        receipt["session_id"] = serde_json::json!("tampered-session");
+        let tampered_json = serde_json::to_string(&receipt).unwrap();
+
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: Some(pub_hex),
+            measurement_allowlist: None,
+        };
+        let result = verify_attestation(&tampered_json, &config);
+        assert_eq!(result.status.as_deref(), Some("invalid"));
+        assert_eq!(result.challenge_bound, Some(false));
+    }
+
+    #[test]
+    fn test_attestation_mock_without_root_key_invalid() {
+        let (receipt_json, _pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: None,
+            measurement_allowlist: None,
+        };
+        let result = verify_attestation(&receipt_json, &config);
+        assert_eq!(result.status.as_deref(), Some("invalid"));
+    }
+
+    #[test]
+    fn test_attestation_intel_tdx_present_unverified() {
+        let session_id = "sess-tdx";
+        let pair_id = "pair-tdx";
+        let timestamp = "2025-06-01T12:00:00Z";
+        let contract_hash = "";
+
+        let challenge_hash = receipt_core::attestation::compute_challenge_hash(
+            session_id, pair_id, contract_hash, timestamp,
+        )
+        .unwrap();
+
+        let measurement = "d".repeat(64);
+        let claims = AttestationClaims {
+            measurement: measurement.clone(),
+            signer_id: None,
+            debug_mode: false,
+            environment: receipt_core::attestation::AttestationEnvironment::IntelTdx,
+            freshness_nonce: challenge_hash.clone(),
+        };
+
+        let evidence = AttestationEvidence {
+            version: AttestationVersion::V1,
+            environment: receipt_core::attestation::AttestationEnvironment::IntelTdx,
+            measurement,
+            evidence: base64::engine::general_purpose::STANDARD.encode(b"tdx-quote"),
+            claims,
+            challenge_hash,
+            timestamp: timestamp.to_string(),
+        };
+
+        let receipt = serde_json::json!({
+            "session_id": session_id,
+            "budget_usage": { "pair_id": pair_id },
+            "session_start": timestamp,
+            "attestation": serde_json::to_value(&evidence).unwrap(),
+        });
+
+        let config = AttestationVerifyConfig::default();
+        let result = verify_attestation(&serde_json::to_string(&receipt).unwrap(), &config);
+        assert_eq!(result.status.as_deref(), Some("present_unverified"));
+        assert_eq!(result.environment.as_deref(), Some("INTEL_TDX"));
+        assert_eq!(result.challenge_bound, Some(true));
+    }
+
+    #[test]
+    fn test_attestation_absent_returns_absent() {
+        let receipt = serde_json::json!({
+            "session_id": "sess-1",
+            "budget_usage": { "pair_id": "pair-1" },
+            "session_start": "2025-06-01T12:00:00Z",
+        });
+        let config = AttestationVerifyConfig::default();
+        let result = verify_attestation(&serde_json::to_string(&receipt).unwrap(), &config);
+        assert_eq!(result.status.as_deref(), Some("absent"));
+        assert!(result.environment.is_none());
+        assert!(result.challenge_bound.is_none());
+    }
+
+    #[test]
+    fn test_attestation_measurement_allowlist_enforced() {
+        let (receipt_json, pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        // Allowlist does not include the measurement "ccc...c" (64 chars)
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: Some(pub_hex),
+            measurement_allowlist: Some(vec!["a".repeat(64)]),
+        };
+        let result = verify_attestation(&receipt_json, &config);
+        assert_eq!(result.status.as_deref(), Some("invalid"));
+    }
+
+    #[test]
+    fn test_attestation_measurement_allowlist_passes() {
+        let measurement = "c".repeat(64);
+        let (receipt_json, pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: Some(pub_hex),
+            measurement_allowlist: Some(vec![measurement]),
+        };
+        let result = verify_attestation(&receipt_json, &config);
+        assert_eq!(result.status.as_deref(), Some("verified"));
     }
 }
