@@ -10,8 +10,9 @@ use ifc_engine::{
     PolicyDecision, PrincipalId, Purpose, TypeTag,
 };
 use message_envelope::{
-    policy_config_hash, sign_envelope, verify_envelope, EnvelopeVersion, MessageEnvelope,
-    UnsignedEnvelope, ENVELOPE_DOMAIN_PREFIX,
+    policy_config_hash, sign_envelope, sign_grant, verify_envelope, EnvelopeVersion,
+    GrantPermissions, GrantProvenance, GrantScope, GrantVersion, MessageEnvelope,
+    UnsignedEnvelope, UnsignedGrant, ENVELOPE_DOMAIN_PREFIX,
 };
 
 /// Fixed 32-byte seed for deterministic test key generation.
@@ -273,4 +274,204 @@ fn generate_test_vectors() {
     write_vector("ifc_msg_wrong_policy_01.json", &vector3);
     write_vector("ifc_msg_wrong_sender_01.json", &vector4);
     write_vector("ifc_registry_hide_01.json", &vector5);
+}
+
+// ============================================================================
+// Grant test vector generation
+// ============================================================================
+
+#[test]
+fn generate_grant_test_vectors() {
+    let signing_key = test_signing_key();
+    let pubkey_hex = hex::encode(signing_key.verifying_key().as_bytes());
+
+    let alice = PrincipalId::new("alice").unwrap();
+    let bob = PrincipalId::new("bob").unwrap();
+    let label = Label::new(
+        Confidentiality::restricted([alice.clone(), bob.clone()].into()),
+        IntegrityLevel::Trusted,
+        TypeTag::Bool,
+    );
+
+    let unsigned = UnsignedGrant {
+        version: GrantVersion::V1,
+        issuer: alice.clone(),
+        issuer_public_key: pubkey_hex.clone(),
+        audience: bob.clone(),
+        label: label.clone(),
+        scope: GrantScope {
+            pair_id: "c".repeat(64),
+            purposes: vec![Purpose::Compatibility, Purpose::Scheduling],
+        },
+        permissions: GrantPermissions { max_uses: 10 },
+        provenance: GrantProvenance {
+            receipt_id: "d".repeat(64),
+            session_id: "12345678-1234-1234-1234-123456789abc".to_string(),
+        },
+        issued_at: "2026-01-15T10:00:00Z".to_string(),
+        expires_at: "2026-02-14T10:00:00Z".to_string(),
+    };
+
+    let grant = sign_grant(&unsigned, &signing_key).unwrap();
+
+    // Vector 1: Valid signed grant — both shape and signature must pass
+    let vector1 = serde_json::json!({
+        "description": "Valid signed IFC capability grant. Label = ({alice, bob}, Trusted, Bool), issuer = alice, audience = bob, purposes = [Compatibility, Scheduling], max_uses = 10.",
+        "grant": serde_json::to_value(&grant).unwrap(),
+        "issuer_public_key_hex": pubkey_hex,
+        "expected": {
+            "shape_valid": true,
+            "signature_valid": true,
+            "grant_id_valid": true
+        }
+    });
+
+    // Vector 2: Tampered grant — audience changed after signing
+    let mut tampered = grant.clone();
+    tampered.audience = PrincipalId::new("mallory").unwrap();
+    let vector2 = serde_json::json!({
+        "description": "Tampered IFC capability grant — audience changed from bob to mallory after signing. grant_id recomputation must fail.",
+        "grant": serde_json::to_value(&tampered).unwrap(),
+        "issuer_public_key_hex": pubkey_hex,
+        "expected": {
+            "shape_valid": true,
+            "signature_valid": false,
+            "grant_id_valid": false
+        }
+    });
+
+    // Vector 3: Invalid shape — missing required fields, bad formats
+    let vector3 = serde_json::json!({
+        "description": "Invalid grant shapes that must be rejected by both Rust deserialization and TypeScript isValidCapabilityGrant.",
+        "cases": [
+            {
+                "name": "wrong_version",
+                "grant": {
+                    "version": "VCAV-GRANT-V99",
+                    "grant_id": "a".repeat(64),
+                    "issuer": "alice",
+                    "issuer_public_key": "b".repeat(64),
+                    "audience": "bob",
+                    "label": { "confidentiality": ["alice", "bob"], "integrity": "TRUSTED", "type_tag": { "kind": "Bool" } },
+                    "scope": { "pair_id": "c".repeat(64), "purposes": ["COMPATIBILITY"] },
+                    "permissions": { "max_uses": 1 },
+                    "provenance": { "receipt_id": "d".repeat(64), "session_id": "12345678-1234-1234-1234-123456789abc" },
+                    "issued_at": "2026-01-15T10:00:00Z",
+                    "expires_at": "2026-02-14T10:00:00Z",
+                    "signature": "e".repeat(128)
+                },
+                "expected": { "shape_valid": false }
+            },
+            {
+                "name": "grant_id_too_short",
+                "grant": {
+                    "version": "VCAV-GRANT-V1",
+                    "grant_id": "abcd",
+                    "issuer": "alice",
+                    "issuer_public_key": "b".repeat(64),
+                    "audience": "bob",
+                    "label": { "confidentiality": ["alice", "bob"], "integrity": "TRUSTED", "type_tag": { "kind": "Bool" } },
+                    "scope": { "pair_id": "c".repeat(64), "purposes": ["COMPATIBILITY"] },
+                    "permissions": { "max_uses": 1 },
+                    "provenance": { "receipt_id": "d".repeat(64), "session_id": "12345678-1234-1234-1234-123456789abc" },
+                    "issued_at": "2026-01-15T10:00:00Z",
+                    "expires_at": "2026-02-14T10:00:00Z",
+                    "signature": "e".repeat(128)
+                },
+                "expected": { "shape_valid": false }
+            },
+            {
+                "name": "empty_purposes",
+                "grant": {
+                    "version": "VCAV-GRANT-V1",
+                    "grant_id": "a".repeat(64),
+                    "issuer": "alice",
+                    "issuer_public_key": "b".repeat(64),
+                    "audience": "bob",
+                    "label": { "confidentiality": ["alice", "bob"], "integrity": "TRUSTED", "type_tag": { "kind": "Bool" } },
+                    "scope": { "pair_id": "c".repeat(64), "purposes": [] },
+                    "permissions": { "max_uses": 1 },
+                    "provenance": { "receipt_id": "d".repeat(64), "session_id": "12345678-1234-1234-1234-123456789abc" },
+                    "issued_at": "2026-01-15T10:00:00Z",
+                    "expires_at": "2026-02-14T10:00:00Z",
+                    "signature": "e".repeat(128)
+                },
+                "expected": { "shape_valid": false }
+            },
+            {
+                "name": "max_uses_zero",
+                "grant": {
+                    "version": "VCAV-GRANT-V1",
+                    "grant_id": "a".repeat(64),
+                    "issuer": "alice",
+                    "issuer_public_key": "b".repeat(64),
+                    "audience": "bob",
+                    "label": { "confidentiality": ["alice", "bob"], "integrity": "TRUSTED", "type_tag": { "kind": "Bool" } },
+                    "scope": { "pair_id": "c".repeat(64), "purposes": ["COMPATIBILITY"] },
+                    "permissions": { "max_uses": 0 },
+                    "provenance": { "receipt_id": "d".repeat(64), "session_id": "12345678-1234-1234-1234-123456789abc" },
+                    "issued_at": "2026-01-15T10:00:00Z",
+                    "expires_at": "2026-02-14T10:00:00Z",
+                    "signature": "e".repeat(128)
+                },
+                "expected": { "shape_valid": false }
+            },
+            {
+                "name": "max_uses_over_100",
+                "grant": {
+                    "version": "VCAV-GRANT-V1",
+                    "grant_id": "a".repeat(64),
+                    "issuer": "alice",
+                    "issuer_public_key": "b".repeat(64),
+                    "audience": "bob",
+                    "label": { "confidentiality": ["alice", "bob"], "integrity": "TRUSTED", "type_tag": { "kind": "Bool" } },
+                    "scope": { "pair_id": "c".repeat(64), "purposes": ["COMPATIBILITY"] },
+                    "permissions": { "max_uses": 101 },
+                    "provenance": { "receipt_id": "d".repeat(64), "session_id": "12345678-1234-1234-1234-123456789abc" },
+                    "issued_at": "2026-01-15T10:00:00Z",
+                    "expires_at": "2026-02-14T10:00:00Z",
+                    "signature": "e".repeat(128)
+                },
+                "expected": { "shape_valid": false }
+            },
+            {
+                "name": "invalid_session_id",
+                "grant": {
+                    "version": "VCAV-GRANT-V1",
+                    "grant_id": "a".repeat(64),
+                    "issuer": "alice",
+                    "issuer_public_key": "b".repeat(64),
+                    "audience": "bob",
+                    "label": { "confidentiality": ["alice", "bob"], "integrity": "TRUSTED", "type_tag": { "kind": "Bool" } },
+                    "scope": { "pair_id": "c".repeat(64), "purposes": ["COMPATIBILITY"] },
+                    "permissions": { "max_uses": 1 },
+                    "provenance": { "receipt_id": "d".repeat(64), "session_id": "not-a-uuid" },
+                    "issued_at": "2026-01-15T10:00:00Z",
+                    "expires_at": "2026-02-14T10:00:00Z",
+                    "signature": "e".repeat(128)
+                },
+                "expected": { "shape_valid": false }
+            }
+        ]
+    });
+
+    // Write vectors
+    let vectors_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("data/test-vectors");
+
+    let write_vector = |name: &str, value: &serde_json::Value| {
+        let path = vectors_dir.join(name);
+        let json = serde_json::to_string_pretty(value).unwrap();
+        std::fs::write(&path, format!("{json}\n")).unwrap_or_else(|e| {
+            eprintln!("Warning: could not write {}: {}", path.display(), e);
+        });
+    };
+
+    write_vector("ifc_grant_positive_01.json", &vector1);
+    write_vector("ifc_grant_tampered_01.json", &vector2);
+    write_vector("ifc_grant_negative_01.json", &vector3);
 }

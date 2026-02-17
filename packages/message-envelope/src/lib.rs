@@ -15,6 +15,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod grant;
+
 use std::fmt;
 
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
@@ -24,6 +26,11 @@ use sha2::{Digest, Sha256};
 use ifc_engine::{Label, LabelReceipt, PolicyConfig, PrincipalId};
 use receipt_core::canonicalize::canonicalize_serializable;
 use receipt_core::signer::hash_message;
+
+pub use grant::{
+    sign_grant, verify_grant, CapabilityGrant, GrantPermissions, GrantProvenance, GrantScope,
+    GrantVersion, UnsignedGrant, GRANT_DOMAIN_PREFIX,
+};
 
 // ============================================================================
 // Constants
@@ -107,6 +114,38 @@ pub enum EnvelopeError {
     /// Invalid public key bytes.
     #[error("invalid public key bytes: {0}")]
     InvalidPublicKeyBytes(String),
+
+    /// Recomputed grant_id does not match the embedded value.
+    #[error("invalid grant_id: recomputed hash does not match")]
+    InvalidGrantId,
+
+    /// Grant has expired.
+    #[error("grant expired: {0}")]
+    GrantExpired(String),
+
+    /// Audience mismatch between grant and runtime context.
+    #[error("audience mismatch: expected {expected}, got {actual}")]
+    AudienceMismatch { expected: String, actual: String },
+
+    /// Grant use limit exceeded.
+    #[error("use limit exceeded: used {used} of {max}")]
+    UseLimitExceeded { used: u32, max: u32 },
+
+    /// Grant not found in registry.
+    #[error("grant not found: {0}")]
+    GrantNotFound(String),
+
+    /// Purpose not allowed by the grant scope.
+    #[error("purpose not allowed: {0}")]
+    PurposeNotAllowed(String),
+
+    /// Outbound label exceeds the grant's label ceiling.
+    #[error("label ceiling exceeded")]
+    LabelCeilingExceeded,
+
+    /// Grant registry is at capacity.
+    #[error("grant registry full")]
+    GrantRegistryFull,
 }
 
 // ============================================================================
