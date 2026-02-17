@@ -753,6 +753,8 @@ pub struct AttestationVerificationResult {
     pub environment: Option<String>,
     /// Whether the challenge hash was recomputed and matched
     pub challenge_bound: Option<bool>,
+    /// Human-readable error detail when status is "invalid"
+    pub error_detail: Option<String>,
 }
 
 /// Verify attestation evidence embedded in a receipt JSON string.
@@ -767,11 +769,11 @@ pub fn verify_attestation(
 ) -> AttestationVerificationResult {
     let receipt: serde_json::Value = match serde_json::from_str(receipt_json) {
         Ok(v) => v,
-        Err(_) => {
+        Err(e) => {
             return AttestationVerificationResult {
                 status: Some("invalid".to_string()),
-                environment: None,
-                challenge_bound: None,
+                error_detail: Some(format!("receipt JSON parse failed: {e}")),
+                ..Default::default()
             };
         }
     };
@@ -781,8 +783,7 @@ pub fn verify_attestation(
     if attestation_value.is_none() || attestation_value == Some(&serde_json::Value::Null) {
         return AttestationVerificationResult {
             status: Some("absent".to_string()),
-            environment: None,
-            challenge_bound: None,
+            ..Default::default()
         };
     }
 
@@ -790,11 +791,11 @@ pub fn verify_attestation(
     let evidence: AttestationEvidence =
         match serde_json::from_value(attestation_value.unwrap().clone()) {
             Ok(e) => e,
-            Err(_) => {
+            Err(e) => {
                 return AttestationVerificationResult {
                     status: Some("invalid".to_string()),
-                    environment: None,
-                    challenge_bound: None,
+                    error_detail: Some(format!("attestation evidence parse failed: {e}")),
+                    ..Default::default()
                 };
             }
         };
@@ -808,7 +809,8 @@ pub fn verify_attestation(
             return AttestationVerificationResult {
                 status: Some("invalid".to_string()),
                 environment: Some(environment_str),
-                challenge_bound: None,
+                error_detail: Some("missing or non-string session_id in receipt".to_string()),
+                ..Default::default()
             };
         }
     };
@@ -823,7 +825,8 @@ pub fn verify_attestation(
             return AttestationVerificationResult {
                 status: Some("invalid".to_string()),
                 environment: Some(environment_str),
-                challenge_bound: None,
+                error_detail: Some("missing or non-string budget_usage.pair_id in receipt".to_string()),
+                ..Default::default()
             };
         }
     };
@@ -841,7 +844,8 @@ pub fn verify_attestation(
             return AttestationVerificationResult {
                 status: Some("invalid".to_string()),
                 environment: Some(environment_str),
-                challenge_bound: None,
+                error_detail: Some("missing or non-string session_start in receipt".to_string()),
+                ..Default::default()
             };
         }
     };
@@ -849,11 +853,12 @@ pub fn verify_attestation(
     // Recompute challenge hash and verify it matches
     let expected_challenge = match compute_challenge_hash(session_id, pair_id, contract_hash, session_start) {
         Ok(h) => h,
-        Err(_) => {
+        Err(e) => {
             return AttestationVerificationResult {
                 status: Some("invalid".to_string()),
                 environment: Some(environment_str),
-                challenge_bound: None,
+                error_detail: Some(format!("challenge hash computation failed: {e}")),
+                ..Default::default()
             };
         }
     };
@@ -863,6 +868,7 @@ pub fn verify_attestation(
             status: Some("invalid".to_string()),
             environment: Some(environment_str),
             challenge_bound: Some(false),
+            error_detail: Some("challenge hash mismatch: recomputed hash does not match evidence".to_string()),
         };
     }
 
@@ -873,6 +879,7 @@ pub fn verify_attestation(
                 status: Some("invalid".to_string()),
                 environment: Some(environment_str),
                 challenge_bound: Some(true),
+                error_detail: Some(format!("measurement {} not in allowlist", evidence.measurement)),
             };
         }
     }
@@ -887,17 +894,19 @@ pub fn verify_attestation(
                         status: Some("invalid".to_string()),
                         environment: Some(environment_str),
                         challenge_bound: Some(true),
+                        error_detail: Some("Mock attestation present but no mock_root_public_key configured".to_string()),
                     };
                 }
             };
 
             let public_key = match parse_public_key_hex(public_key_hex) {
                 Ok(k) => k,
-                Err(_) => {
+                Err(e) => {
                     return AttestationVerificationResult {
                         status: Some("invalid".to_string()),
                         environment: Some(environment_str),
                         challenge_bound: Some(true),
+                        error_detail: Some(format!("mock_root_public_key parse failed: {e}")),
                     };
                 }
             };
@@ -905,11 +914,12 @@ pub fn verify_attestation(
             // Reconstruct signing input: SHA-256(prefix_bytes || JCS(claims))
             let claims_canonical = match canonicalize_serializable(&evidence.claims) {
                 Ok(c) => c,
-                Err(_) => {
+                Err(e) => {
                     return AttestationVerificationResult {
                         status: Some("invalid".to_string()),
                         environment: Some(environment_str),
                         challenge_bound: Some(true),
+                        error_detail: Some(format!("internal: JCS canonicalization failed: {e}")),
                     };
                 }
             };
@@ -921,22 +931,24 @@ pub fn verify_attestation(
             // Decode evidence bytes from base64
             let sig_bytes = match base64::engine::general_purpose::STANDARD.decode(&evidence.evidence) {
                 Ok(b) => b,
-                Err(_) => {
+                Err(e) => {
                     return AttestationVerificationResult {
                         status: Some("invalid".to_string()),
                         environment: Some(environment_str),
                         challenge_bound: Some(true),
+                        error_detail: Some(format!("evidence base64 decode failed: {e}")),
                     };
                 }
             };
 
             let signature = match ed25519_dalek::Signature::from_slice(&sig_bytes) {
                 Ok(s) => s,
-                Err(_) => {
+                Err(e) => {
                     return AttestationVerificationResult {
                         status: Some("invalid".to_string()),
                         environment: Some(environment_str),
                         challenge_bound: Some(true),
+                        error_detail: Some(format!("signature parse failed: {e}")),
                     };
                 }
             };
@@ -946,11 +958,13 @@ pub fn verify_attestation(
                     status: Some("verified".to_string()),
                     environment: Some(environment_str),
                     challenge_bound: Some(true),
+                    error_detail: None,
                 },
-                Err(_) => AttestationVerificationResult {
+                Err(e) => AttestationVerificationResult {
                     status: Some("invalid".to_string()),
                     environment: Some(environment_str),
                     challenge_bound: Some(true),
+                    error_detail: Some(format!("Ed25519 signature verification failed: {e}")),
                 },
             }
         }
@@ -959,6 +973,7 @@ pub fn verify_attestation(
                 status: Some("present_unverified".to_string()),
                 environment: Some(environment_str),
                 challenge_bound: Some(true),
+                error_detail: None,
             }
         }
     }
