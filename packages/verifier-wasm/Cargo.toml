@@ -25,3 +25,9 @@ getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] 
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+
+# wasm-pack runs wasm-opt by default for release builds. Some wasm-opt builds
+# (notably older Binaryen distributions) fail validation unless bulk-memory is
+# explicitly enabled. Disable wasm-opt here to keep `make build` portable.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
