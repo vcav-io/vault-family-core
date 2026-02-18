@@ -260,20 +260,24 @@ fn generate_test_vectors() {
         .parent()
         .unwrap()
         .join("data/test-vectors");
+    let ifc_vectors_dir = vectors_dir.join("ifc");
+    std::fs::create_dir_all(&ifc_vectors_dir).ok();
 
-    let write_vector = |name: &str, value: &serde_json::Value| {
-        let path = vectors_dir.join(name);
+    let write_vector = |dir: &std::path::Path, name: &str, value: &serde_json::Value| {
+        let path = dir.join(name);
         let json = serde_json::to_string_pretty(value).unwrap();
         std::fs::write(&path, json).unwrap_or_else(|e| {
             eprintln!("Warning: could not write {}: {}", path.display(), e);
         });
     };
 
-    write_vector("ifc_msg_envelope_01.json", &vector1);
-    write_vector("ifc_msg_envelope_02.json", &vector2);
-    write_vector("ifc_msg_wrong_policy_01.json", &vector3);
-    write_vector("ifc_msg_wrong_sender_01.json", &vector4);
-    write_vector("ifc_registry_hide_01.json", &vector5);
+    // Non-conforming vectors go to ifc/ subdirectory (not picked up by VSSP conformance glob)
+    write_vector(&ifc_vectors_dir, "ifc_msg_envelope_01.json", &vector1);
+    write_vector(&ifc_vectors_dir, "ifc_msg_envelope_02.json", &vector2);
+    write_vector(&ifc_vectors_dir, "ifc_msg_wrong_policy_01.json", &vector3);
+    write_vector(&ifc_vectors_dir, "ifc_msg_wrong_sender_01.json", &vector4);
+    // Conforming vector stays in flat directory
+    write_vector(&vectors_dir, "ifc_registry_hide_01.json", &vector5);
 }
 
 // ============================================================================
@@ -455,13 +459,14 @@ fn generate_grant_test_vectors() {
         ]
     });
 
-    // Write vectors
+    // Write vectors to ifc/ subdirectory (non-conforming to VSSP {description, input, expected} format)
     let vectors_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .parent()
         .unwrap()
-        .join("data/test-vectors");
+        .join("data/test-vectors/ifc");
+    std::fs::create_dir_all(&vectors_dir).ok();
 
     let write_vector = |name: &str, value: &serde_json::Value| {
         let path = vectors_dir.join(name);
