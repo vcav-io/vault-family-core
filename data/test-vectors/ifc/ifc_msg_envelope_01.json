@@ -1,0 +1,44 @@
+{
+  "description": "Valid IFC message envelope with correct Ed25519 signature. Label = ({alice, bob}, Trusted, Bool), sender = alice, recipient = bob, purpose = Compatibility.",
+  "envelope": {
+    "created_at": "2026-01-15T10:00:00Z",
+    "envelope_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "ifc_policy_hash": "b3ee09462ce14076bc661bf66a36366f4d781df1f6cb034161f231ca543c6f4f",
+    "ifc_signature": "8031c739e3b55cf49fb9057608ed4f5f7ce4e91d23d01ef334c40df761e6945da0c5b5f9dbb197e4984775ef1dc6749160d6c7873e0af8485a3832aafb71020a",
+    "label": {
+      "confidentiality": [
+        "alice",
+        "bob"
+      ],
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bool"
+      }
+    },
+    "label_receipt": {
+      "evaluated_label": {
+        "confidentiality": [
+          "alice",
+          "bob"
+        ],
+        "integrity": "TRUSTED",
+        "type_tag": {
+          "kind": "Bool"
+        }
+      },
+      "recipient": "bob",
+      "sequence": 1,
+      "tier": "TIER1",
+      "type_tag_bits": 1
+    },
+    "payload": "hello bob",
+    "recipient": "bob",
+    "sender": "alice",
+    "version": "VCAV-MSG-V1"
+  },
+  "expected": {
+    "policy_hash_valid": true,
+    "signature_valid": true
+  },
+  "sender_public_key_hex": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664"
+}

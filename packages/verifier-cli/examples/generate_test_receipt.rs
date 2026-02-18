@@ -39,6 +39,7 @@ fn main() {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
             budget_enforcement: None,
+            compartment_id: None,
         },
         budget_chain: None,
         model_identity: None,
@@ -52,6 +53,10 @@ fn main() {
         schema_entropy_ceiling_bits: None,
         prompt_template_hash: None,
         contract_timing_class: None,
+        ifc_output_label: None,
+        ifc_policy_hash: None,
+        ifc_label_receipt: None,
+        ifc_joined_confidentiality: None,
         receipt_key_id: None,
         attestation: None,
     };

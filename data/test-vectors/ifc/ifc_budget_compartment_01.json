@@ -1,0 +1,43 @@
+{
+  "description": "Budget compartment ID derivation: SHA-256('vcav/budget_key/v2' || pair_id || JCS(confidentiality)). Tests public (null), single-principal, and multi-principal cases across different pair IDs.",
+  "domain_prefix": "vcav/budget_key/v2",
+  "vectors": [
+    {
+      "label": "public_confidentiality",
+      "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "confidentiality": null,
+      "expected_compartment_id": "581b530a462f976c69d6a98b2019088ed436add01c3ab292826e8f6d16f4e12a"
+    },
+    {
+      "label": "single_principal_alice",
+      "pair_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "confidentiality": ["alice"],
+      "expected_compartment_id": "603cbea39e6251c9930cd35035fe5b81fe3721542d62d8407db94027d8adb885"
+    },
+    {
+      "label": "two_principals_alice_bob",
+      "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "confidentiality": ["alice", "bob"],
+      "expected_compartment_id": "c9724c1b844106a274f4768e45510e5ab018403f4a1df106bcea3aa33fe352c0"
+    },
+    {
+      "label": "different_pair_same_confidentiality",
+      "pair_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "confidentiality": ["alice", "bob"],
+      "expected_compartment_id": "794332e17049fcfd7adff9b82320b0658406c7e48faa934fa7a93a53a8547bb0"
+    },
+    {
+      "label": "same_pair_different_confidentiality",
+      "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "confidentiality": ["carol"],
+      "expected_compartment_id": "0d47d42e330d3820cd5ad55acd5080dd805f9c01a25c97c17e0d334005654a76"
+    },
+    {
+      "label": "default_compartment_equals_null",
+      "pair_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "confidentiality": null,
+      "expected_compartment_id": "e97d5ab0a2df8a82f6c2b454db7f0107951e68ca6019593e25cc748f2e7a966c"
+    }
+  ],
+  "schemas": []
+}

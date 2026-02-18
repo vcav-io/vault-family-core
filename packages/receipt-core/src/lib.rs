@@ -19,6 +19,7 @@
 //! - [`manifest`] - Signed publication manifest for operator artefact bundles
 
 pub mod agreement;
+pub mod attestation;
 pub mod canonicalize;
 pub mod handoff;
 pub mod ledger;
@@ -38,8 +39,13 @@ pub use handoff::{
     BudgetTierV2, HashRef, SessionHandoff, UnsignedSessionHandoff, UnsignedSessionHandoffBuilder,
 };
 pub use ledger::{ApplyOutcome, BudgetLedger, LedgerError};
+pub use attestation::{
+    compute_challenge_hash, AttestationChallenge, AttestationClaims, AttestationEnvironment,
+    AttestationError, AttestationEvidence, AttestationVersion,
+    ATTESTATION_CHALLENGE_DOMAIN_PREFIX,
+};
 pub use receipt::{
-    Attestation, BudgetChainRecord, BudgetUsageRecord, ExecutionLane, Receipt, ReceiptBuilder,
+    BudgetChainRecord, BudgetUsageRecord, ExecutionLane, Receipt, ReceiptBuilder,
     ReceiptStatus, SignalClass, UnsignedReceipt, SCHEMA_VERSION,
 };
 pub use manifest::{

@@ -1,0 +1,34 @@
+{
+  "description": "Policy evaluation: type-based declassification. Untrusted + Enum(3) within threshold (256) + authorized recipient → Allow Tier 1. Label = ({bob}, Untrusted, Enum(3)), recipient = bob, purpose = Compatibility.",
+  "input": {
+    "operation": "policy_evaluate",
+    "outbound_label": {
+      "confidentiality": ["bob"],
+      "integrity": "UNTRUSTED",
+      "type_tag": {
+        "kind": "Enum",
+        "value": 3
+      }
+    },
+    "recipient": "bob",
+    "ambient_label": {
+      "confidentiality": null,
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bot"
+      }
+    },
+    "purpose": "COMPATIBILITY",
+    "sequence": 1,
+    "config": {
+      "declassification_threshold": 256
+    }
+  },
+  "expected": {
+    "decision": "ALLOW",
+    "tier": "TIER1",
+    "to_tier": null,
+    "reason": null
+  },
+  "schemas": []
+}

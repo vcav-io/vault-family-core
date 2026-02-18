@@ -1,0 +1,71 @@
+{
+  "description": "Invalid attestation evidence - wrong version, bad measurement, missing fields",
+  "test_cases": [
+    {
+      "name": "wrong_version",
+      "attestation": {
+        "version": "VCAV-ATTEST-V99",
+        "environment": "MOCK",
+        "measurement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence": "bW9jaw==",
+        "claims": {
+          "measurement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "debug_mode": false,
+          "environment": "MOCK",
+          "freshness_nonce": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "challenge_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "timestamp": "2025-06-01T12:00:00Z"
+      },
+      "expected_valid": false
+    },
+    {
+      "name": "measurement_too_short",
+      "attestation": {
+        "version": "VCAV-ATTEST-V1",
+        "environment": "MOCK",
+        "measurement": "abcd1234",
+        "evidence": "bW9jaw==",
+        "claims": {
+          "measurement": "abcd1234",
+          "debug_mode": false,
+          "environment": "MOCK",
+          "freshness_nonce": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "challenge_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "timestamp": "2025-06-01T12:00:00Z"
+      },
+      "expected_valid": false
+    },
+    {
+      "name": "unknown_environment",
+      "attestation": {
+        "version": "VCAV-ATTEST-V1",
+        "environment": "UNKNOWN_TEE",
+        "measurement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence": "bW9jaw==",
+        "claims": {
+          "measurement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "debug_mode": false,
+          "environment": "MOCK",
+          "freshness_nonce": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "challenge_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "timestamp": "2025-06-01T12:00:00Z"
+      },
+      "expected_valid": false
+    },
+    {
+      "name": "missing_claims",
+      "attestation": {
+        "version": "VCAV-ATTEST-V1",
+        "environment": "MOCK",
+        "measurement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence": "bW9jaw==",
+        "challenge_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "timestamp": "2025-06-01T12:00:00Z"
+      },
+      "expected_valid": false
+    }
+  ]
+}

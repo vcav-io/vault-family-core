@@ -1,18 +1,22 @@
 [package]
-name = "verifier-core"
-description = "VCAV verification logic (WASM-compatible, no filesystem)"
+name = "message-envelope"
+description = "Signed message envelopes for IFC-controlled inter-agent communication"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
+ifc-engine = { path = "../ifc-engine" }
 receipt-core = { path = "../receipt-core" }
 serde.workspace = true
 serde_json.workspace = true
 ed25519-dalek.workspace = true
 sha2.workspace = true
 hex.workspace = true
-base64.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
-guardian-core = { path = "../guardian-core" }
+proptest.workspace = true

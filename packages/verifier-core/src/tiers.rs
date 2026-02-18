@@ -6,9 +6,13 @@
 //! Tier 2 (Receipt + artefacts): Tier 1 + profile/policy/contract hash verification
 //! Tier 3 (Manifest): Tier 1/2 + manifest signature verification and artefact coverage
 
+use base64::Engine;
+use ed25519_dalek::Verifier;
 use receipt_core::{
     compute_agreement_hash, canonicalize::canonicalize_serializable,
     parse_public_key_hex, verify_manifest, PublicationManifest, SessionAgreementFields,
+    attestation::{AttestationEnvironment, AttestationEvidence, compute_challenge_hash},
+    hash_message,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -20,6 +24,7 @@ use std::collections::HashSet;
 
 const PROFILE_HASH_DOMAIN_PREFIX: &str = "vcav/model_profile/v1";
 const POLICY_BUNDLE_DOMAIN_PREFIX: &str = "vcav/policy_bundle/v1";
+const BUDGET_KEY_V2_DOMAIN_PREFIX: &str = "vcav/budget_key/v2";
 
 // ============================================================================
 // Profile Digest (mirrors vault-runtime::config::ProfileDigestV1)
@@ -404,6 +409,16 @@ pub struct TierResult {
     pub contract_enforcement: Option<ContractEnforcementResult>,
     /// Error message for the first failing check
     pub error: Option<String>,
+    /// Attestation verification status.
+    /// None / "absent": no attestation present
+    /// "verified": attestation present and verified (Mock with valid signature)
+    /// "present_unverified": attestation present but environment not verifiable (TDX, CC)
+    /// "invalid": attestation present, checks failed
+    pub attestation_status: Option<String>,
+    /// Attestation environment (e.g. "MOCK", "INTEL_TDX", "NVIDIA_CC")
+    pub attestation_environment: Option<String>,
+    /// Whether the challenge hash was recomputed and matched
+    pub attestation_challenge_bound: Option<bool>,
 }
 
 // ============================================================================
@@ -603,6 +618,365 @@ pub fn verify_manifest_from_str(
         runtime_hash_match,
         guardian_hash_match,
     })
+}
+
+// ============================================================================
+// Compartment ID Verification
+// ============================================================================
+
+/// Result of compartment ID verification.
+#[derive(Debug, Clone, Default)]
+pub struct CompartmentResult {
+    /// Whether the compartment_id has valid 64-char hex format
+    pub format_valid: Option<bool>,
+    /// Whether the compartment_id matches the recomputed value from
+    /// pair_id + ifc_joined_confidentiality. None if confidentiality data
+    /// was not available for recomputation.
+    pub derivation_valid: Option<bool>,
+    /// Warnings (e.g., compartment present but no confidentiality to verify against)
+    pub warnings: Vec<String>,
+}
+
+/// Validate that a string is a well-formed 64-char lowercase hex compartment ID.
+fn is_valid_compartment_hex(s: &str) -> bool {
+    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+}
+
+/// Recompute a compartment ID from pair_id and a JCS-canonicalized confidentiality value.
+///
+/// This mirrors `guardian_core::budget::generate_compartment_id` but operates on
+/// a `serde_json::Value` (from the receipt) rather than a `BTreeSet<String>`.
+/// The hash is: `SHA-256("vcav/budget_key/v2" || pair_id || JCS(confidentiality))`.
+///
+/// `confidentiality` should be either `Value::Null` (public) or a JSON array
+/// of sorted principal strings (restricted).
+fn recompute_compartment_id(
+    pair_id: &str,
+    confidentiality: &serde_json::Value,
+) -> Result<String, String> {
+    use receipt_core::canonicalize::canonicalize;
+
+    let jcs_bytes = if confidentiality.is_null() {
+        b"null".to_vec()
+    } else {
+        canonicalize(confidentiality).into_bytes()
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(BUDGET_KEY_V2_DOMAIN_PREFIX.as_bytes());
+    hasher.update(pair_id.as_bytes());
+    hasher.update(&jcs_bytes);
+
+    Ok(hex::encode(hasher.finalize()))
+}
+
+/// Verify a compartment ID from a receipt's budget usage record.
+///
+/// - If `compartment_id` is `None`, returns a default (no-op) result.
+/// - If present, validates 64-char hex format.
+/// - If `ifc_joined_confidentiality` is also present, recomputes the expected
+///   compartment ID and verifies it matches.
+/// - If `compartment_id` is present but `ifc_joined_confidentiality` is absent,
+///   format is validated but derivation cannot be verified (warning issued).
+pub fn verify_compartment_id(
+    pair_id: &str,
+    compartment_id: Option<&str>,
+    ifc_joined_confidentiality: Option<&serde_json::Value>,
+) -> CompartmentResult {
+    let mut result = CompartmentResult::default();
+
+    let cid = match compartment_id {
+        Some(c) => c,
+        None => return result,
+    };
+
+    // Validate format
+    let format_ok = is_valid_compartment_hex(cid);
+    result.format_valid = Some(format_ok);
+
+    if !format_ok {
+        return result;
+    }
+
+    // Recompute and verify derivation if confidentiality data is available
+    match ifc_joined_confidentiality {
+        Some(conf) => {
+            match recompute_compartment_id(pair_id, conf) {
+                Ok(expected) => {
+                    result.derivation_valid = Some(cid == expected);
+                }
+                Err(e) => {
+                    result.derivation_valid = Some(false);
+                    result.warnings.push(format!(
+                        "Failed to recompute compartment_id: {}", e
+                    ));
+                }
+            }
+        }
+        None => {
+            result.warnings.push(
+                "compartment_id present but ifc_joined_confidentiality absent; \
+                 cannot verify derivation"
+                    .to_string(),
+            );
+        }
+    }
+
+    result
+}
+
+// ============================================================================
+// Attestation Verification
+// ============================================================================
+
+/// Domain separation prefix for Mock attestation signing.
+const MOCK_ATTESTATION_DOMAIN_PREFIX: &str = "vcav/mock_attestation/v1";
+
+/// Configuration for attestation verification.
+#[derive(Debug, Clone, Default)]
+pub struct AttestationVerifyConfig {
+    /// Ed25519 public key hex (64 chars) for verifying Mock attestation.
+    /// Required to verify Mock evidence; if absent and Mock evidence is present, status = "invalid".
+    pub mock_root_public_key: Option<String>,
+
+    /// Optional allowlist of accepted measurement hashes.
+    /// If present and attestation measurement is not in list, status = "invalid".
+    pub measurement_allowlist: Option<Vec<String>>,
+}
+
+/// Result of attestation verification.
+#[derive(Debug, Clone, Default)]
+pub struct AttestationVerificationResult {
+    /// Attestation verification status: "absent", "verified", "present_unverified", or "invalid"
+    pub status: Option<String>,
+    /// Attestation environment (e.g. "MOCK", "INTEL_TDX", "NVIDIA_CC")
+    pub environment: Option<String>,
+    /// Whether the challenge hash was recomputed and matched
+    pub challenge_bound: Option<bool>,
+    /// Human-readable error detail when status is "invalid"
+    pub error_detail: Option<String>,
+}
+
+/// Verify attestation evidence embedded in a receipt JSON string.
+///
+/// Parses the receipt, extracts the attestation field, and verifies:
+/// - Challenge hash binding (session_id, pair_id, contract_hash, session_start)
+/// - Mock attestation Ed25519 signature (if Mock environment)
+/// - Measurement allowlist (if configured)
+pub fn verify_attestation(
+    receipt_json: &str,
+    config: &AttestationVerifyConfig,
+) -> AttestationVerificationResult {
+    let receipt: serde_json::Value = match serde_json::from_str(receipt_json) {
+        Ok(v) => v,
+        Err(e) => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                error_detail: Some(format!("receipt JSON parse failed: {e}")),
+                ..Default::default()
+            };
+        }
+    };
+
+    // Check if attestation is absent
+    let attestation_value = receipt.get("attestation");
+    if attestation_value.is_none() || attestation_value == Some(&serde_json::Value::Null) {
+        return AttestationVerificationResult {
+            status: Some("absent".to_string()),
+            ..Default::default()
+        };
+    }
+
+    // Parse attestation evidence
+    let evidence: AttestationEvidence =
+        match serde_json::from_value(attestation_value.unwrap().clone()) {
+            Ok(e) => e,
+            Err(e) => {
+                return AttestationVerificationResult {
+                    status: Some("invalid".to_string()),
+                    error_detail: Some(format!("attestation evidence parse failed: {e}")),
+                    ..Default::default()
+                };
+            }
+        };
+
+    let environment_str = evidence.environment.to_string();
+
+    // Extract session fields for challenge recomputation
+    let session_id = match receipt.get("session_id").and_then(|v| v.as_str()) {
+        Some(s) => s,
+        None => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                error_detail: Some("missing or non-string session_id in receipt".to_string()),
+                ..Default::default()
+            };
+        }
+    };
+
+    let pair_id = match receipt
+        .get("budget_usage")
+        .and_then(|v| v.get("pair_id"))
+        .and_then(|v| v.as_str())
+    {
+        Some(s) => s,
+        None => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                error_detail: Some("missing or non-string budget_usage.pair_id in receipt".to_string()),
+                ..Default::default()
+            };
+        }
+    };
+
+    // Empty string is the canonical encoding of "no contract" for challenge hash
+    // computation. Both signer and verifier must agree on this convention.
+    let contract_hash = receipt
+        .get("contract_hash")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let session_start = match receipt.get("session_start").and_then(|v| v.as_str()) {
+        Some(s) => s,
+        None => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                error_detail: Some("missing or non-string session_start in receipt".to_string()),
+                ..Default::default()
+            };
+        }
+    };
+
+    // Recompute challenge hash and verify it matches
+    let expected_challenge = match compute_challenge_hash(session_id, pair_id, contract_hash, session_start) {
+        Ok(h) => h,
+        Err(e) => {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                error_detail: Some(format!("challenge hash computation failed: {e}")),
+                ..Default::default()
+            };
+        }
+    };
+
+    if expected_challenge != evidence.challenge_hash {
+        return AttestationVerificationResult {
+            status: Some("invalid".to_string()),
+            environment: Some(environment_str),
+            challenge_bound: Some(false),
+            error_detail: Some("challenge hash mismatch: recomputed hash does not match evidence".to_string()),
+        };
+    }
+
+    // Check measurement allowlist before environment-specific verification
+    if let Some(allowlist) = &config.measurement_allowlist {
+        if !allowlist.contains(&evidence.measurement) {
+            return AttestationVerificationResult {
+                status: Some("invalid".to_string()),
+                environment: Some(environment_str),
+                challenge_bound: Some(true),
+                error_detail: Some(format!("measurement {} not in allowlist", evidence.measurement)),
+            };
+        }
+    }
+
+    match evidence.environment {
+        AttestationEnvironment::Mock => {
+            // Verify Ed25519 signature
+            let public_key_hex = match &config.mock_root_public_key {
+                Some(k) => k,
+                None => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                        error_detail: Some("Mock attestation present but no mock_root_public_key configured".to_string()),
+                    };
+                }
+            };
+
+            let public_key = match parse_public_key_hex(public_key_hex) {
+                Ok(k) => k,
+                Err(e) => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                        error_detail: Some(format!("mock_root_public_key parse failed: {e}")),
+                    };
+                }
+            };
+
+            // Reconstruct signing input: SHA-256(prefix_bytes || JCS(claims))
+            let claims_canonical = match canonicalize_serializable(&evidence.claims) {
+                Ok(c) => c,
+                Err(e) => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                        error_detail: Some(format!("internal: JCS canonicalization failed: {e}")),
+                    };
+                }
+            };
+
+            let mut signing_input = MOCK_ATTESTATION_DOMAIN_PREFIX.as_bytes().to_vec();
+            signing_input.extend(claims_canonical.as_bytes());
+            let signing_hash = hash_message(&signing_input);
+
+            // Decode evidence bytes from base64
+            let sig_bytes = match base64::engine::general_purpose::STANDARD.decode(&evidence.evidence) {
+                Ok(b) => b,
+                Err(e) => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                        error_detail: Some(format!("evidence base64 decode failed: {e}")),
+                    };
+                }
+            };
+
+            let signature = match ed25519_dalek::Signature::from_slice(&sig_bytes) {
+                Ok(s) => s,
+                Err(e) => {
+                    return AttestationVerificationResult {
+                        status: Some("invalid".to_string()),
+                        environment: Some(environment_str),
+                        challenge_bound: Some(true),
+                        error_detail: Some(format!("signature parse failed: {e}")),
+                    };
+                }
+            };
+
+            match public_key.verify(&signing_hash, &signature) {
+                Ok(_) => AttestationVerificationResult {
+                    status: Some("verified".to_string()),
+                    environment: Some(environment_str),
+                    challenge_bound: Some(true),
+                    error_detail: None,
+                },
+                Err(e) => AttestationVerificationResult {
+                    status: Some("invalid".to_string()),
+                    environment: Some(environment_str),
+                    challenge_bound: Some(true),
+                    error_detail: Some(format!("Ed25519 signature verification failed: {e}")),
+                },
+            }
+        }
+        AttestationEnvironment::IntelTdx | AttestationEnvironment::NvidiaCC => {
+            AttestationVerificationResult {
+                status: Some("present_unverified".to_string()),
+                environment: Some(environment_str),
+                challenge_bound: Some(true),
+                error_detail: None,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1162,6 +1536,10 @@ mod tests {
             schema_entropy_ceiling_bits: receipt.schema_entropy_ceiling_bits,
             prompt_template_hash: receipt.prompt_template_hash,
             contract_timing_class: receipt.contract_timing_class,
+            ifc_output_label: receipt.ifc_output_label,
+            ifc_policy_hash: receipt.ifc_policy_hash,
+            ifc_label_receipt: receipt.ifc_label_receipt,
+            ifc_joined_confidentiality: receipt.ifc_joined_confidentiality,
             attestation: receipt.attestation,
         };
         (unsigned, sig)
@@ -1920,5 +2298,409 @@ mod tests {
         assert_eq!(result.prompt_template_hash_matches, Some(false));
         // All mismatches recorded as warnings
         assert!(result.warnings.len() >= 4);
+    }
+
+    // ========================================================================
+    // Compartment ID verification tests
+    // ========================================================================
+
+    #[test]
+    fn compartment_none_returns_default_result() {
+        let result = verify_compartment_id("a".repeat(64).as_str(), None, None);
+        assert!(result.format_valid.is_none());
+        assert!(result.derivation_valid.is_none());
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn compartment_valid_format_64_hex() {
+        let cid = "a".repeat(64);
+        let result = verify_compartment_id("b".repeat(64).as_str(), Some(&cid), None);
+        assert_eq!(result.format_valid, Some(true));
+        // Can't verify derivation without confidentiality
+        assert!(result.derivation_valid.is_none());
+        assert!(!result.warnings.is_empty());
+    }
+
+    #[test]
+    fn compartment_rejects_short_hex() {
+        let result = verify_compartment_id(
+            "a".repeat(64).as_str(),
+            Some("abcdef1234"),
+            None,
+        );
+        assert_eq!(result.format_valid, Some(false));
+    }
+
+    #[test]
+    fn compartment_rejects_uppercase_hex() {
+        let mut cid = "a".repeat(63);
+        cid.push('A');
+        let result = verify_compartment_id("b".repeat(64).as_str(), Some(&cid), None);
+        assert_eq!(result.format_valid, Some(false));
+    }
+
+    #[test]
+    fn compartment_rejects_non_hex() {
+        let mut cid = "a".repeat(63);
+        cid.push('g');
+        let result = verify_compartment_id("b".repeat(64).as_str(), Some(&cid), None);
+        assert_eq!(result.format_valid, Some(false));
+    }
+
+    #[test]
+    fn compartment_recompute_matches_guardian_core_public() {
+        use guardian_core::budget::generate_compartment_id;
+
+        let pair_id = "a".repeat(64);
+        let expected = generate_compartment_id(&pair_id, None).unwrap();
+
+        let result = verify_compartment_id(
+            &pair_id,
+            Some(&expected),
+            Some(&serde_json::Value::Null),
+        );
+        assert_eq!(result.format_valid, Some(true));
+        assert_eq!(result.derivation_valid, Some(true));
+    }
+
+    #[test]
+    fn compartment_recompute_matches_guardian_core_restricted() {
+        use guardian_core::budget::generate_compartment_id;
+        use std::collections::BTreeSet;
+
+        let pair_id = "b".repeat(64);
+        let mut principals = BTreeSet::new();
+        principals.insert("alice".to_string());
+        principals.insert("bob".to_string());
+
+        let expected = generate_compartment_id(&pair_id, Some(&principals)).unwrap();
+
+        let conf_value = serde_json::json!(["alice", "bob"]);
+        let result = verify_compartment_id(
+            &pair_id,
+            Some(&expected),
+            Some(&conf_value),
+        );
+        assert_eq!(result.format_valid, Some(true));
+        assert_eq!(result.derivation_valid, Some(true));
+    }
+
+    #[test]
+    fn compartment_mismatch_derivation_fails() {
+        use guardian_core::budget::generate_compartment_id;
+
+        let pair_id = "c".repeat(64);
+        // Generate compartment for public
+        let cid = generate_compartment_id(&pair_id, None).unwrap();
+
+        // But claim restricted confidentiality — should mismatch
+        let conf_value = serde_json::json!(["alice"]);
+        let result = verify_compartment_id(&pair_id, Some(&cid), Some(&conf_value));
+        assert_eq!(result.format_valid, Some(true));
+        assert_eq!(result.derivation_valid, Some(false));
+    }
+
+    #[test]
+    fn compartment_present_without_confidentiality_warns() {
+        let cid = "d".repeat(64);
+        let result = verify_compartment_id("e".repeat(64).as_str(), Some(&cid), None);
+        assert_eq!(result.format_valid, Some(true));
+        assert!(result.derivation_valid.is_none());
+        assert!(result.warnings.iter().any(|w| w.contains("cannot verify derivation")));
+    }
+
+    #[test]
+    fn compartment_recompute_single_principal() {
+        use guardian_core::budget::generate_compartment_id;
+        use std::collections::BTreeSet;
+
+        let pair_id = "f".repeat(64);
+        let mut principals = BTreeSet::new();
+        principals.insert("eve".to_string());
+
+        let expected = generate_compartment_id(&pair_id, Some(&principals)).unwrap();
+
+        let conf_value = serde_json::json!(["eve"]);
+        let result = verify_compartment_id(
+            &pair_id,
+            Some(&expected),
+            Some(&conf_value),
+        );
+        assert_eq!(result.format_valid, Some(true));
+        assert_eq!(result.derivation_valid, Some(true));
+    }
+
+    #[test]
+    fn test_vector_compartment_derivation() {
+        let v = load_vector("ifc_budget_compartment_01.json");
+        let vectors = v["vectors"].as_array().unwrap();
+
+        for vec in vectors {
+            let label = vec["label"].as_str().unwrap();
+            let pair_id = vec["pair_id"].as_str().unwrap();
+            let expected_cid = vec["expected_compartment_id"].as_str().unwrap();
+
+            let conf = &vec["confidentiality"];
+            let result = verify_compartment_id(pair_id, Some(expected_cid), Some(conf));
+
+            assert_eq!(
+                result.format_valid,
+                Some(true),
+                "format_valid failed for vector: {}",
+                label
+            );
+            assert_eq!(
+                result.derivation_valid,
+                Some(true),
+                "derivation_valid failed for vector: {}",
+                label
+            );
+        }
+    }
+
+    #[test]
+    fn test_vector_compartment_adversarial_format() {
+        let v = load_vector("ifc_budget_compartment_02.json");
+        let vectors = v["vectors"].as_array().unwrap();
+
+        for vec in vectors {
+            let label = vec["label"].as_str().unwrap();
+
+            // Skip guardian-core validation tests (no compartment_id field)
+            if vec.get("compartment_id").is_none() {
+                continue;
+            }
+
+            let cid = vec["compartment_id"].as_str().unwrap();
+            let expected_format = vec["expected_format_valid"].as_bool().unwrap();
+
+            let default_pair = "a".repeat(64);
+            let pair_id = vec
+                .get("pair_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&default_pair);
+            let conf = vec.get("confidentiality");
+
+            let result = verify_compartment_id(pair_id, Some(cid), conf);
+
+            assert_eq!(
+                result.format_valid,
+                Some(expected_format),
+                "format_valid failed for vector: {}",
+                label
+            );
+
+            if let Some(expected_derivation) = vec.get("expected_derivation_valid") {
+                assert_eq!(
+                    result.derivation_valid,
+                    Some(expected_derivation.as_bool().unwrap()),
+                    "derivation_valid failed for vector: {}",
+                    label
+                );
+            }
+        }
+    }
+
+    // ========================================================================
+    // Attestation verification tests
+    // ========================================================================
+
+    use ed25519_dalek::Signer;
+    use receipt_core::attestation::{
+        AttestationClaims, AttestationEvidence, AttestationVersion,
+    };
+
+    /// Build a mock receipt JSON with a valid Mock attestation, returning (receipt_json, public_key_hex).
+    fn build_test_mock_evidence(
+        session_id: &str,
+        pair_id: &str,
+        contract_hash: &str,
+        timestamp: &str,
+    ) -> (String, String) {
+        // Deterministic signing key for tests
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&[0x07u8; 32]);
+        let verifying_key = signing_key.verifying_key();
+        let pub_hex = receipt_core::signer::public_key_to_hex(&verifying_key);
+
+        // Compute challenge hash
+        let challenge_hash = receipt_core::attestation::compute_challenge_hash(
+            session_id,
+            pair_id,
+            contract_hash,
+            timestamp,
+        )
+        .unwrap();
+
+        let measurement = "c".repeat(64);
+
+        // Build claims
+        let claims = AttestationClaims {
+            measurement: measurement.clone(),
+            signer_id: None,
+            debug_mode: false,
+            environment: receipt_core::attestation::AttestationEnvironment::Mock,
+            freshness_nonce: challenge_hash.clone(),
+        };
+
+        // Sign: SHA-256(prefix_bytes || JCS(claims))
+        let claims_canonical = canonicalize_serializable(&claims).unwrap();
+        let mut signing_input = MOCK_ATTESTATION_DOMAIN_PREFIX.as_bytes().to_vec();
+        signing_input.extend(claims_canonical.as_bytes());
+        let signing_hash = receipt_core::hash_message(&signing_input);
+
+        let signature = signing_key.sign(&signing_hash);
+        let sig_bytes = signature.to_bytes();
+        let evidence_b64 =
+            base64::engine::general_purpose::STANDARD.encode(sig_bytes.as_ref());
+
+        let evidence = AttestationEvidence {
+            version: AttestationVersion::V1,
+            environment: receipt_core::attestation::AttestationEnvironment::Mock,
+            measurement: measurement.clone(),
+            evidence: evidence_b64,
+            claims,
+            challenge_hash,
+            timestamp: timestamp.to_string(),
+        };
+
+        let receipt = serde_json::json!({
+            "session_id": session_id,
+            "budget_usage": { "pair_id": pair_id },
+            "contract_hash": contract_hash,
+            "session_start": timestamp,
+            "attestation": serde_json::to_value(&evidence).unwrap(),
+        });
+
+        (serde_json::to_string(&receipt).unwrap(), pub_hex)
+    }
+
+    #[test]
+    fn test_attestation_valid_mock_verified() {
+        let (receipt_json, pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: Some(pub_hex),
+            measurement_allowlist: None,
+        };
+        let result = verify_attestation(&receipt_json, &config);
+        assert_eq!(result.status.as_deref(), Some("verified"));
+        assert_eq!(result.environment.as_deref(), Some("MOCK"));
+        assert_eq!(result.challenge_bound, Some(true));
+    }
+
+    #[test]
+    fn test_attestation_challenge_hash_mismatch_invalid() {
+        let (receipt_json, pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        // Tamper: change session_id in the receipt so challenge hash recomputation fails
+        let mut receipt: serde_json::Value = serde_json::from_str(&receipt_json).unwrap();
+        receipt["session_id"] = serde_json::json!("tampered-session");
+        let tampered_json = serde_json::to_string(&receipt).unwrap();
+
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: Some(pub_hex),
+            measurement_allowlist: None,
+        };
+        let result = verify_attestation(&tampered_json, &config);
+        assert_eq!(result.status.as_deref(), Some("invalid"));
+        assert_eq!(result.challenge_bound, Some(false));
+    }
+
+    #[test]
+    fn test_attestation_mock_without_root_key_invalid() {
+        let (receipt_json, _pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: None,
+            measurement_allowlist: None,
+        };
+        let result = verify_attestation(&receipt_json, &config);
+        assert_eq!(result.status.as_deref(), Some("invalid"));
+    }
+
+    #[test]
+    fn test_attestation_intel_tdx_present_unverified() {
+        let session_id = "sess-tdx";
+        let pair_id = "pair-tdx";
+        let timestamp = "2025-06-01T12:00:00Z";
+        let contract_hash = "";
+
+        let challenge_hash = receipt_core::attestation::compute_challenge_hash(
+            session_id, pair_id, contract_hash, timestamp,
+        )
+        .unwrap();
+
+        let measurement = "d".repeat(64);
+        let claims = AttestationClaims {
+            measurement: measurement.clone(),
+            signer_id: None,
+            debug_mode: false,
+            environment: receipt_core::attestation::AttestationEnvironment::IntelTdx,
+            freshness_nonce: challenge_hash.clone(),
+        };
+
+        let evidence = AttestationEvidence {
+            version: AttestationVersion::V1,
+            environment: receipt_core::attestation::AttestationEnvironment::IntelTdx,
+            measurement,
+            evidence: base64::engine::general_purpose::STANDARD.encode(b"tdx-quote"),
+            claims,
+            challenge_hash,
+            timestamp: timestamp.to_string(),
+        };
+
+        let receipt = serde_json::json!({
+            "session_id": session_id,
+            "budget_usage": { "pair_id": pair_id },
+            "session_start": timestamp,
+            "attestation": serde_json::to_value(&evidence).unwrap(),
+        });
+
+        let config = AttestationVerifyConfig::default();
+        let result = verify_attestation(&serde_json::to_string(&receipt).unwrap(), &config);
+        assert_eq!(result.status.as_deref(), Some("present_unverified"));
+        assert_eq!(result.environment.as_deref(), Some("INTEL_TDX"));
+        assert_eq!(result.challenge_bound, Some(true));
+    }
+
+    #[test]
+    fn test_attestation_absent_returns_absent() {
+        let receipt = serde_json::json!({
+            "session_id": "sess-1",
+            "budget_usage": { "pair_id": "pair-1" },
+            "session_start": "2025-06-01T12:00:00Z",
+        });
+        let config = AttestationVerifyConfig::default();
+        let result = verify_attestation(&serde_json::to_string(&receipt).unwrap(), &config);
+        assert_eq!(result.status.as_deref(), Some("absent"));
+        assert!(result.environment.is_none());
+        assert!(result.challenge_bound.is_none());
+    }
+
+    #[test]
+    fn test_attestation_measurement_allowlist_enforced() {
+        let (receipt_json, pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        // Allowlist does not include the measurement "ccc...c" (64 chars)
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: Some(pub_hex),
+            measurement_allowlist: Some(vec!["a".repeat(64)]),
+        };
+        let result = verify_attestation(&receipt_json, &config);
+        assert_eq!(result.status.as_deref(), Some("invalid"));
+    }
+
+    #[test]
+    fn test_attestation_measurement_allowlist_passes() {
+        let measurement = "c".repeat(64);
+        let (receipt_json, pub_hex) =
+            build_test_mock_evidence("sess-1", "pair-1", "abc", "2025-06-01T12:00:00Z");
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: Some(pub_hex),
+            measurement_allowlist: Some(vec![measurement]),
+        };
+        let result = verify_attestation(&receipt_json, &config);
+        assert_eq!(result.status.as_deref(), Some("verified"));
     }
 }

@@ -8,6 +8,7 @@ use guardian_core::{BudgetTier, Purpose};
 use serde::{Deserialize, Serialize};
 
 use crate::agreement::ModelIdentity;
+use crate::attestation::AttestationEvidence;
 
 // ============================================================================
 // Constants
@@ -133,6 +134,11 @@ pub struct BudgetUsageRecord {
     /// Absent for legacy receipts (treated as enforced).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub budget_enforcement: Option<String>,
+
+    /// Budget compartment identifier (64-char hex SHA-256, Seq 38+).
+    /// Absent for legacy receipts (treated as default compartment).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compartment_id: Option<String>,
 }
 
 /// Receipt-chain linkage for budget integrity verification.
@@ -146,23 +152,6 @@ pub struct BudgetChainRecord {
 
     /// Canonical hash of this unsigned receipt.
     pub receipt_hash: String,
-}
-
-// ============================================================================
-// Attestation
-// ============================================================================
-
-/// Enclave attestation data (optional, null in dev mode)
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Attestation {
-    /// Enclave measurement hash (64-96 hex chars)
-    pub enclave_measurement: String,
-
-    /// Base64-encoded attestation document
-    pub attestation_document: String,
-
-    /// When attestation was generated
-    pub attestation_timestamp: DateTime<Utc>,
 }
 
 // ============================================================================
@@ -289,9 +278,26 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_timing_class: Option<String>,
 
+    /// IFC output label (serialized `Label`) for declassified vault output (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_output_label: Option<serde_json::Value>,
+
+    /// SHA-256 hash of the IFC policy configuration (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_policy_hash: Option<String>,
+
+    /// IFC label receipt recording the declassification decision (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_label_receipt: Option<serde_json::Value>,
+
+    /// IFC joined confidentiality set for budget compartment verification (optional, Seq 38+).
+    /// Canonical JSON form; verifier can recompute compartment_id from this.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_joined_confidentiality: Option<serde_json::Value>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attestation: Option<Attestation>,
+    pub attestation: Option<AttestationEvidence>,
 
     /// 64-byte hex-encoded Ed25519 signature over canonical receipt
     pub signature: String,
@@ -438,9 +444,26 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_timing_class: Option<String>,
 
+    /// IFC output label (serialized `Label`) for declassified vault output (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_output_label: Option<serde_json::Value>,
+
+    /// SHA-256 hash of the IFC policy configuration (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_policy_hash: Option<String>,
+
+    /// IFC label receipt recording the declassification decision (optional, Seq 37+).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_label_receipt: Option<serde_json::Value>,
+
+    /// IFC joined confidentiality set for budget compartment verification (optional, Seq 38+).
+    /// Canonical JSON form; verifier can recompute compartment_id from this.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ifc_joined_confidentiality: Option<serde_json::Value>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attestation: Option<Attestation>,
+    pub attestation: Option<AttestationEvidence>,
 }
 
 impl UnsignedReceipt {
@@ -479,6 +502,10 @@ impl UnsignedReceipt {
             schema_entropy_ceiling_bits: self.schema_entropy_ceiling_bits,
             prompt_template_hash: self.prompt_template_hash,
             contract_timing_class: self.contract_timing_class,
+            ifc_output_label: self.ifc_output_label,
+            ifc_policy_hash: self.ifc_policy_hash,
+            ifc_label_receipt: self.ifc_label_receipt,
+            ifc_joined_confidentiality: self.ifc_joined_confidentiality,
             attestation: self.attestation,
             signature,
         }
@@ -523,7 +550,11 @@ pub struct ReceiptBuilder {
     schema_entropy_ceiling_bits: Option<u32>,
     prompt_template_hash: Option<String>,
     contract_timing_class: Option<String>,
-    attestation: Option<Attestation>,
+    ifc_output_label: Option<serde_json::Value>,
+    ifc_policy_hash: Option<String>,
+    ifc_label_receipt: Option<serde_json::Value>,
+    ifc_joined_confidentiality: Option<serde_json::Value>,
+    attestation: Option<AttestationEvidence>,
 }
 
 impl ReceiptBuilder {
@@ -743,8 +774,32 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the IFC output label (optional)
+    pub fn ifc_output_label(mut self, v: Option<serde_json::Value>) -> Self {
+        self.ifc_output_label = v;
+        self
+    }
+
+    /// Set the IFC policy hash (optional)
+    pub fn ifc_policy_hash(mut self, v: Option<String>) -> Self {
+        self.ifc_policy_hash = v;
+        self
+    }
+
+    /// Set the IFC label receipt (optional)
+    pub fn ifc_label_receipt(mut self, v: Option<serde_json::Value>) -> Self {
+        self.ifc_label_receipt = v;
+        self
+    }
+
+    /// Set the IFC joined confidentiality set (optional, Seq 38+)
+    pub fn ifc_joined_confidentiality(mut self, v: Option<serde_json::Value>) -> Self {
+        self.ifc_joined_confidentiality = v;
+        self
+    }
+
     /// Set the attestation (optional)
-    pub fn attestation(mut self, attestation: Option<Attestation>) -> Self {
+    pub fn attestation(mut self, attestation: Option<AttestationEvidence>) -> Self {
         self.attestation = attestation;
         self
     }
@@ -786,6 +841,10 @@ impl ReceiptBuilder {
             schema_entropy_ceiling_bits: self.schema_entropy_ceiling_bits,
             prompt_template_hash: self.prompt_template_hash,
             contract_timing_class: self.contract_timing_class,
+            ifc_output_label: self.ifc_output_label,
+            ifc_policy_hash: self.ifc_policy_hash,
+            ifc_label_receipt: self.ifc_label_receipt,
+            ifc_joined_confidentiality: self.ifc_joined_confidentiality,
             attestation: self.attestation,
         })
     }
@@ -806,6 +865,7 @@ mod tests {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
             budget_enforcement: None,
+            compartment_id: None,
         }
     }
 
@@ -855,6 +915,10 @@ mod tests {
             schema_entropy_ceiling_bits: None,
             prompt_template_hash: None,
             contract_timing_class: None,
+            ifc_output_label: None,
+            ifc_policy_hash: None,
+            ifc_label_receipt: None,
+            ifc_joined_confidentiality: None,
             attestation: None,
         }
     }
@@ -1052,16 +1116,35 @@ mod tests {
     // ==================== Attestation Tests ====================
 
     #[test]
-    fn test_attestation_serde() {
-        let attestation = Attestation {
-            enclave_measurement: "f".repeat(64),
-            attestation_document: "base64encodeddoc".to_string(),
-            attestation_timestamp: Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap(),
+    fn test_attestation_evidence_serde_in_receipt() {
+        // AttestationEvidence round-trip is covered in attestation.rs;
+        // this test verifies it works embedded in a receipt.
+        use crate::attestation::{
+            AttestationClaims, AttestationEnvironment, AttestationEvidence, AttestationVersion,
+        };
+        use base64::Engine;
+
+        let evidence_b64 =
+            base64::engine::general_purpose::STANDARD.encode(b"mock-evidence-data");
+        let evidence = AttestationEvidence {
+            version: AttestationVersion::V1,
+            environment: AttestationEnvironment::Mock,
+            measurement: "f".repeat(64),
+            evidence: evidence_b64,
+            claims: AttestationClaims {
+                measurement: "f".repeat(64),
+                signer_id: None,
+                debug_mode: false,
+                environment: AttestationEnvironment::Mock,
+                freshness_nonce: "a".repeat(64),
+            },
+            challenge_hash: "a".repeat(64),
+            timestamp: "2025-01-15T10:00:00Z".to_string(),
         };
 
-        let json = serde_json::to_string(&attestation).unwrap();
-        let parsed: Attestation = serde_json::from_str(&json).unwrap();
-        assert_eq!(attestation, parsed);
+        let json = serde_json::to_string(&evidence).unwrap();
+        let parsed: AttestationEvidence = serde_json::from_str(&json).unwrap();
+        assert_eq!(evidence, parsed);
     }
 
     #[test]
@@ -1096,11 +1179,28 @@ mod tests {
 
     #[test]
     fn test_receipt_with_attestation() {
+        use crate::attestation::{
+            AttestationClaims, AttestationEnvironment, AttestationEvidence, AttestationVersion,
+        };
+        use base64::Engine;
+
+        let evidence_b64 =
+            base64::engine::general_purpose::STANDARD.encode(b"mock-evidence");
         let mut unsigned = sample_unsigned_receipt();
-        unsigned.attestation = Some(Attestation {
-            enclave_measurement: "f".repeat(64),
-            attestation_document: "base64doc".to_string(),
-            attestation_timestamp: Utc.with_ymd_and_hms(2025, 1, 15, 10, 0, 0).unwrap(),
+        unsigned.attestation = Some(AttestationEvidence {
+            version: AttestationVersion::V1,
+            environment: AttestationEnvironment::Mock,
+            measurement: "f".repeat(64),
+            evidence: evidence_b64,
+            claims: AttestationClaims {
+                measurement: "f".repeat(64),
+                signer_id: None,
+                debug_mode: false,
+                environment: AttestationEnvironment::Mock,
+                freshness_nonce: "a".repeat(64),
+            },
+            challenge_hash: "a".repeat(64),
+            timestamp: "2025-01-15T10:00:00Z".to_string(),
         });
 
         let signed = unsigned.sign("e".repeat(128));
@@ -1650,6 +1750,10 @@ mod tests {
             schema_entropy_ceiling_bits: None,
             prompt_template_hash: None,
             contract_timing_class: None,
+            ifc_output_label: None,
+            ifc_policy_hash: None,
+            ifc_label_receipt: None,
+            ifc_joined_confidentiality: None,
             receipt_key_id: None,
             attestation: None,
         };

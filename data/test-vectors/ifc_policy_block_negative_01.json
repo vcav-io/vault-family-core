@@ -1,0 +1,35 @@
+{
+  "description": "Policy evaluation negative test: empty confidentiality set (nobody can read) → Block with NoReaders reason. Label = ([], Trusted, Bool), recipient = alice, purpose = Compatibility.",
+  "input": {
+    "operation": "policy_evaluate",
+    "outbound_label": {
+      "confidentiality": [],
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bool"
+      }
+    },
+    "recipient": "alice",
+    "ambient_label": {
+      "confidentiality": null,
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bot"
+      }
+    },
+    "purpose": "COMPATIBILITY",
+    "sequence": 1,
+    "config": {
+      "declassification_threshold": 256
+    }
+  },
+  "expected": {
+    "decision": "BLOCK",
+    "tier": null,
+    "to_tier": null,
+    "reason": {
+      "kind": "NoReaders"
+    }
+  },
+  "schemas": []
+}

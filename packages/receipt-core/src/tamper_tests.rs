@@ -58,6 +58,7 @@ mod tests {
             budget_limit: 128,
             budget_tier: BudgetTier::Default,
             budget_enforcement: None,
+            compartment_id: None,
         }
     }
 
@@ -99,6 +100,10 @@ mod tests {
             schema_entropy_ceiling_bits: None,
             prompt_template_hash: None,
             contract_timing_class: None,
+            ifc_output_label: None,
+            ifc_policy_hash: None,
+            ifc_label_receipt: None,
+            ifc_joined_confidentiality: None,
             attestation: None,
         }
     }
@@ -960,13 +965,14 @@ mod tests {
     mod domain_separation {
         use super::*;
 
-        /// All 9 domain prefixes in the VCAV system
-        const ALL_PREFIXES: [&str; 9] = [
+        /// All 10 domain prefixes in the VCAV system
+        const ALL_PREFIXES: [&str; 10] = [
             "VCAV-RECEIPT-V1:",       // DOMAIN_PREFIX
             "VCAV-HANDOFF-V1:",       // SESSION_HANDOFF_DOMAIN_PREFIX
             "VCAV-AGREEMENT-V1:",     // AGREEMENT_DOMAIN_PREFIX
             "VCAV-PREAGREEMENT-V1:",  // PRE_AGREEMENT_DOMAIN_PREFIX
             "VCAV-MANIFEST-V1:",      // MANIFEST_DOMAIN_PREFIX
+            "VCAV-MSG-V1:",           // ENVELOPE_DOMAIN_PREFIX (message-envelope)
             "vcav/receipt_hash/v1",   // RECEIPT_HASH_DOMAIN_PREFIX
             "vcav/budget_chain/v1",   // BUDGET_CHAIN_DOMAIN_PREFIX
             "vcav/model_profile/v1",  // PROFILE_HASH_DOMAIN_PREFIX

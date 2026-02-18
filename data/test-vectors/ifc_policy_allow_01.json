@@ -1,0 +1,33 @@
+{
+  "description": "Policy evaluation: authorized recipient in confidentiality set + Trusted integrity → Allow Tier 1. Label = ({bob}, Trusted, Bool), recipient = bob, purpose = Compatibility.",
+  "input": {
+    "operation": "policy_evaluate",
+    "outbound_label": {
+      "confidentiality": ["bob"],
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bool"
+      }
+    },
+    "recipient": "bob",
+    "ambient_label": {
+      "confidentiality": null,
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bot"
+      }
+    },
+    "purpose": "COMPATIBILITY",
+    "sequence": 1,
+    "config": {
+      "declassification_threshold": 256
+    }
+  },
+  "expected": {
+    "decision": "ALLOW",
+    "tier": "TIER1",
+    "to_tier": null,
+    "reason": null
+  },
+  "schemas": []
+}

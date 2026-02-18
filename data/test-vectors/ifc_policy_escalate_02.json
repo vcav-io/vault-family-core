@@ -1,0 +1,35 @@
+{
+  "description": "Policy evaluation: unauthorized recipient (not in C set) + String type tag → Escalate to Tier 3 (SealedVault). Label = ({alice}, Trusted, String), recipient = bob, purpose = Compatibility.",
+  "input": {
+    "operation": "policy_evaluate",
+    "outbound_label": {
+      "confidentiality": ["alice"],
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "String"
+      }
+    },
+    "recipient": "bob",
+    "ambient_label": {
+      "confidentiality": null,
+      "integrity": "TRUSTED",
+      "type_tag": {
+        "kind": "Bot"
+      }
+    },
+    "purpose": "COMPATIBILITY",
+    "sequence": 1,
+    "config": {
+      "declassification_threshold": 256
+    }
+  },
+  "expected": {
+    "decision": "ESCALATE",
+    "tier": null,
+    "to_tier": "TIER3",
+    "reason": {
+      "kind": "SealedVault"
+    }
+  },
+  "schemas": []
+}

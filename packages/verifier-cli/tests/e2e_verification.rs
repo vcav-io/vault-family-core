@@ -69,6 +69,7 @@ fn build_test_receipt(
             budget_limit: 128,
             budget_tier: guardian_core::BudgetTier::Default,
             budget_enforcement: None,
+            compartment_id: None,
         })
         .model_profile_hash(profile_hash)
         .policy_bundle_hash(policy_hash)
@@ -225,6 +226,10 @@ fn write_receipt_file(
         schema_entropy_ceiling_bits: unsigned.schema_entropy_ceiling_bits,
         prompt_template_hash: unsigned.prompt_template_hash.clone(),
         contract_timing_class: unsigned.contract_timing_class.clone(),
+        ifc_output_label: unsigned.ifc_output_label.clone(),
+        ifc_policy_hash: unsigned.ifc_policy_hash.clone(),
+        ifc_label_receipt: unsigned.ifc_label_receipt.clone(),
+        ifc_joined_confidentiality: unsigned.ifc_joined_confidentiality.clone(),
         signature: signature.to_string(),
     };
     let path = dir.join("receipt.json");
