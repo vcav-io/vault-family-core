@@ -45,8 +45,8 @@ pub use attestation::{
     ATTESTATION_CHALLENGE_DOMAIN_PREFIX,
 };
 pub use receipt::{
-    BudgetChainRecord, BudgetUsageRecord, ExecutionLane, Receipt, ReceiptBuilder,
-    ReceiptStatus, SignalClass, UnsignedReceipt, SCHEMA_VERSION,
+    BudgetChainRecord, BudgetUsageRecord, ExecutionLane, PolicyDeclaration, PolicyMode,
+    Receipt, ReceiptBuilder, ReceiptStatus, SignalClass, UnsignedReceipt, SCHEMA_VERSION,
 };
 pub use manifest::{
     compute_operator_key_id, create_manifest_signing_message, sign_manifest, verify_manifest,

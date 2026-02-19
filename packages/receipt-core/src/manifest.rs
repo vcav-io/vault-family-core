@@ -442,6 +442,11 @@ mod tests {
             ifc_policy_hash: None,
             ifc_label_receipt: None,
             ifc_joined_confidentiality: None,
+            entropy_status_commitment: None,
+            ledger_head_hash: None,
+            delta_commitment_counterparty: None,
+            delta_commitment_contract: None,
+            policy_declaration: None,
             receipt_key_id: None,
             attestation: None,
         };

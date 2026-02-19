@@ -154,6 +154,11 @@ pub(crate) fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         ifc_policy_hash: receipt.ifc_policy_hash.clone(),
         ifc_label_receipt: receipt.ifc_label_receipt.clone(),
         ifc_joined_confidentiality: receipt.ifc_joined_confidentiality.clone(),
+        entropy_status_commitment: receipt.entropy_status_commitment.clone(),
+        ledger_head_hash: receipt.ledger_head_hash.clone(),
+        delta_commitment_counterparty: receipt.delta_commitment_counterparty.clone(),
+        delta_commitment_contract: receipt.delta_commitment_contract.clone(),
+        policy_declaration: receipt.policy_declaration.clone(),
         receipt_key_id: receipt.receipt_key_id.clone(),
         attestation: receipt.attestation.clone(),
     }
@@ -883,6 +888,11 @@ mod tests {
             ifc_joined_confidentiality: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
+            entropy_status_commitment: None,
+            ledger_head_hash: None,
+            delta_commitment_counterparty: None,
+            delta_commitment_contract: None,
+            policy_declaration: None,
         })
     }
 
@@ -1578,6 +1588,11 @@ mod tests {
             ifc_joined_confidentiality: None,
             receipt_key_id: Some("kid-test-active".to_string()),
             attestation: None,
+            entropy_status_commitment: None,
+            ledger_head_hash: None,
+            delta_commitment_counterparty: None,
+            delta_commitment_contract: None,
+            policy_declaration: None,
         })
     }
 

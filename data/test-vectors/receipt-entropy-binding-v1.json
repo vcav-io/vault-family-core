@@ -1,0 +1,79 @@
+{
+  "_comment": "Cross-language test vector for receipt entropy binding. Verifies that entropy commitment fields (entropy_status_commitment, ledger_head_hash, delta_commitment_counterparty, delta_commitment_contract) and policy_declaration are correctly included in the receipt. Values derived from entropy-status-v1.json golden data. Both Rust and TypeScript verifiers must accept this receipt structure.",
+  "description": "Receipt with entropy status commitments and policy declaration (COMPLETED, ADVISORY enforcement mode). Entropy values correspond to the session-bbb entry from entropy-status-v1.json (pair-alice-bob, 7d window, 12000 millibits counterparty total).",
+  "input": {
+    "unsigned_receipt": {
+      "budget_chain": {
+        "chain_id": "chain-1111111111111111111111111111111111111111111111111111111111111111",
+        "prev_receipt_hash": null,
+        "receipt_hash": "441db37f7fd470d496f528cf50c84a5676ce502632f03004186a18ab8334b636"
+      },
+      "budget_usage": {
+        "bits_used_after": 8,
+        "bits_used_before": 0,
+        "budget_limit": 128,
+        "budget_tier": "DEFAULT",
+        "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "window_start": "2026-01-14T12:00:00Z"
+      },
+      "execution_lane": "GLASS_LOCAL",
+      "fixed_window_duration_seconds": 120,
+      "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "llama_cpp_version": "0.1.0",
+      "mitigations_applied": [],
+      "model_weights_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "output": {
+        "confidence_bucket": "HIGH",
+        "decision": "PROCEED",
+        "reason_code": "MUTUAL_INTEREST_UNCLEAR"
+      },
+      "output_entropy_bits": 8,
+      "output_schema_version": "1.0.0",
+      "participant_ids": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "purpose_code": "COMPATIBILITY",
+      "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "schema_version": "1.0.0",
+      "session_end": "2026-01-15T12:02:00Z",
+      "session_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "session_start": "2026-01-15T12:00:00Z",
+      "status": "COMPLETED",
+      "entropy_status_commitment": "bbcbcda532280f70e90b483ef2c5b65c36986dbe8de0ce48ff75c3bc5f6443aa",
+      "ledger_head_hash": "832eb48197b5074555399b62f4e5348c8b191084b032c7bdf044d2a1af2fd3a9",
+      "delta_commitment_counterparty": "bfa3d1bb7738cfb77f7a8d89c443de9e51c6f5aad20df38e38effd10a8da60e8",
+      "delta_commitment_contract": "be066775e11350efb7ee229900a20d189453c44c031cd338bcb9bd3924147817",
+      "policy_declaration": {
+        "mode": "DECLARED",
+        "policy_hash": "aabbccddeeff0011223344556677889900aabbccddeeff001122334455667788",
+        "policy_schema": "vcav-policy-v1",
+        "policy_version": "1.0.0"
+      }
+    }
+  },
+  "entropy_source": {
+    "_comment": "Entropy values sourced from entropy-status-v1.json golden test vector",
+    "vector_ref": "data/test-vectors/entropy-status-v1.json",
+    "pair_id": "pair-alice-bob",
+    "contract_key": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+    "as_of_utc": "2026-01-15T12:00:00Z",
+    "entropy_status_commitment": "bbcbcda532280f70e90b483ef2c5b65c36986dbe8de0ce48ff75c3bc5f6443aa",
+    "ledger_head_hash": "832eb48197b5074555399b62f4e5348c8b191084b032c7bdf044d2a1af2fd3a9",
+    "delta_commitment_counterparty": "bfa3d1bb7738cfb77f7a8d89c443de9e51c6f5aad20df38e38effd10a8da60e8",
+    "delta_commitment_contract": "be066775e11350efb7ee229900a20d189453c44c031cd338bcb9bd3924147817"
+  },
+  "expected": {
+    "entropy_fields_present": true,
+    "policy_declaration_present": true,
+    "policy_mode": "DECLARED",
+    "entropy_status_commitment": "bbcbcda532280f70e90b483ef2c5b65c36986dbe8de0ce48ff75c3bc5f6443aa",
+    "ledger_head_hash": "832eb48197b5074555399b62f4e5348c8b191084b032c7bdf044d2a1af2fd3a9",
+    "delta_commitment_counterparty": "bfa3d1bb7738cfb77f7a8d89c443de9e51c6f5aad20df38e38effd10a8da60e8",
+    "delta_commitment_contract": "be066775e11350efb7ee229900a20d189453c44c031cd338bcb9bd3924147817"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/receipt.v2.schema.json"
+  ]
+}

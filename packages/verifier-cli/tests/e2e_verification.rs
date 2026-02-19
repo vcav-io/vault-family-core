@@ -230,6 +230,11 @@ fn write_receipt_file(
         ifc_policy_hash: unsigned.ifc_policy_hash.clone(),
         ifc_label_receipt: unsigned.ifc_label_receipt.clone(),
         ifc_joined_confidentiality: unsigned.ifc_joined_confidentiality.clone(),
+        entropy_status_commitment: unsigned.entropy_status_commitment.clone(),
+        ledger_head_hash: unsigned.ledger_head_hash.clone(),
+        delta_commitment_counterparty: unsigned.delta_commitment_counterparty.clone(),
+        delta_commitment_contract: unsigned.delta_commitment_contract.clone(),
+        policy_declaration: unsigned.policy_declaration.clone(),
         signature: signature.to_string(),
     };
     let path = dir.join("receipt.json");

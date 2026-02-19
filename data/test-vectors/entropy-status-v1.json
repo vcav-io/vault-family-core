@@ -1,0 +1,73 @@
+{
+  "_comment": "Cross-language test vector for EntropyLedger / EntropyStatus. All hashes verified by Rust guardian-core. TypeScript must reproduce identical values.",
+  "description": "Three ledger entries. as_of = 2026-01-15T12:00:00Z. 7d window starts 2026-01-08T12:00:00Z. entry session-aaa (2026-01-08T10:00:00Z) falls outside 7d window by 2 hours.",
+  "entries": [
+    {
+      "session_id": "session-aaa",
+      "pair_id": "pair-alice-bob",
+      "contract_key": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+      "entropy_millibits": 8000,
+      "timestamp": "2026-01-08T10:00:00Z",
+      "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "session_id": "session-bbb",
+      "pair_id": "pair-alice-bob",
+      "contract_key": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+      "entropy_millibits": 12000,
+      "timestamp": "2026-01-14T20:00:00Z",
+      "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000002"
+    },
+    {
+      "session_id": "session-ccc",
+      "pair_id": "pair-alice-carol",
+      "contract_key": "contract:none:v1",
+      "entropy_millibits": 5000,
+      "timestamp": "2026-01-15T09:00:00Z",
+      "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000003"
+    }
+  ],
+  "expected": {
+    "entry_hashes": [
+      "91a8474d68937e5a186c2fbade9cef4043d8cbc21326a8b12452f910fa3a1b65",
+      "24cab32ecf1256df60f48dfa257272081e5e401fe510e6f74116833742b2b17b",
+      "3f5968dd7d2dd44bfff920cfbaf439870dc41de38594b49588fa4510a67058f7"
+    ],
+    "ledger_head_hash": "832eb48197b5074555399b62f4e5348c8b191084b032c7bdf044d2a1af2fd3a9",
+    "status": {
+      "query": {
+        "pair_id": "pair-alice-bob",
+        "contract_key": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+        "session_entropy_millibits": 3000,
+        "as_of_utc": "2026-01-15T12:00:00Z"
+      },
+      "schema_version": "entropy_status_v1",
+      "as_of_utc": "2026-01-15T12:00:00Z",
+      "contract_key": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+      "windows": {
+        "24h": {
+          "start_utc": "2026-01-14T12:00:00Z",
+          "end_utc": "2026-01-15T12:00:00Z"
+        },
+        "7d": {
+          "start_utc": "2026-01-08T12:00:00Z",
+          "end_utc": "2026-01-15T12:00:00Z"
+        }
+      },
+      "session_entropy_millibits": 3000,
+      "counterparty_totals_millibits": {
+        "24h": 12000,
+        "7d": 12000,
+        "lifetime": 20000
+      },
+      "contract_totals_millibits": {
+        "7d": 12000
+      },
+      "session_count_counterparty": 2,
+      "ledger_head_hash": "832eb48197b5074555399b62f4e5348c8b191084b032c7bdf044d2a1af2fd3a9",
+      "delta_commitment_counterparty": "bfa3d1bb7738cfb77f7a8d89c443de9e51c6f5aad20df38e38effd10a8da60e8",
+      "delta_commitment_contract": "be066775e11350efb7ee229900a20d189453c44c031cd338bcb9bd3924147817"
+    },
+    "entropy_status_commitment": "bbcbcda532280f70e90b483ef2c5b65c36986dbe8de0ce48ff75c3bc5f6443aa"
+  }
+}

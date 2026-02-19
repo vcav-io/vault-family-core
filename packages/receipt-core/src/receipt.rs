@@ -18,6 +18,37 @@ use crate::attestation::AttestationEvidence;
 pub const SCHEMA_VERSION: &str = "1.0.0";
 
 // ============================================================================
+// PolicyMode / PolicyDeclaration
+// ============================================================================
+
+/// Policy mode for agent-supplied policy declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PolicyMode {
+    /// Agent applied a policy and commits to its hash.
+    Declared,
+    /// Agent explicitly applied no policy.
+    None,
+    /// Policy state cannot be determined (legacy or non-compliant agent).
+    Unknown,
+}
+
+/// Agent-supplied policy declaration for receipt binding.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyDeclaration {
+    pub mode: PolicyMode,
+    /// SHA-256 hash of canonical policy artefact. MUST be present iff mode=DECLARED.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_hash: Option<String>,
+    /// Policy schema identifier. MUST be present iff mode=DECLARED.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_schema: Option<String>,
+    /// Policy version identifier (optional even for DECLARED).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_version: Option<String>,
+}
+
+// ============================================================================
 // ReceiptStatus
 // ============================================================================
 
@@ -61,6 +92,14 @@ pub enum SignalClass {
     BudgetExhausted,
     /// One or more inputs were rejected by guardian policy checks.
     InputRejected,
+    /// Session aborted because STRICT entropy threshold was exceeded.
+    EntropyThresholdExceeded,
+    /// Forward-compatible catch-all for unknown signal classes.
+    /// Serializes as "OTHER" to match Display impl (used in hash computation).
+    #[serde(other)]
+    Other,
+    // Note: serde(other) catches any unrecognized variant on deserialization.
+    // serde(rename_all) serializes this as "OTHER". Display must match.
 }
 
 impl std::fmt::Display for SignalClass {
@@ -70,6 +109,8 @@ impl std::fmt::Display for SignalClass {
             SignalClass::SessionAborted => write!(f, "SESSION_ABORTED"),
             SignalClass::BudgetExhausted => write!(f, "BUDGET_EXHAUSTED"),
             SignalClass::InputRejected => write!(f, "INPUT_REJECTED"),
+            SignalClass::EntropyThresholdExceeded => write!(f, "ENTROPY_THRESHOLD_EXCEEDED"),
+            SignalClass::Other => write!(f, "OTHER"),
         }
     }
 }
@@ -295,6 +336,26 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ifc_joined_confidentiality: Option<serde_json::Value>,
 
+    /// Commitment to the entropy status object at the relevant decision point (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_status_commitment: Option<String>,
+
+    /// Ledger head hash at the time of the decision point (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ledger_head_hash: Option<String>,
+
+    /// Delta commitment to counterparty ledger slice (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta_commitment_counterparty: Option<String>,
+
+    /// Delta commitment to contract ledger slice (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta_commitment_contract: Option<String>,
+
+    /// Agent-supplied policy declaration (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_declaration: Option<PolicyDeclaration>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<AttestationEvidence>,
@@ -461,6 +522,26 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ifc_joined_confidentiality: Option<serde_json::Value>,
 
+    /// Commitment to the entropy status object at the relevant decision point (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_status_commitment: Option<String>,
+
+    /// Ledger head hash at the time of the decision point (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ledger_head_hash: Option<String>,
+
+    /// Delta commitment to counterparty ledger slice (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta_commitment_counterparty: Option<String>,
+
+    /// Delta commitment to contract ledger slice (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta_commitment_contract: Option<String>,
+
+    /// Agent-supplied policy declaration (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_declaration: Option<PolicyDeclaration>,
+
     /// Enclave attestation (null in dev mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attestation: Option<AttestationEvidence>,
@@ -506,6 +587,11 @@ impl UnsignedReceipt {
             ifc_policy_hash: self.ifc_policy_hash,
             ifc_label_receipt: self.ifc_label_receipt,
             ifc_joined_confidentiality: self.ifc_joined_confidentiality,
+            entropy_status_commitment: self.entropy_status_commitment,
+            ledger_head_hash: self.ledger_head_hash,
+            delta_commitment_counterparty: self.delta_commitment_counterparty,
+            delta_commitment_contract: self.delta_commitment_contract,
+            policy_declaration: self.policy_declaration,
             attestation: self.attestation,
             signature,
         }
@@ -554,6 +640,11 @@ pub struct ReceiptBuilder {
     ifc_policy_hash: Option<String>,
     ifc_label_receipt: Option<serde_json::Value>,
     ifc_joined_confidentiality: Option<serde_json::Value>,
+    entropy_status_commitment: Option<String>,
+    ledger_head_hash: Option<String>,
+    delta_commitment_counterparty: Option<String>,
+    delta_commitment_contract: Option<String>,
+    policy_declaration: Option<PolicyDeclaration>,
     attestation: Option<AttestationEvidence>,
 }
 
@@ -798,6 +889,36 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the entropy status commitment (optional)
+    pub fn entropy_status_commitment(mut self, v: Option<String>) -> Self {
+        self.entropy_status_commitment = v;
+        self
+    }
+
+    /// Set the ledger head hash (optional)
+    pub fn ledger_head_hash(mut self, v: Option<String>) -> Self {
+        self.ledger_head_hash = v;
+        self
+    }
+
+    /// Set the delta commitment to counterparty ledger slice (optional)
+    pub fn delta_commitment_counterparty(mut self, v: Option<String>) -> Self {
+        self.delta_commitment_counterparty = v;
+        self
+    }
+
+    /// Set the delta commitment to contract ledger slice (optional)
+    pub fn delta_commitment_contract(mut self, v: Option<String>) -> Self {
+        self.delta_commitment_contract = v;
+        self
+    }
+
+    /// Set the policy declaration (optional)
+    pub fn policy_declaration(mut self, v: Option<PolicyDeclaration>) -> Self {
+        self.policy_declaration = v;
+        self
+    }
+
     /// Set the attestation (optional)
     pub fn attestation(mut self, attestation: Option<AttestationEvidence>) -> Self {
         self.attestation = attestation;
@@ -808,6 +929,40 @@ impl ReceiptBuilder {
     ///
     /// Returns None if any required field is missing.
     pub fn build_unsigned(self) -> Option<UnsignedReceipt> {
+        // Validate policy_declaration before constructing the receipt
+        let policy_declaration = match self.policy_declaration {
+            Some(pd) => {
+                let valid = match pd.mode {
+                    PolicyMode::Declared => {
+                        if pd.policy_hash.is_none() || pd.policy_schema.is_none() {
+                            eprintln!(
+                                "WARNING: policy_declaration mode=DECLARED but policy_hash or policy_schema is missing; omitting policy_declaration"
+                            );
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                    PolicyMode::None | PolicyMode::Unknown => {
+                        if pd.policy_hash.is_some()
+                            || pd.policy_schema.is_some()
+                            || pd.policy_version.is_some()
+                        {
+                            eprintln!(
+                                "WARNING: policy_declaration mode={:?} has unexpected hash/schema/version fields; omitting policy_declaration",
+                                pd.mode
+                            );
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                };
+                if valid { Some(pd) } else { None }
+            }
+            None => None,
+        };
+
         Some(UnsignedReceipt {
             schema_version: SCHEMA_VERSION.to_string(),
             session_id: self.session_id?,
@@ -845,6 +1000,11 @@ impl ReceiptBuilder {
             ifc_policy_hash: self.ifc_policy_hash,
             ifc_label_receipt: self.ifc_label_receipt,
             ifc_joined_confidentiality: self.ifc_joined_confidentiality,
+            entropy_status_commitment: self.entropy_status_commitment,
+            ledger_head_hash: self.ledger_head_hash,
+            delta_commitment_counterparty: self.delta_commitment_counterparty,
+            delta_commitment_contract: self.delta_commitment_contract,
+            policy_declaration,
             attestation: self.attestation,
         })
     }
@@ -919,6 +1079,11 @@ mod tests {
             ifc_policy_hash: None,
             ifc_label_receipt: None,
             ifc_joined_confidentiality: None,
+            entropy_status_commitment: None,
+            ledger_head_hash: None,
+            delta_commitment_counterparty: None,
+            delta_commitment_contract: None,
+            policy_declaration: None,
             attestation: None,
         }
     }
@@ -1754,6 +1919,11 @@ mod tests {
             ifc_policy_hash: None,
             ifc_label_receipt: None,
             ifc_joined_confidentiality: None,
+            entropy_status_commitment: None,
+            ledger_head_hash: None,
+            delta_commitment_counterparty: None,
+            delta_commitment_contract: None,
+            policy_declaration: None,
             receipt_key_id: None,
             attestation: None,
         };
@@ -1811,5 +1981,101 @@ mod tests {
         assert_eq!(read_back["expected"]["verification_result"], "PASS");
         assert!(read_back["input"]["signed_receipt"]["contract_hash"].is_string());
         assert!(read_back["input"]["signed_receipt"]["output_schema_id"].is_string());
+    }
+
+    // ==================== PolicyDeclaration / PolicyMode Tests ====================
+
+    #[test]
+    fn test_policy_declaration_serde_declared() {
+        let pd = PolicyDeclaration {
+            mode: PolicyMode::Declared,
+            policy_hash: Some("a".repeat(64)),
+            policy_schema: Some("entropy_policy_v1".to_string()),
+            policy_version: Some("sdk-0.9.2".to_string()),
+        };
+        let json = serde_json::to_value(&pd).unwrap();
+        assert_eq!(json["mode"], "DECLARED");
+        assert_eq!(json["policy_hash"], "a".repeat(64));
+        let round_trip: PolicyDeclaration = serde_json::from_value(json).unwrap();
+        assert_eq!(round_trip, pd);
+    }
+
+    #[test]
+    fn test_policy_declaration_serde_none() {
+        let pd = PolicyDeclaration {
+            mode: PolicyMode::None,
+            policy_hash: None,
+            policy_schema: None,
+            policy_version: None,
+        };
+        let json = serde_json::to_value(&pd).unwrap();
+        assert_eq!(json["mode"], "NONE");
+        assert!(json.get("policy_hash").is_none());
+        let round_trip: PolicyDeclaration = serde_json::from_value(json).unwrap();
+        assert_eq!(round_trip, pd);
+    }
+
+    #[test]
+    fn test_policy_declaration_serde_unknown() {
+        let pd = PolicyDeclaration {
+            mode: PolicyMode::Unknown,
+            policy_hash: None,
+            policy_schema: None,
+            policy_version: None,
+        };
+        let json = serde_json::to_value(&pd).unwrap();
+        assert_eq!(json["mode"], "UNKNOWN");
+        let round_trip: PolicyDeclaration = serde_json::from_value(json).unwrap();
+        assert_eq!(round_trip, pd);
+    }
+
+    #[test]
+    fn test_signal_class_entropy_threshold_exceeded() {
+        let sc = SignalClass::EntropyThresholdExceeded;
+        let json = serde_json::to_value(&sc).unwrap();
+        assert_eq!(json, "ENTROPY_THRESHOLD_EXCEEDED");
+        let round_trip: SignalClass = serde_json::from_value(json).unwrap();
+        assert_eq!(round_trip, SignalClass::EntropyThresholdExceeded);
+    }
+
+    #[test]
+    fn test_signal_class_forward_compat_unknown() {
+        // Unknown signal class should deserialize to Other
+        let json = serde_json::Value::String("FUTURE_SIGNAL_CLASS".to_string());
+        let sc: SignalClass = serde_json::from_value(json).unwrap();
+        assert_eq!(sc, SignalClass::Other);
+    }
+
+    #[test]
+    fn test_receipt_backward_compat_without_new_fields() {
+        // An old receipt JSON without entropy/policy fields should deserialize fine
+        let receipt = sample_unsigned_receipt();
+        let json = serde_json::to_value(&receipt).unwrap();
+        // Verify new fields are absent from serialized JSON
+        assert!(json.get("entropy_status_commitment").is_none());
+        assert!(json.get("policy_declaration").is_none());
+        // Should round-trip
+        let round_trip: UnsignedReceipt = serde_json::from_value(json).unwrap();
+        assert_eq!(round_trip.entropy_status_commitment, None);
+        assert_eq!(round_trip.policy_declaration, None);
+    }
+
+    #[test]
+    fn test_receipt_with_entropy_fields_round_trip() {
+        let mut receipt = sample_unsigned_receipt();
+        receipt.entropy_status_commitment = Some("a".repeat(64));
+        receipt.ledger_head_hash = Some("b".repeat(64));
+        receipt.delta_commitment_counterparty = Some("c".repeat(64));
+        receipt.delta_commitment_contract = Some("d".repeat(64));
+        receipt.policy_declaration = Some(PolicyDeclaration {
+            mode: PolicyMode::Declared,
+            policy_hash: Some("e".repeat(64)),
+            policy_schema: Some("entropy_policy_v1".to_string()),
+            policy_version: None,
+        });
+        let json = serde_json::to_value(&receipt).unwrap();
+        let round_trip: UnsignedReceipt = serde_json::from_value(json).unwrap();
+        assert_eq!(round_trip.entropy_status_commitment, receipt.entropy_status_commitment);
+        assert_eq!(round_trip.policy_declaration, receipt.policy_declaration);
     }
 }

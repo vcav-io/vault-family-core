@@ -1541,6 +1541,11 @@ mod tests {
             ifc_label_receipt: receipt.ifc_label_receipt,
             ifc_joined_confidentiality: receipt.ifc_joined_confidentiality,
             attestation: receipt.attestation,
+            entropy_status_commitment: receipt.entropy_status_commitment,
+            ledger_head_hash: receipt.ledger_head_hash,
+            delta_commitment_counterparty: receipt.delta_commitment_counterparty,
+            delta_commitment_contract: receipt.delta_commitment_contract,
+            policy_declaration: receipt.policy_declaration,
         };
         (unsigned, sig)
     }

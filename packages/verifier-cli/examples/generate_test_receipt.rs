@@ -59,6 +59,11 @@ fn main() {
         ifc_joined_confidentiality: None,
         receipt_key_id: None,
         attestation: None,
+        entropy_status_commitment: None,
+        ledger_head_hash: None,
+        delta_commitment_counterparty: None,
+        delta_commitment_contract: None,
+        policy_declaration: None,
     };
 
     let signature = sign_receipt(&unsigned, &signing_key).unwrap();
