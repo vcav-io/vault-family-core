@@ -2438,7 +2438,7 @@ mod tests {
 
     #[test]
     fn test_vector_compartment_derivation() {
-        let v = load_vector("ifc_budget_compartment_01.json");
+        let v = load_vector("ifc/ifc_budget_compartment_01.json");
         let vectors = v["vectors"].as_array().unwrap();
 
         for vec in vectors {
@@ -2466,7 +2466,7 @@ mod tests {
 
     #[test]
     fn test_vector_compartment_adversarial_format() {
-        let v = load_vector("ifc_budget_compartment_02.json");
+        let v = load_vector("ifc/ifc_budget_compartment_02.json");
         let vectors = v["vectors"].as_array().unwrap();
 
         for vec in vectors {
