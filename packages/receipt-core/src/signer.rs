@@ -520,7 +520,7 @@ mod tests {
     fn test_receipt_hash_test_vector() {
         // This is a protocol lock: changes to canonicalization or domain prefixes must
         // update this vector deliberately.
-        const EXPECTED: &str = "079d4400efb38432d6221856eb4f896b95300646b5c83bca0ff8c0def1da6528";
+        const EXPECTED: &str = "35c43dbc83cb05786f9719c4d1d36da111a31d82fb46c34fb69793d9c856ff17";
 
         let json = include_str!("../testdata/unsigned_receipt_core.json");
         let receipt: UnsignedReceipt =

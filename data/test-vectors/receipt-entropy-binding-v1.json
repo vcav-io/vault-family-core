@@ -16,7 +16,7 @@
         "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "window_start": "2026-01-14T12:00:00Z"
       },
-      "execution_lane": "GLASS_LOCAL",
+      "execution_lane": "SOFTWARE_LOCAL",
       "fixed_window_duration_seconds": 120,
       "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",

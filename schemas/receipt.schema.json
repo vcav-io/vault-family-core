@@ -207,8 +207,8 @@
       "type": "string",
       "enum": [
         "SEALED_LOCAL",
-        "GLASS_LOCAL",
-        "GLASS_REMOTE"
+        "SOFTWARE_LOCAL",
+        "API_MEDIATED"
       ],
       "description": "Execution lane used for this session"
     },

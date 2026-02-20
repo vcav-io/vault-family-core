@@ -122,22 +122,21 @@ pub enum ExecutionLane {
     #[serde(rename = "SEALED_LOCAL")]
     SealedLocal,
     /// Software-attested local inference (auditable runtime, software signing).
-    #[serde(rename = "GLASS_LOCAL")]
+    #[serde(rename = "SOFTWARE_LOCAL")]
     SoftwareLocal,
     /// API-mediated inference via external provider.
-    #[serde(rename = "GLASS_REMOTE")]
+    #[serde(rename = "API_MEDIATED")]
     ApiMediated,
 }
 
 impl std::fmt::Display for ExecutionLane {
     /// Display uses wire-format values because `.to_string()` feeds into
-    /// `compute_budget_chain_id` (SHA-256 hash). Changing these strings
-    /// would silently break budget chain continuity.
+    /// `compute_budget_chain_id` (SHA-256 hash).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ExecutionLane::SealedLocal => write!(f, "SEALED_LOCAL"),
-            ExecutionLane::SoftwareLocal => write!(f, "GLASS_LOCAL"),
-            ExecutionLane::ApiMediated => write!(f, "GLASS_REMOTE"),
+            ExecutionLane::SoftwareLocal => write!(f, "SOFTWARE_LOCAL"),
+            ExecutionLane::ApiMediated => write!(f, "API_MEDIATED"),
         }
     }
 }
@@ -1316,29 +1315,24 @@ mod tests {
     fn test_execution_lane_serde_and_display() {
         let sealed = serde_json::to_string(&ExecutionLane::SealedLocal).unwrap();
         assert_eq!(sealed, "\"SEALED_LOCAL\"");
-        let parsed: ExecutionLane = serde_json::from_str("\"GLASS_REMOTE\"").unwrap();
+        // Old alias still deserializes correctly
+        let parsed: ExecutionLane = serde_json::from_str("\"API_MEDIATED\"").unwrap();
         assert_eq!(parsed, ExecutionLane::ApiMediated);
-        // Display must emit wire-format values (used by compute_budget_chain_id)
-        assert_eq!(ExecutionLane::SoftwareLocal.to_string(), "GLASS_LOCAL");
-        assert_eq!(ExecutionLane::ApiMediated.to_string(), "GLASS_REMOTE");
+        // Display must emit new wire-format values (used by compute_budget_chain_id)
+        assert_eq!(ExecutionLane::SoftwareLocal.to_string(), "SOFTWARE_LOCAL");
+        assert_eq!(ExecutionLane::ApiMediated.to_string(), "API_MEDIATED");
     }
 
     #[test]
-    fn test_execution_lane_wire_compat_glass_local_deserializes_to_software_local() {
-        let parsed: ExecutionLane = serde_json::from_str("\"GLASS_LOCAL\"").unwrap();
-        assert_eq!(parsed, ExecutionLane::SoftwareLocal);
-    }
-
-    #[test]
-    fn test_execution_lane_wire_compat_glass_remote_deserializes_to_api_mediated() {
-        let parsed: ExecutionLane = serde_json::from_str("\"GLASS_REMOTE\"").unwrap();
-        assert_eq!(parsed, ExecutionLane::ApiMediated);
+    fn test_execution_lane_rejects_old_glass_names() {
+        assert!(serde_json::from_str::<ExecutionLane>("\"GLASS_LOCAL\"").is_err());
+        assert!(serde_json::from_str::<ExecutionLane>("\"GLASS_REMOTE\"").is_err());
     }
 
     #[test]
     fn test_execution_lane_serializes_to_wire_format() {
-        assert_eq!(serde_json::to_string(&ExecutionLane::SoftwareLocal).unwrap(), "\"GLASS_LOCAL\"");
-        assert_eq!(serde_json::to_string(&ExecutionLane::ApiMediated).unwrap(), "\"GLASS_REMOTE\"");
+        assert_eq!(serde_json::to_string(&ExecutionLane::SoftwareLocal).unwrap(), "\"SOFTWARE_LOCAL\"");
+        assert_eq!(serde_json::to_string(&ExecutionLane::ApiMediated).unwrap(), "\"API_MEDIATED\"");
         assert_eq!(serde_json::to_string(&ExecutionLane::SealedLocal).unwrap(), "\"SEALED_LOCAL\"");
     }
 

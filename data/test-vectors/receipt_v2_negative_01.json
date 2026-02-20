@@ -6,12 +6,12 @@
   },
   "input": {
     "correct_domain_prefix": "VCAV-RECEIPT-V1:",
-    "signature_hex": "655c08a850dee98df4a4c3bb38544b71fc2c37af13b01e1f264c4d89e9217b6ec468c38a8b5e607ef456bbc991c588bb3ec3e7aea5b8ba4e81707740998a5d02",
+    "signature_hex": "0761bc3c935e80286048501006b0beba42a54428b30be83e9959eb3f35acdebe94df28f42711da429c820dfbbcd563f2d90c97bffc223edcd4484d803d2af90c",
     "unsigned_receipt": {
       "budget_chain": {
         "chain_id": "chain-1111111111111111111111111111111111111111111111111111111111111111",
         "prev_receipt_hash": null,
-        "receipt_hash": "441db37f7fd470d496f528cf50c84a5676ce502632f03004186a18ab8334b636"
+        "receipt_hash": "f61055f0ee3110f1b6e49ee24451da14a24ec4d4e8e14661eb775c5c1a5d19ab"
       },
       "budget_usage": {
         "bits_used_after": 8,
@@ -21,7 +21,7 @@
         "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "window_start": "2025-05-01T00:00:00Z"
       },
-      "execution_lane": "GLASS_LOCAL",
+      "execution_lane": "SOFTWARE_LOCAL",
       "fixed_window_duration_seconds": 120,
       "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",

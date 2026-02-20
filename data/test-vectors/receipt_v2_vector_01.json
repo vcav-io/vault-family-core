@@ -1,7 +1,7 @@
 {
   "description": "Standalone signed receipt for verifier-cli integration testing (COMPLETED, Ed25519)",
   "expected": {
-    "signature_hex": "28b1ff33b7d9f164a19567761b603097c686e31a39d4ca1d651ae72b735c5da46358f816ecd3091975ee126b16ade8a895c4b77e033d4de0679ca5e226bc6305",
+    "signature_hex": "a7b9da7835704d5c50b58a351dc587187c948b23c3b3574ee035f13ea75635b4c7d3fcd02dd6a0f73b82908ce36b3ac254cc43de0f97234a9bbe6f3e9b396f07",
     "verification_result": "PASS"
   },
   "input": {
@@ -9,7 +9,7 @@
       "budget_chain": {
         "chain_id": "chain-1111111111111111111111111111111111111111111111111111111111111111",
         "prev_receipt_hash": null,
-        "receipt_hash": "441db37f7fd470d496f528cf50c84a5676ce502632f03004186a18ab8334b636"
+        "receipt_hash": "f61055f0ee3110f1b6e49ee24451da14a24ec4d4e8e14661eb775c5c1a5d19ab"
       },
       "budget_usage": {
         "bits_used_after": 8,
@@ -19,7 +19,7 @@
         "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "window_start": "2025-05-01T00:00:00Z"
       },
-      "execution_lane": "GLASS_LOCAL",
+      "execution_lane": "SOFTWARE_LOCAL",
       "fixed_window_duration_seconds": 120,
       "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -43,7 +43,7 @@
       "session_end": "2025-06-01T12:02:00Z",
       "session_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "session_start": "2025-06-01T12:00:00Z",
-      "signature": "28b1ff33b7d9f164a19567761b603097c686e31a39d4ca1d651ae72b735c5da46358f816ecd3091975ee126b16ade8a895c4b77e033d4de0679ca5e226bc6305",
+      "signature": "a7b9da7835704d5c50b58a351dc587187c948b23c3b3574ee035f13ea75635b4c7d3fcd02dd6a0f73b82908ce36b3ac254cc43de0f97234a9bbe6f3e9b396f07",
       "status": "COMPLETED"
     },
     "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
