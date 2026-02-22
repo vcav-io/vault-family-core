@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use ifc_engine::{
-    Confidentiality, IntegrityLevel, Label, PolicyConfig, PolicyDecision, PrincipalId, Purpose,
-    TypeTag,
+    Confidentiality, EscalationReason, IntegrityLevel, Label, PolicyConfig, PolicyDecision,
+    PrincipalId, Purpose, TypeTag,
 };
 use label_registry::{LabelRegistry, ReceiveDecision};
 use message_envelope::grant::{
@@ -746,12 +746,26 @@ fn format_policy_decision(decision: &PolicyDecision) -> String {
             to_tier,
             reason,
             label_receipt,
-        } => escalated_response(serde_json::json!({
-            "decision": "ESCALATE",
-            "to_tier": format!("{:?}", to_tier),
-            "reason": format!("{:?}", reason),
-            "label_receipt": serde_json::to_value(label_receipt).unwrap_or_default(),
-        })),
+        } => {
+            let (reason_kind, reason_detail) = match reason {
+                EscalationReason::BoundedExchange { entropy_bits } => {
+                    ("SENSITIVITY_HIGH", serde_json::json!({ "entropy_bits": entropy_bits }))
+                }
+                EscalationReason::SealedVault => {
+                    ("CONSENT_REQUIRED", serde_json::Value::Null)
+                }
+                EscalationReason::PurposeOverride { purpose } => {
+                    ("PURPOSE_OVERRIDE", serde_json::json!({ "purpose": format!("{:?}", purpose) }))
+                }
+            };
+            escalated_response(serde_json::json!({
+                "decision": "ESCALATE",
+                "to_tier": format!("{:?}", to_tier),
+                "reason_kind": reason_kind,
+                "reason_detail": reason_detail,
+                "label_receipt": serde_json::to_value(label_receipt).unwrap_or_default(),
+            }))
+        }
         PolicyDecision::Block { reason } => blocked_response(&format!("{:?}", reason)),
     }
 }
