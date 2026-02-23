@@ -178,7 +178,7 @@ mod tests {
     use crate::signer::{generate_keypair, public_key_to_hex, sign_receipt};
     use crate::receipt::{BudgetUsageRecord, ExecutionLane, ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION};
     use chrono::{TimeZone, Utc};
-    use guardian_core::{BudgetTier, Purpose};
+    use vault_family_types::{BudgetTier, Purpose};
 
     fn sample_artefacts() -> ManifestArtefacts {
         ManifestArtefacts {
@@ -415,6 +415,9 @@ mod tests {
             execution_lane: ExecutionLane::SoftwareLocal,
             output: None,
             output_entropy_bits: 8,
+            receipt_payload_type: None,
+            receipt_payload_version: None,
+            payload: None,
             mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),

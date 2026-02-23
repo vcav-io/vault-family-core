@@ -42,7 +42,7 @@ mod tests {
     use crate::handoff::{BudgetTierV2, HashRef, UnsignedSessionHandoff};
     use chrono::{TimeZone, Utc};
     use ed25519_dalek::{Signer, SigningKey, Verifier};
-    use guardian_core::{BudgetTier, Purpose};
+    use vault_family_types::{BudgetTier, Purpose};
     use sha2::{Digest, Sha256};
 
     // =========================================================================
@@ -85,6 +85,9 @@ mod tests {
                 "reason_code": "MUTUAL_INTEREST_UNCLEAR"
             })),
             output_entropy_bits: 8,
+            receipt_payload_type: None,
+            receipt_payload_version: None,
+            payload: None,
             mitigations_applied: vec![],
             budget_usage: sample_budget_usage(),
             budget_chain: None,

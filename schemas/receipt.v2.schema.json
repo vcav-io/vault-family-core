@@ -104,6 +104,21 @@
       "maximum": 32,
       "description": "Calculated entropy of this output"
     },
+    "receipt_payload_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Typed payload type identifier (optional)"
+    },
+    "receipt_payload_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Typed payload version string (optional)"
+    },
+    "payload": {
+      "description": "Typed payload blob. Opaque to vault-family-core; exact JSON bytes are preserved through signing round-trips."
+    },
     "budget_usage": {
       "type": "object",
       "properties": {

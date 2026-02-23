@@ -1,7 +1,7 @@
 //! Generates a test receipt and key for manual CLI testing
 
 use chrono::{TimeZone, Utc};
-use guardian_core::{BudgetTier, Purpose};
+use vault_family_types::{BudgetTier, Purpose};
 use receipt_core::{
     generate_keypair, public_key_to_hex, sign_receipt, BudgetUsageRecord, UnsignedReceipt,
 };
@@ -30,6 +30,9 @@ fn main() {
             "confidence_bucket": "HIGH"
         })),
         output_entropy_bits: 8,
+        receipt_payload_type: None,
+        receipt_payload_version: None,
+        payload: None,
         mitigations_applied: vec![],
         budget_usage: BudgetUsageRecord {
             pair_id: "a".repeat(64),

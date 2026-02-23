@@ -136,6 +136,9 @@ pub(crate) fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         execution_lane: receipt.execution_lane,
         output: receipt.output.clone(),
         output_entropy_bits: receipt.output_entropy_bits,
+        receipt_payload_type: receipt.receipt_payload_type.clone(),
+        receipt_payload_version: receipt.receipt_payload_version.clone(),
+        payload: receipt.payload.clone(),
         mitigations_applied: receipt.mitigations_applied.clone(),
         budget_usage: receipt.budget_usage.clone(),
         budget_chain: receipt.budget_chain.clone(),
@@ -667,7 +670,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
 
     // Load schema registry (from directory or embedded)
     let registry = if let Some(schema_dir) = &args.schema_dir {
-        match guardian_core::SchemaRegistry::load_from_directory(Path::new(schema_dir)) {
+        match crate::schema_registry::SchemaRegistry::load_from_directory(Path::new(schema_dir)) {
             Ok(r) => r,
             Err(e) => {
                 return VerifyDetails {
@@ -739,15 +742,15 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                 .unwrap_or_else(|| {
                     // Infer schema from purpose code
                     match receipt.purpose_code {
-                        guardian_core::Purpose::Compatibility => {
+                        vault_family_types::Purpose::Compatibility => {
                             "vault_result_compatibility".to_string()
                         }
-                        guardian_core::Purpose::Scheduling => "vault_result_scheduling".to_string(),
-                        guardian_core::Purpose::Mediation => "vault_result_mediation".to_string(),
-                        guardian_core::Purpose::Negotiation => {
+                        vault_family_types::Purpose::Scheduling => "vault_result_scheduling".to_string(),
+                        vault_family_types::Purpose::Mediation => "vault_result_mediation".to_string(),
+                        vault_family_types::Purpose::Negotiation => {
                             "vault_result_negotiation".to_string()
                         }
-                        guardian_core::Purpose::SchedulingCompatV1 => {
+                        vault_family_types::Purpose::SchedulingCompatV1 => {
                             "vault_result_scheduling_compat_v1".to_string()
                         }
                     }
@@ -794,7 +797,7 @@ mod tests {
     use crate::cli::OutputFormat;
     use crate::keys::sha256_hex;
     use chrono::{TimeZone, Utc};
-    use guardian_core::{BudgetTier, Purpose};
+    use vault_family_types::{BudgetTier, Purpose};
     use receipt_core::{
         generate_keypair, public_key_to_hex, sign_receipt, BudgetChainRecord, BudgetUsageRecord,
     };
@@ -859,6 +862,9 @@ mod tests {
                 "reason_code": "UNKNOWN"
             })),
             output_entropy_bits: 8,
+            receipt_payload_type: None,
+            receipt_payload_version: None,
+            payload: None,
             mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),
@@ -1559,6 +1565,9 @@ mod tests {
                 }
             })),
             output_entropy_bits: 20,
+            receipt_payload_type: None,
+            receipt_payload_version: None,
+            payload: None,
             mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),
