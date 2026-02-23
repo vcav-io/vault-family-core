@@ -178,7 +178,7 @@ mod tests {
     };
     use crate::signer::{compute_receipt_hash, generate_keypair, sign_receipt};
     use chrono::{TimeZone, Utc};
-    use guardian_core::{BudgetTier, Purpose};
+    use vault_family_types::{BudgetTier, Purpose};
 
     fn chain_id() -> String {
         format!("chain-{}", "1".repeat(64))

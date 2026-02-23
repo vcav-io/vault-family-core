@@ -42,7 +42,7 @@ mod tests {
     use crate::handoff::{BudgetTierV2, HashRef, UnsignedSessionHandoff};
     use chrono::{TimeZone, Utc};
     use ed25519_dalek::{Signer, SigningKey, Verifier};
-    use guardian_core::{BudgetTier, Purpose};
+    use vault_family_types::{BudgetTier, Purpose};
     use sha2::{Digest, Sha256};
 
     // =========================================================================

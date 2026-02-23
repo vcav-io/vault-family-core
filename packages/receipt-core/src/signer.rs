@@ -117,21 +117,21 @@ pub fn hash_message(message: &[u8]) -> [u8; 32] {
 /// therefore covered by the receipt signature.
 pub fn compute_budget_chain_id(
     participant_ids: &[String],
-    purpose_code: guardian_core::Purpose,
+    purpose_code: vault_family_types::Purpose,
     output_schema_id: &str,
     lane_id: &str,
 ) -> Result<String, SigningError> {
     #[derive(serde::Serialize)]
     struct BudgetChainIdCore {
         participant_ids: Vec<String>,
-        purpose_code: guardian_core::Purpose,
+        purpose_code: vault_family_types::Purpose,
         output_schema_id: String,
         lane_id: String,
     }
 
     let mut ids: Vec<String> = participant_ids
         .iter()
-        .map(|s| guardian_core::normalize_agent_id(s))
+        .map(|s| vault_family_types::normalize_agent_id(s))
         .collect();
     ids.sort();
 
@@ -312,7 +312,7 @@ mod tests {
         BudgetUsageRecord, ExecutionLane, ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
     };
     use chrono::{TimeZone, Utc};
-    use guardian_core::{BudgetTier, Purpose};
+    use vault_family_types::{BudgetTier, Purpose};
 
     fn sample_unsigned_receipt() -> UnsignedReceipt {
         UnsignedReceipt {

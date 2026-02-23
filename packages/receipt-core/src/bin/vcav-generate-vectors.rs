@@ -10,7 +10,7 @@
 
 use chrono::{TimeZone, Utc};
 use ed25519_dalek::Signer;
-use guardian_core::{BudgetTier, Purpose};
+use vault_family_types::{BudgetTier, Purpose};
 use receipt_core::{
     canonicalize, compute_agreement_hash, compute_operator_key_id, compute_pre_agreement_hash,
     compute_receipt_hash, compute_receipt_key_id, create_handoff_signing_message,

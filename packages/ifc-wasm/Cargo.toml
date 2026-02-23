@@ -14,7 +14,7 @@ ifc-engine = { path = "../ifc-engine" }
 message-envelope = { path = "../message-envelope" }
 label-registry = { path = "../label-registry" }
 receipt-core = { path = "../receipt-core" }
-guardian-core = { path = "../guardian-core" }
+vault-family-types = { path = "../vault-family-types" }
 wasm-bindgen = "0.2"
 serde.workspace = true
 serde_json.workspace = true

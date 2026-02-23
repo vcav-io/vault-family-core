@@ -463,7 +463,7 @@ impl IfcRuntime {
             }
 
             // 4. pair_id must match issuer+recipient
-            let expected_pair_id = guardian_core::generate_pair_id(
+            let expected_pair_id = vault_family_types::generate_pair_id(
                 self.agent_id.as_str(),
                 recipient.as_str(),
             );
@@ -628,7 +628,7 @@ impl IfcRuntime {
         };
 
         // Compute pair_id internally
-        let pair_id = guardian_core::generate_pair_id(
+        let pair_id = vault_family_types::generate_pair_id(
             self.agent_id.as_str(),
             audience.as_str(),
         );
@@ -1070,7 +1070,7 @@ mod tests {
                 TypeTag::Bool,
             ),
             scope: GrantScope {
-                pair_id: guardian_core::generate_pair_id("alice", "bob"),
+                pair_id: vault_family_types::generate_pair_id("alice", "bob"),
                 purposes: vec![Purpose::Compatibility],
             },
             permissions: GrantPermissions { max_uses: 1 },
@@ -1128,7 +1128,7 @@ mod tests {
                 TypeTag::Bool,
             ),
             scope: GrantScope {
-                pair_id: guardian_core::generate_pair_id("alice", "bob"),
+                pair_id: vault_family_types::generate_pair_id("alice", "bob"),
                 purposes: vec![Purpose::Compatibility],
             },
             permissions: GrantPermissions { max_uses: 10 },
@@ -1184,7 +1184,7 @@ mod tests {
                 TypeTag::Bool,
             ),
             scope: GrantScope {
-                pair_id: guardian_core::generate_pair_id("alice", "bob"),
+                pair_id: vault_family_types::generate_pair_id("alice", "bob"),
                 purposes: vec![Purpose::Compatibility],
             },
             permissions: GrantPermissions { max_uses: 10 },
@@ -1241,7 +1241,7 @@ mod tests {
                 TypeTag::Bool,
             ),
             scope: GrantScope {
-                pair_id: guardian_core::generate_pair_id("alice", "bob"),
+                pair_id: vault_family_types::generate_pair_id("alice", "bob"),
                 purposes: vec![Purpose::Scheduling], // only scheduling
             },
             permissions: GrantPermissions { max_uses: 10 },
@@ -1297,7 +1297,7 @@ mod tests {
                 TypeTag::Bool,
             ),
             scope: GrantScope {
-                pair_id: guardian_core::generate_pair_id("alice", "bob"),
+                pair_id: vault_family_types::generate_pair_id("alice", "bob"),
                 purposes: vec![Purpose::Compatibility],
             },
             permissions: GrantPermissions { max_uses: 1 },
@@ -1359,7 +1359,7 @@ mod tests {
                 TypeTag::Bool,
             ),
             scope: GrantScope {
-                pair_id: guardian_core::generate_pair_id("alice", "bob"),
+                pair_id: vault_family_types::generate_pair_id("alice", "bob"),
                 purposes: vec![Purpose::Compatibility],
             },
             permissions: GrantPermissions { max_uses: 10 },

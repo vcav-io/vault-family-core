@@ -4,7 +4,7 @@
 //! Receipts are cryptographic proofs of session execution and constraints.
 
 use chrono::{DateTime, Utc};
-use guardian_core::{BudgetTier, Purpose};
+use vault_family_types::{BudgetTier, Purpose};
 use serde::{Deserialize, Serialize};
 
 use crate::agreement::ModelIdentity;
@@ -1013,7 +1013,7 @@ impl ReceiptBuilder {
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    use guardian_core::BudgetTier;
+    use vault_family_types::BudgetTier;
 
     fn sample_budget_usage() -> BudgetUsageRecord {
         BudgetUsageRecord {

@@ -1,0 +1,12 @@
+[package]
+name = "vault-family-types"
+description = "Shared receipt/protocol vocabulary types for the vault family (VCAV + AgentVault)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+unicode-normalization.workspace = true
