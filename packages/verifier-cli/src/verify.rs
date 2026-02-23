@@ -1918,9 +1918,11 @@ mod tests {
     fn vectors_dir() -> std::path::PathBuf {
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         manifest
-            .parent()
+            .parent() // packages/
             .unwrap()
-            .parent()
+            .parent() // vault-family-core/
+            .unwrap()
+            .parent() // repo root
             .unwrap()
             .join("data")
             .join("test-vectors")

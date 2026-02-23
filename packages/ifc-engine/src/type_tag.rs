@@ -419,7 +419,7 @@ mod tests {
 
     fn load_declassification_vector(filename: &str) -> serde_json::Value {
         let path = format!(
-            "{}/../../data/test-vectors/{}",
+            "{}/../../../data/test-vectors/{}",
             env!("CARGO_MANIFEST_DIR"),
             filename
         );

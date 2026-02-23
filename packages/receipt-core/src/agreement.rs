@@ -335,7 +335,7 @@ mod tests {
         // Load fixtures from shared file
         let fixtures_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../harnesses/agreement-hash-fixtures.json"
+            "/../../../harnesses/agreement-hash-fixtures.json"
         );
         let fixtures_str = std::fs::read_to_string(fixtures_path)
             .expect("Failed to read agreement-hash-fixtures.json");

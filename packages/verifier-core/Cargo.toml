@@ -14,5 +14,8 @@ sha2.workspace = true
 hex.workspace = true
 base64.workspace = true
 
+[build-dependencies]
+serde_json = "1.0"
+
 [dev-dependencies]
-guardian-core = { path = "../guardian-core" }
+guardian-core = { path = "../../../vcav/packages/guardian-core" }

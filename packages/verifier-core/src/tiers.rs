@@ -1095,7 +1095,7 @@ mod tests {
         // Load the golden test vector
         let fixtures_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../data/test-vectors/profile-digest-v1.json"
+            "/../../../data/test-vectors/profile-digest-v1.json"
         );
         let fixtures_str = std::fs::read_to_string(fixtures_path)
             .expect("Failed to read profile-digest-v1.json");
@@ -1478,7 +1478,7 @@ mod tests {
     /// Helper: load a verification vector JSON file from the data/test-vectors directory.
     fn load_vector(filename: &str) -> serde_json::Value {
         let path = format!(
-            "{}/../../data/test-vectors/{}",
+            "{}/../../../data/test-vectors/{}",
             env!("CARGO_MANIFEST_DIR"),
             filename
         );

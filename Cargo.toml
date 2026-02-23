@@ -1,0 +1,57 @@
+[workspace]
+resolver = "2"
+members = [
+    "packages/vault-family-types",
+    "packages/receipt-core",
+    "packages/verifier-core",
+    "packages/verifier-cli",
+    "packages/verifier-wasm",
+    "packages/ifc-engine",
+    "packages/message-envelope",
+    "packages/label-registry",
+    "packages/ifc-wasm",
+    "packages/escalation-interface",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/vcav-core/vcav"
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Schema validation
+jsonschema = { version = "0.18", default-features = false, features = ["draft202012"] }
+
+# Cryptography
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+sha2 = "0.10"
+rand = "0.8"
+hex = "0.4"
+base64 = "0.22"
+
+# Unicode normalization
+unicode-normalization = "0.1"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# CLI
+clap = { version = "4.4", features = ["derive"] }
+
+# Testing
+proptest = "1.4"
+
+[profile.release]
+lto = "thin"
+panic = "abort"
+strip = true
+overflow-checks = true

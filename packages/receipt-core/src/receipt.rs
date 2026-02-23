@@ -2149,7 +2149,7 @@ mod tests {
 
         let vector_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../data/test-vectors/receipt_v2_vector_02.json"
+            "/../../../data/test-vectors/receipt_v2_vector_02.json"
         );
         std::fs::write(
             vector_path,
