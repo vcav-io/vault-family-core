@@ -41,7 +41,7 @@ fn build_test_receipt(
 ) -> receipt_core::UnsignedReceipt {
     ReceiptBuilder::new()
         .session_id("b".repeat(64))
-        .purpose_code(guardian_core::Purpose::Compatibility)
+        .purpose_code(vault_family_types::Purpose::Compatibility)
         .participant_ids(vec!["agent-alice".into(), "agent-bob".into()])
         .runtime_hash("c".repeat(64))
         .guardian_policy_hash("d".repeat(64))
@@ -67,7 +67,7 @@ fn build_test_receipt(
             bits_used_before: 0,
             bits_used_after: 8,
             budget_limit: 128,
-            budget_tier: guardian_core::BudgetTier::Default,
+            budget_tier: vault_family_types::BudgetTier::Default,
             budget_enforcement: None,
             compartment_id: None,
         })
@@ -210,6 +210,9 @@ fn write_receipt_file(
         execution_lane: unsigned.execution_lane,
         output: unsigned.output.clone(),
         output_entropy_bits: unsigned.output_entropy_bits,
+        receipt_payload_type: unsigned.receipt_payload_type.clone(),
+        receipt_payload_version: unsigned.receipt_payload_version.clone(),
+        payload: unsigned.payload.clone(),
         mitigations_applied: unsigned.mitigations_applied.clone(),
         budget_usage: unsigned.budget_usage.clone(),
         budget_chain: unsigned.budget_chain.clone(),
@@ -333,7 +336,7 @@ fn test_tampered_receipt_signature_fails() {
 
     // Tamper: change purpose_code
     let mut tampered = unsigned.clone();
-    tampered.purpose_code = guardian_core::Purpose::Scheduling;
+    tampered.purpose_code = vault_family_types::Purpose::Scheduling;
 
     // Tier 1: signature verification must fail on tampered receipt
     let result = verify_receipt(&tampered, &signature, &vk);

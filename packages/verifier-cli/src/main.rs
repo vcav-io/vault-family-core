@@ -16,6 +16,7 @@
 mod cli;
 mod embedded_schemas;
 mod keys;
+mod schema_registry;
 mod tiers;
 mod verify;
 

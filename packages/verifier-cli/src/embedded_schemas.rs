@@ -2,9 +2,9 @@
 //!
 //! Schema constants are sourced from `verifier_core::schema_validator`.
 //! This module handles the `SchemaRegistry` loading which requires
-//! `guardian-core` and filesystem (tempdir) — not WASM-compatible.
+//! filesystem (tempdir) — not WASM-compatible.
 
-use guardian_core::SchemaRegistry;
+use crate::schema_registry::{SchemaError, SchemaRegistry};
 use std::io::Write;
 use tempfile::TempDir;
 use verifier_core::schema_validator::SCHEMAS;
@@ -21,7 +21,7 @@ pub enum EmbeddedSchemaError {
         error: std::io::Error,
     },
     /// Failed to load registry from temp directory
-    LoadFailed(guardian_core::SchemaError),
+    LoadFailed(SchemaError),
 }
 
 impl std::fmt::Display for EmbeddedSchemaError {

@@ -14,16 +14,18 @@ name = "vcav-verify-chain"
 path = "src/bin/vcav-verify-chain.rs"
 
 [dependencies]
-guardian-core = { path = "../guardian-core" }
+vault-family-types = { path = "../vault-family-types" }
 receipt-core = { path = "../receipt-core" }
 verifier-core = { path = "../verifier-core" }
 serde.workspace = true
 serde_json.workspace = true
+jsonschema.workspace = true
 ed25519-dalek.workspace = true
 sha2.workspace = true
 clap.workspace = true
 anyhow.workspace = true
 hex.workspace = true
+thiserror.workspace = true
 tempfile = "3.10"
 
 [dev-dependencies]

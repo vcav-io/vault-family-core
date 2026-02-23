@@ -523,6 +523,9 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         execution_lane: receipt.execution_lane,
         output: receipt.output.clone(),
         output_entropy_bits: receipt.output_entropy_bits,
+        receipt_payload_type: receipt.receipt_payload_type.clone(),
+        receipt_payload_version: receipt.receipt_payload_version.clone(),
+        payload: receipt.payload.clone(),
         mitigations_applied: receipt.mitigations_applied.clone(),
         budget_usage: receipt.budget_usage.clone(),
         budget_chain: receipt.budget_chain.clone(),
@@ -751,7 +754,7 @@ fn sha256_hex(data: &[u8]) -> String {
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
-    use guardian_core::{BudgetTier, Purpose};
+    use vault_family_types::{BudgetTier, Purpose};
     use receipt_core::{
         generate_keypair, public_key_to_hex, sign_receipt, BudgetChainRecord, BudgetUsageRecord,
     };
@@ -789,6 +792,9 @@ mod tests {
                 "reason_code": "UNKNOWN"
             })),
             output_entropy_bits: 8,
+            receipt_payload_type: None,
+            receipt_payload_version: None,
+            payload: None,
             mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),
