@@ -24,10 +24,8 @@ fn find_repo_root(start: &Path) -> PathBuf {
 
     let mut dir = start.to_path_buf();
     loop {
-        for sentinel in sentinels {
-            if dir.join(sentinel).exists() {
-                return dir;
-            }
+        if sentinels.iter().all(|s| dir.join(s).exists()) {
+            return dir;
         }
         match dir.parent() {
             Some(parent) => dir = parent.to_path_buf(),
