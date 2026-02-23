@@ -419,6 +419,9 @@ pub struct TierResult {
     pub attestation_environment: Option<String>,
     /// Whether the challenge hash was recomputed and matched
     pub attestation_challenge_bound: Option<bool>,
+    /// Whether the receipt's output was validated against a protocol-specific schema.
+    /// `None` = not checked, `Some(true)` = validated, `Some(false)` = no matching schema available.
+    pub payload_schema_validated: Option<bool>,
 }
 
 // ============================================================================
@@ -2046,31 +2049,18 @@ mod tests {
     }
 
     // =========================================================================
-    // Timing class drift detection (verifier-core vs guardian-core)
+    // Timing class golden values (pinned from guardian-core for cross-repo verification)
     // =========================================================================
 
+    // Golden values pinned from guardian-core. These are verified by cross-language
+    // test vectors and should not change without updating the test vectors.
     #[test]
-    fn test_timing_class_windows_match_guardian_core() {
-        // verifier-core inlines timing class window values for WASM compat.
-        // This test ensures they stay in sync with guardian-core's canonical values.
-        use guardian_core::TimingClass;
-
-        for (name, canonical) in [
-            ("FAST", TimingClass::Fast),
-            ("SHORT", TimingClass::Short),
-            ("STANDARD", TimingClass::Standard),
-            ("EXTENDED", TimingClass::Extended),
-            ("LONG", TimingClass::Long),
-        ] {
-            let inlined = timing_class_window_seconds(name)
-                .unwrap_or_else(|| panic!("verifier-core missing timing class: {name}"));
-            assert_eq!(
-                inlined,
-                canonical.window_seconds(),
-                "timing class {name}: verifier-core has {inlined}s but guardian-core has {}s",
-                canonical.window_seconds()
-            );
-        }
+    fn test_timing_class_windows_golden_values() {
+        assert_eq!(timing_class_window_seconds("FAST"), Some(30));
+        assert_eq!(timing_class_window_seconds("SHORT"), Some(60));
+        assert_eq!(timing_class_window_seconds("STANDARD"), Some(120));
+        assert_eq!(timing_class_window_seconds("EXTENDED"), Some(300));
+        assert_eq!(timing_class_window_seconds("LONG"), Some(600));
     }
 
     // =========================================================================
@@ -2357,54 +2347,32 @@ mod tests {
     }
 
     #[test]
-    fn compartment_recompute_matches_guardian_core_public() {
-        use guardian_core::budget::generate_compartment_id;
-
+    fn compartment_recompute_golden_public() {
         let pair_id = "a".repeat(64);
-        let expected = generate_compartment_id(&pair_id, None).unwrap();
-
-        let result = verify_compartment_id(
-            &pair_id,
-            Some(&expected),
-            Some(&serde_json::Value::Null),
-        );
+        let expected = "581b530a462f976c69d6a98b2019088ed436add01c3ab292826e8f6d16f4e12a";
+        let result = verify_compartment_id(&pair_id, Some(expected), Some(&serde_json::Value::Null));
         assert_eq!(result.format_valid, Some(true));
         assert_eq!(result.derivation_valid, Some(true));
     }
 
     #[test]
-    fn compartment_recompute_matches_guardian_core_restricted() {
-        use guardian_core::budget::generate_compartment_id;
-        use std::collections::BTreeSet;
-
+    fn compartment_recompute_golden_restricted() {
         let pair_id = "b".repeat(64);
-        let mut principals = BTreeSet::new();
-        principals.insert("alice".to_string());
-        principals.insert("bob".to_string());
-
-        let expected = generate_compartment_id(&pair_id, Some(&principals)).unwrap();
-
+        let expected = "5885afbd20c5670210b0af761f97f8d929bdfcec0cee9c3b6c0d6f6bd803555f";
         let conf_value = serde_json::json!(["alice", "bob"]);
-        let result = verify_compartment_id(
-            &pair_id,
-            Some(&expected),
-            Some(&conf_value),
-        );
+        let result = verify_compartment_id(&pair_id, Some(expected), Some(&conf_value));
         assert_eq!(result.format_valid, Some(true));
         assert_eq!(result.derivation_valid, Some(true));
     }
 
     #[test]
-    fn compartment_mismatch_derivation_fails() {
-        use guardian_core::budget::generate_compartment_id;
-
+    fn compartment_mismatch_golden() {
         let pair_id = "c".repeat(64);
-        // Generate compartment for public
-        let cid = generate_compartment_id(&pair_id, None).unwrap();
-
+        // Compartment computed for public (null) confidentiality
+        let cid = "e97d5ab0a2df8a82f6c2b454db7f0107951e68ca6019593e25cc748f2e7a966c";
         // But claim restricted confidentiality — should mismatch
         let conf_value = serde_json::json!(["alice"]);
-        let result = verify_compartment_id(&pair_id, Some(&cid), Some(&conf_value));
+        let result = verify_compartment_id(&pair_id, Some(cid), Some(&conf_value));
         assert_eq!(result.format_valid, Some(true));
         assert_eq!(result.derivation_valid, Some(false));
     }
@@ -2419,22 +2387,11 @@ mod tests {
     }
 
     #[test]
-    fn compartment_recompute_single_principal() {
-        use guardian_core::budget::generate_compartment_id;
-        use std::collections::BTreeSet;
-
+    fn compartment_recompute_golden_single_principal() {
         let pair_id = "f".repeat(64);
-        let mut principals = BTreeSet::new();
-        principals.insert("eve".to_string());
-
-        let expected = generate_compartment_id(&pair_id, Some(&principals)).unwrap();
-
+        let expected = "aa731f14ce8b7d093cda5f1409b01625c4acf52b7398f8473043b09627ab3de4";
         let conf_value = serde_json::json!(["eve"]);
-        let result = verify_compartment_id(
-            &pair_id,
-            Some(&expected),
-            Some(&conf_value),
-        );
+        let result = verify_compartment_id(&pair_id, Some(expected), Some(&conf_value));
         assert_eq!(result.format_valid, Some(true));
         assert_eq!(result.derivation_valid, Some(true));
     }

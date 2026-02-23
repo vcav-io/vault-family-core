@@ -668,10 +668,26 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
         };
     }
 
-    // Load schema registry (from directory or embedded)
-    let registry = if let Some(schema_dir) = &args.schema_dir {
+    // Load embedded schemas (family envelope schemas — always available)
+    let embedded_registry = match embedded_schemas::load_embedded_registry() {
+        Ok(r) => r,
+        Err(e) => {
+            return VerifyDetails {
+                receipt: Some(receipt),
+                status: VerificationStatus::FailSchema,
+                schema_skipped: false,
+                output_schema_valid: None,
+                output_schema_id: None,
+                tier_result: tier,
+                error: Some(format!("Failed to load embedded schemas: {}", e)),
+            };
+        }
+    };
+
+    // Load schema_dir registry for protocol-specific output schemas (if provided)
+    let schema_dir_registry = if let Some(schema_dir) = &args.schema_dir {
         match crate::schema_registry::SchemaRegistry::load_from_directory(Path::new(schema_dir)) {
-            Ok(r) => r,
+            Ok(r) => Some(r),
             Err(e) => {
                 return VerifyDetails {
                     receipt: Some(receipt),
@@ -685,22 +701,12 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
             }
         }
     } else {
-        // Use embedded schemas (default)
-        match embedded_schemas::load_embedded_registry() {
-            Ok(r) => r,
-            Err(e) => {
-                return VerifyDetails {
-                    receipt: Some(receipt),
-                    status: VerificationStatus::FailSchema,
-                    schema_skipped: false,
-                    output_schema_valid: None,
-                    output_schema_id: None,
-                    tier_result: tier,
-                    error: Some(format!("Failed to load embedded schemas: {}", e)),
-                };
-            }
-        }
+        None
     };
+
+    // For receipt validation, always use embedded schemas.
+    // For output validation, prefer schema_dir (protocol schemas) then fall back to embedded.
+    let registry = &embedded_registry;
 
     // Validate against receipt schema
     let receipt_json = match serde_json::to_value(&receipt) {
@@ -756,9 +762,24 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                     }
                 });
 
-            // Validate output against its schema
-            let valid = registry.validate(&schema_id, output).is_ok();
-            (Some(valid), Some(schema_id))
+            // Validate output against its schema.
+            // Try schema_dir registry first (protocol-specific), then embedded.
+            let output_reg = schema_dir_registry.as_ref().unwrap_or(registry);
+            match output_reg.validate(&schema_id, output) {
+                Ok(()) => (Some(true), Some(schema_id)),
+                Err(crate::schema_registry::SchemaError::NotFound(_)) => {
+                    // Also try embedded (schema_dir may not have family schemas)
+                    match registry.validate(&schema_id, output) {
+                        Ok(()) => (Some(true), Some(schema_id)),
+                        Err(crate::schema_registry::SchemaError::NotFound(_)) => {
+                            // Schema not in any registry — cannot validate (not a failure)
+                            (None, Some(schema_id))
+                        }
+                        Err(_) => (Some(false), Some(schema_id)),
+                    }
+                }
+                Err(_) => (Some(false), Some(schema_id)),
+            }
         } else {
             // No output (aborted session) - can't validate
             (None, None)
@@ -803,6 +824,14 @@ mod tests {
     };
     use std::io::Write;
     use tempfile::{NamedTempFile, TempDir};
+
+    /// Path to vcav schemas directory (for output schema validation tests).
+    /// After the repo split, these tests should move to the vcav repo.
+    fn vcav_schema_dir() -> String {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let vcav_schemas = manifest_dir.join("../../../vcav/schemas");
+        vcav_schemas.to_str().unwrap().to_string()
+    }
 
     fn chain_id() -> String {
         format!("chain-{}", "1".repeat(64))
@@ -1628,7 +1657,7 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
             keyring_dir: None,
-            schema_dir: None,
+            schema_dir: Some(vcav_schema_dir()),
             skip_schema_validation: false,
             validate_output: true,
             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
@@ -1661,7 +1690,7 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
             keyring_dir: None,
-            schema_dir: None,
+            schema_dir: Some(vcav_schema_dir()),
             skip_schema_validation: false,
             validate_output: true,
             output_schema_id: Some("vault_result_compatibility".to_string()),
@@ -1706,6 +1735,7 @@ mod tests {
         ];
 
         let (signing_key, verifying_key) = generate_keypair();
+        let schema_dir = vcav_schema_dir();
 
         for decision in &decisions {
             for confidence in &confidence_buckets {
@@ -1744,7 +1774,7 @@ mod tests {
                             receipt: receipt_file.path().to_str().unwrap().to_string(),
                             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
                             keyring_dir: None,
-                            schema_dir: None,
+                            schema_dir: Some(schema_dir.clone()),
                             skip_schema_validation: false,
                             validate_output: true,
                             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
@@ -1812,7 +1842,7 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
             keyring_dir: None,
-            schema_dir: None,
+            schema_dir: Some(vcav_schema_dir()),
             skip_schema_validation: false,
             validate_output: true,
             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
@@ -1862,7 +1892,7 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
             keyring_dir: None,
-            schema_dir: None,
+            schema_dir: Some(vcav_schema_dir()),
             skip_schema_validation: false,
             validate_output: true,
             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
@@ -1909,6 +1939,42 @@ mod tests {
         assert!(details.receipt.is_some());
         assert_eq!(details.status, VerificationStatus::Ok);
         assert_eq!(details.output_schema_valid, None);
+    }
+
+    #[test]
+    fn test_verify_d2_output_schema_not_embedded_skips_gracefully() {
+        let (receipt_file, pubkey_file, _receipt) = create_d2_test_files();
+
+        // No schema_dir provided — protocol schemas are not embedded, so output
+        // validation should be skipped (output_schema_valid = None) rather than failing.
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: false,
+            validate_output: true,
+            output_schema_id: Some("vault_result_compatibility_d2".to_string()),
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: None,
+            manifest: None,
+            strict_runtime: false,
+            strict: false,
+        };
+
+        let details = verify(&args);
+        assert!(details.receipt.is_some());
+        // Schema not found in embedded registry → gracefully skipped (not a failure)
+        assert_eq!(details.status, VerificationStatus::Ok);
+        assert_eq!(details.output_schema_valid, None);
+        assert_eq!(
+            details.output_schema_id,
+            Some("vault_result_compatibility_d2".to_string())
+        );
     }
 
     // ========================================================================
