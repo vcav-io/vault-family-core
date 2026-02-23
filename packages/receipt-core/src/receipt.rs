@@ -145,6 +145,19 @@ fn default_execution_lane() -> ExecutionLane {
     ExecutionLane::SoftwareLocal
 }
 
+/// Compare two `Option<Box<RawValue>>` by their underlying JSON byte string.
+/// `RawValue` does not implement `PartialEq`; this is the canonical comparison.
+fn opt_raw_eq(
+    a: &Option<Box<serde_json::value::RawValue>>,
+    b: &Option<Box<serde_json::value::RawValue>>,
+) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(x), Some(y)) => x.get() == y.get(),
+        _ => false,
+    }
+}
+
 // ============================================================================
 // BudgetUsageRecord
 // ============================================================================
@@ -206,7 +219,12 @@ pub struct BudgetChainRecord {
 /// - Output and entropy calculation
 /// - Budget usage accounting
 /// - Ed25519 signature over canonical receipt
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// **Payload opacity invariant:** vault-family-core MUST NOT validate payload
+/// contents beyond envelope-level checks. The `payload` field is opaque bytes
+/// from the perspective of the receipt layer — interpretation is the caller's
+/// responsibility.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Receipt {
     /// Receipt schema version (always "1.0.0")
     pub schema_version: String,
@@ -259,6 +277,20 @@ pub struct Receipt {
 
     /// Calculated entropy of this output
     pub output_entropy_bits: u32,
+
+    /// Typed payload type identifier (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_payload_type: Option<String>,
+
+    /// Typed payload version string (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_payload_version: Option<String>,
+
+    /// Typed payload blob. Uses `RawValue` (not `Value`) to preserve exact JSON bytes
+    /// through signing round-trips — avoids serialization drift that could invalidate
+    /// signatures when the payload is re-serialized by a different JSON implementation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<Box<serde_json::value::RawValue>>,
 
     /// Mitigation IDs applied by runtime policy enforcement
     pub mitigations_applied: Vec<String>,
@@ -363,6 +395,59 @@ pub struct Receipt {
     pub signature: String,
 }
 
+impl PartialEq for Receipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.schema_version == other.schema_version
+            && self.session_id == other.session_id
+            && self.purpose_code == other.purpose_code
+            && self.participant_ids == other.participant_ids
+            && self.runtime_hash == other.runtime_hash
+            && self.guardian_policy_hash == other.guardian_policy_hash
+            && self.model_weights_hash == other.model_weights_hash
+            && self.llama_cpp_version == other.llama_cpp_version
+            && self.inference_config_hash == other.inference_config_hash
+            && self.output_schema_version == other.output_schema_version
+            && self.session_start == other.session_start
+            && self.session_end == other.session_end
+            && self.fixed_window_duration_seconds == other.fixed_window_duration_seconds
+            && self.status == other.status
+            && self.execution_lane == other.execution_lane
+            && self.output == other.output
+            && self.output_entropy_bits == other.output_entropy_bits
+            && self.receipt_payload_type == other.receipt_payload_type
+            && self.receipt_payload_version == other.receipt_payload_version
+            && opt_raw_eq(&self.payload, &other.payload)
+            && self.mitigations_applied == other.mitigations_applied
+            && self.budget_usage == other.budget_usage
+            && self.budget_chain == other.budget_chain
+            && self.model_identity == other.model_identity
+            && self.agreement_hash == other.agreement_hash
+            && self.receipt_key_id == other.receipt_key_id
+            && self.model_profile_hash == other.model_profile_hash
+            && self.policy_bundle_hash == other.policy_bundle_hash
+            && self.contract_hash == other.contract_hash
+            && self.output_schema_id == other.output_schema_id
+            && self.signal_class == other.signal_class
+            && self.entropy_budget_bits == other.entropy_budget_bits
+            && self.schema_entropy_ceiling_bits == other.schema_entropy_ceiling_bits
+            && self.prompt_template_hash == other.prompt_template_hash
+            && self.contract_timing_class == other.contract_timing_class
+            && self.ifc_output_label == other.ifc_output_label
+            && self.ifc_policy_hash == other.ifc_policy_hash
+            && self.ifc_label_receipt == other.ifc_label_receipt
+            && self.ifc_joined_confidentiality == other.ifc_joined_confidentiality
+            && self.entropy_status_commitment == other.entropy_status_commitment
+            && self.ledger_head_hash == other.ledger_head_hash
+            && self.delta_commitment_counterparty == other.delta_commitment_counterparty
+            && self.delta_commitment_contract == other.delta_commitment_contract
+            && self.policy_declaration == other.policy_declaration
+            && self.attestation == other.attestation
+            && self.signature == other.signature
+    }
+}
+
+impl Eq for Receipt {}
+
 impl Receipt {
     /// Create a new receipt builder
     pub fn builder() -> ReceiptBuilder {
@@ -392,7 +477,12 @@ impl Receipt {
 /// A receipt without a signature, used during construction.
 ///
 /// This is serialized and canonicalized before signing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// **Payload opacity invariant:** vault-family-core MUST NOT validate payload
+/// contents beyond envelope-level checks. The `payload` field is opaque bytes
+/// from the perspective of the receipt layer — interpretation is the caller's
+/// responsibility.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnsignedReceipt {
     /// Receipt schema version
     pub schema_version: String,
@@ -445,6 +535,20 @@ pub struct UnsignedReceipt {
 
     /// Calculated entropy of this output
     pub output_entropy_bits: u32,
+
+    /// Typed payload type identifier (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_payload_type: Option<String>,
+
+    /// Typed payload version string (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_payload_version: Option<String>,
+
+    /// Typed payload blob. Uses `RawValue` (not `Value`) to preserve exact JSON bytes
+    /// through signing round-trips — avoids serialization drift that could invalidate
+    /// signatures when the payload is re-serialized by a different JSON implementation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<Box<serde_json::value::RawValue>>,
 
     /// Mitigation IDs applied by runtime policy enforcement
     pub mitigations_applied: Vec<String>,
@@ -546,6 +650,58 @@ pub struct UnsignedReceipt {
     pub attestation: Option<AttestationEvidence>,
 }
 
+impl PartialEq for UnsignedReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.schema_version == other.schema_version
+            && self.session_id == other.session_id
+            && self.purpose_code == other.purpose_code
+            && self.participant_ids == other.participant_ids
+            && self.runtime_hash == other.runtime_hash
+            && self.guardian_policy_hash == other.guardian_policy_hash
+            && self.model_weights_hash == other.model_weights_hash
+            && self.llama_cpp_version == other.llama_cpp_version
+            && self.inference_config_hash == other.inference_config_hash
+            && self.output_schema_version == other.output_schema_version
+            && self.session_start == other.session_start
+            && self.session_end == other.session_end
+            && self.fixed_window_duration_seconds == other.fixed_window_duration_seconds
+            && self.status == other.status
+            && self.execution_lane == other.execution_lane
+            && self.output == other.output
+            && self.output_entropy_bits == other.output_entropy_bits
+            && self.receipt_payload_type == other.receipt_payload_type
+            && self.receipt_payload_version == other.receipt_payload_version
+            && opt_raw_eq(&self.payload, &other.payload)
+            && self.mitigations_applied == other.mitigations_applied
+            && self.budget_usage == other.budget_usage
+            && self.budget_chain == other.budget_chain
+            && self.model_identity == other.model_identity
+            && self.agreement_hash == other.agreement_hash
+            && self.receipt_key_id == other.receipt_key_id
+            && self.model_profile_hash == other.model_profile_hash
+            && self.policy_bundle_hash == other.policy_bundle_hash
+            && self.contract_hash == other.contract_hash
+            && self.output_schema_id == other.output_schema_id
+            && self.signal_class == other.signal_class
+            && self.entropy_budget_bits == other.entropy_budget_bits
+            && self.schema_entropy_ceiling_bits == other.schema_entropy_ceiling_bits
+            && self.prompt_template_hash == other.prompt_template_hash
+            && self.contract_timing_class == other.contract_timing_class
+            && self.ifc_output_label == other.ifc_output_label
+            && self.ifc_policy_hash == other.ifc_policy_hash
+            && self.ifc_label_receipt == other.ifc_label_receipt
+            && self.ifc_joined_confidentiality == other.ifc_joined_confidentiality
+            && self.entropy_status_commitment == other.entropy_status_commitment
+            && self.ledger_head_hash == other.ledger_head_hash
+            && self.delta_commitment_counterparty == other.delta_commitment_counterparty
+            && self.delta_commitment_contract == other.delta_commitment_contract
+            && self.policy_declaration == other.policy_declaration
+            && self.attestation == other.attestation
+    }
+}
+
+impl Eq for UnsignedReceipt {}
+
 impl UnsignedReceipt {
     /// Add a signature to create a signed Receipt
     pub fn sign(self, signature: String) -> Receipt {
@@ -567,6 +723,9 @@ impl UnsignedReceipt {
             execution_lane: self.execution_lane,
             output: self.output,
             output_entropy_bits: self.output_entropy_bits,
+            receipt_payload_type: self.receipt_payload_type,
+            receipt_payload_version: self.receipt_payload_version,
+            payload: self.payload,
             mitigations_applied: self.mitigations_applied,
             budget_usage: self.budget_usage,
             budget_chain: self.budget_chain,
@@ -620,6 +779,9 @@ pub struct ReceiptBuilder {
     execution_lane: Option<ExecutionLane>,
     output: Option<serde_json::Value>,
     output_entropy_bits: Option<u32>,
+    receipt_payload_type: Option<String>,
+    receipt_payload_version: Option<String>,
+    payload: Option<Box<serde_json::value::RawValue>>,
     mitigations_applied: Vec<String>,
     budget_usage: Option<BudgetUsageRecord>,
     budget_chain: Option<BudgetChainRecord>,
@@ -747,6 +909,25 @@ impl ReceiptBuilder {
     /// Set the output entropy bits
     pub fn output_entropy_bits(mut self, bits: u32) -> Self {
         self.output_entropy_bits = Some(bits);
+        self
+    }
+
+    /// Set the receipt payload type identifier (optional)
+    pub fn receipt_payload_type(mut self, v: Option<String>) -> Self {
+        self.receipt_payload_type = v;
+        self
+    }
+
+    /// Set the receipt payload version string (optional)
+    pub fn receipt_payload_version(mut self, v: Option<String>) -> Self {
+        self.receipt_payload_version = v;
+        self
+    }
+
+    /// Set the typed payload blob (optional).
+    /// Use `serde_json::value::RawValue::from_string` to construct a `Box<RawValue>`.
+    pub fn payload(mut self, v: Option<Box<serde_json::value::RawValue>>) -> Self {
+        self.payload = v;
         self
     }
 
@@ -980,6 +1161,9 @@ impl ReceiptBuilder {
             execution_lane: self.execution_lane.unwrap_or_else(default_execution_lane),
             output: self.output,
             output_entropy_bits: self.output_entropy_bits?,
+            receipt_payload_type: self.receipt_payload_type,
+            receipt_payload_version: self.receipt_payload_version,
+            payload: self.payload,
             mitigations_applied: self.mitigations_applied,
             budget_usage: self.budget_usage?,
             budget_chain: self.budget_chain,
@@ -1059,6 +1243,9 @@ mod tests {
                 "reason_code": "MUTUAL_INTEREST_UNCLEAR"
             })),
             output_entropy_bits: 8,
+            receipt_payload_type: None,
+            receipt_payload_version: None,
+            payload: None,
             mitigations_applied: vec![],
             budget_usage: sample_budget_usage(),
             budget_chain: None,
@@ -1891,6 +2078,9 @@ mod tests {
                 "reason_code": "MUTUAL_INTEREST_UNCLEAR"
             })),
             output_entropy_bits: 8,
+            receipt_payload_type: None,
+            receipt_payload_version: None,
+            payload: None,
             mitigations_applied: vec![],
             budget_usage: sample_budget_usage(),
             budget_chain: Some(BudgetChainRecord {
@@ -2071,5 +2261,82 @@ mod tests {
         let round_trip: UnsignedReceipt = serde_json::from_value(json).unwrap();
         assert_eq!(round_trip.entropy_status_commitment, receipt.entropy_status_commitment);
         assert_eq!(round_trip.policy_declaration, receipt.policy_declaration);
+    }
+
+    // ==================== Payload Slot Tests ====================
+
+    #[test]
+    fn test_receipt_payload_slot_omitted_when_none() {
+        let unsigned = sample_unsigned_receipt();
+        assert!(unsigned.receipt_payload_type.is_none());
+        assert!(unsigned.receipt_payload_version.is_none());
+        assert!(unsigned.payload.is_none());
+
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(!json.contains("receipt_payload_type"));
+        assert!(!json.contains("receipt_payload_version"));
+        assert!(!json.contains("\"payload\""));
+    }
+
+    #[test]
+    fn test_receipt_payload_slot_roundtrip() {
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.receipt_payload_type = Some("mediation_outcome_v1".to_string());
+        unsigned.receipt_payload_version = Some("1.0.0".to_string());
+        unsigned.payload = Some(
+            serde_json::value::RawValue::from_string(
+                r#"{"decision":"PROCEED","score":42}"#.to_string(),
+            )
+            .unwrap(),
+        );
+
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(json.contains("receipt_payload_type"));
+        assert!(json.contains("receipt_payload_version"));
+        assert!(json.contains("\"payload\""));
+        assert!(json.contains("mediation_outcome_v1"));
+        assert!(json.contains("1.0.0"));
+
+        let parsed: UnsignedReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.receipt_payload_type, unsigned.receipt_payload_type);
+        assert_eq!(parsed.receipt_payload_version, unsigned.receipt_payload_version);
+        assert_eq!(
+            parsed.payload.as_ref().map(|r| r.get()),
+            unsigned.payload.as_ref().map(|r| r.get()),
+        );
+        // Full PartialEq (uses opt_raw_eq internally)
+        assert_eq!(parsed, unsigned);
+    }
+
+    #[test]
+    fn test_receipt_payload_signature_stability() {
+        use crate::{sign_receipt, verify_receipt, SigningKey};
+
+        let signing_key = SigningKey::from_bytes(&[0x07u8; 32]);
+        let verifying_key = signing_key.verifying_key();
+
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.receipt_payload_type = Some("mediation_outcome_v1".to_string());
+        unsigned.receipt_payload_version = Some("1.0.0".to_string());
+        unsigned.payload = Some(
+            serde_json::value::RawValue::from_string(
+                r#"{"decision":"PROCEED","score":42}"#.to_string(),
+            )
+            .unwrap(),
+        );
+
+        let signature = sign_receipt(&unsigned, &signing_key).expect("sign");
+
+        // Verify before round-trip
+        verify_receipt(&unsigned, &signature, &verifying_key)
+            .expect("signature must verify before round-trip");
+
+        // Serialize to JSON and deserialize back — RawValue must preserve exact bytes
+        let json = serde_json::to_string(&unsigned).unwrap();
+        let restored: UnsignedReceipt = serde_json::from_str(&json).unwrap();
+
+        // Signature must still verify against the restored receipt
+        verify_receipt(&restored, &signature, &verifying_key)
+            .expect("signature must verify after JSON round-trip (RawValue preserves bytes)");
     }
 }

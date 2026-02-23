@@ -8,7 +8,7 @@ license.workspace = true
 [dependencies]
 vault-family-types = { path = "../vault-family-types" }
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 ed25519-dalek.workspace = true
 sha2.workspace = true
 chrono.workspace = true

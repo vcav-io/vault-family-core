@@ -337,6 +337,9 @@ mod tests {
                 "reason_code": "MUTUAL_INTEREST_UNCLEAR"
             })),
             output_entropy_bits: 8,
+            receipt_payload_type: None,
+            receipt_payload_version: None,
+            payload: None,
             mitigations_applied: vec![],
             budget_usage: BudgetUsageRecord {
                 pair_id: "a".repeat(64),

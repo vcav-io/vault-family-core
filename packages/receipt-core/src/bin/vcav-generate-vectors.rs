@@ -71,6 +71,9 @@ fn sample_unsigned_receipt() -> UnsignedReceipt {
             "reason_code": "MUTUAL_INTEREST_UNCLEAR"
         })),
         output_entropy_bits: 8,
+        receipt_payload_type: None,
+        receipt_payload_version: None,
+        payload: None,
         mitigations_applied: vec![],
         budget_usage: BudgetUsageRecord {
             pair_id: "a".repeat(64),
@@ -131,6 +134,9 @@ fn sample_aborted_receipt() -> UnsignedReceipt {
         status: ReceiptStatus::Aborted,
         output: None,
         output_entropy_bits: 0,
+        receipt_payload_type: None,
+        receipt_payload_version: None,
+        payload: None,
         mitigations_applied: vec![],
         budget_usage: BudgetUsageRecord {
             pair_id: "a".repeat(64),
@@ -872,6 +878,9 @@ fn sample_full_receipt(vault_pub_hex: &str) -> UnsignedReceipt {
             "reason_code": "MUTUAL_INTEREST_UNCLEAR"
         })),
         output_entropy_bits: 8,
+        receipt_payload_type: None,
+        receipt_payload_version: None,
+        payload: None,
         mitigations_applied: vec![],
         budget_usage: BudgetUsageRecord {
             pair_id: "a".repeat(64),
