@@ -826,11 +826,18 @@ mod tests {
     use tempfile::{NamedTempFile, TempDir};
 
     /// Path to vcav schemas directory (for output schema validation tests).
-    /// After the repo split, these tests should move to the vcav repo.
-    fn vcav_schema_dir() -> String {
-        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let vcav_schemas = manifest_dir.join("../../../vcav/schemas");
-        vcav_schemas.to_str().unwrap().to_string()
+    /// Post repo-split: vcav schemas live in a separate repo.
+    /// Set VCAV_SCHEMAS_DIR to a local checkout of vcav/schemas/ to enable these tests.
+    fn vcav_schema_dir() -> Option<String> {
+        std::env::var("VCAV_SCHEMAS_DIR").ok().or_else(|| {
+            let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            let vcav_schemas = manifest_dir.join("../../vcav/schemas");
+            if vcav_schemas.exists() {
+                Some(vcav_schemas.to_str().unwrap().to_string())
+            } else {
+                None
+            }
+        })
     }
 
     fn chain_id() -> String {
@@ -1651,13 +1658,14 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_valid() {
+        let Some(schema_dir) = vcav_schema_dir() else { return; };
         let (receipt_file, pubkey_file, _receipt) = create_d2_test_files();
 
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
             keyring_dir: None,
-            schema_dir: Some(vcav_schema_dir()),
+            schema_dir: Some(schema_dir),
             skip_schema_validation: false,
             validate_output: true,
             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
@@ -1684,13 +1692,14 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_invalid_wrong_schema() {
+        let Some(schema_dir) = vcav_schema_dir() else { return; };
         let (receipt_file, pubkey_file, _receipt) = create_d2_test_files();
 
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
             keyring_dir: None,
-            schema_dir: Some(vcav_schema_dir()),
+            schema_dir: Some(schema_dir),
             skip_schema_validation: false,
             validate_output: true,
             output_schema_id: Some("vault_result_compatibility".to_string()),
@@ -1713,6 +1722,7 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_all_enum_values() {
+        let Some(schema_dir) = vcav_schema_dir() else { return; };
         let decisions = ["PROCEED", "DO_NOT_PROCEED", "INCONCLUSIVE"];
         let confidence_buckets = ["LOW", "MEDIUM", "HIGH"];
         let reason_codes = [
@@ -1735,7 +1745,6 @@ mod tests {
         ];
 
         let (signing_key, verifying_key) = generate_keypair();
-        let schema_dir = vcav_schema_dir();
 
         for decision in &decisions {
             for confidence in &confidence_buckets {
@@ -1808,6 +1817,7 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_invalid_enum_value() {
+        let Some(_schema_dir) = vcav_schema_dir() else { return; };
         let (signing_key, verifying_key) = generate_keypair();
 
         let mut unsigned = UnsignedReceipt {
@@ -1842,7 +1852,7 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
             keyring_dir: None,
-            schema_dir: Some(vcav_schema_dir()),
+            schema_dir: vcav_schema_dir(),
             skip_schema_validation: false,
             validate_output: true,
             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
@@ -1864,6 +1874,7 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_missing_output_b() {
+        let Some(_schema_dir) = vcav_schema_dir() else { return; };
         let (signing_key, verifying_key) = generate_keypair();
 
         let mut unsigned = UnsignedReceipt {
@@ -1892,7 +1903,7 @@ mod tests {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
             keyring_dir: None,
-            schema_dir: Some(vcav_schema_dir()),
+            schema_dir: vcav_schema_dir(),
             skip_schema_validation: false,
             validate_output: true,
             output_schema_id: Some("vault_result_compatibility_d2".to_string()),
@@ -1986,9 +1997,7 @@ mod tests {
         manifest
             .parent() // packages/
             .unwrap()
-            .parent() // vault-family-core/
-            .unwrap()
-            .parent() // repo root
+            .parent() // workspace root
             .unwrap()
             .join("data")
             .join("test-vectors")

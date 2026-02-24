@@ -82,7 +82,7 @@ enum ReasonEnum {
 
 /// Load a test vector JSON file from the workspace root.
 fn load_vector<T: for<'de> Deserialize<'de>>(filename: &str) -> T {
-    let path = format!("../../../data/test-vectors/{}", filename);
+    let path = format!("../../data/test-vectors/{}", filename);
     let content =
         std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
     serde_json::from_str(&content).unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
