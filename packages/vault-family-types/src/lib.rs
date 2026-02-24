@@ -11,7 +11,9 @@
 mod purpose;
 mod budget_tier;
 mod agent_id;
+mod lane;
 
 pub use purpose::Purpose;
-pub use budget_tier::{BudgetTier, DEFAULT_BUDGET_BITS, ELEVATED_BUDGET_BITS};
+pub use budget_tier::{BudgetTier, BudgetTierV2, DEFAULT_BUDGET_BITS, ELEVATED_BUDGET_BITS};
 pub use agent_id::{normalize_agent_id, generate_pair_id, PAIR_ID_DOMAIN_PREFIX};
+pub use lane::{LaneId, ExecutionLane};

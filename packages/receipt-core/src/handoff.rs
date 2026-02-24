@@ -4,6 +4,7 @@
 //! to VCAV Core. Both participants sign the handoff to authorize session creation.
 
 use serde::{Deserialize, Serialize};
+pub use vault_family_types::BudgetTierV2;
 
 // ============================================================================
 // HashRef
@@ -24,36 +25,6 @@ impl HashRef {
         Self {
             hash_alg: "sha256".to_string(),
             hash_b64: hash_b64.into(),
-        }
-    }
-}
-
-// ============================================================================
-// BudgetTierV2
-// ============================================================================
-
-/// Budget tier for Phase 2 (TINY/SMALL/MEDIUM/LARGE)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum BudgetTierV2 {
-    /// Minimal entropy budget (8 bits)
-    Tiny,
-    /// Small entropy budget (16 bits)
-    Small,
-    /// Medium entropy budget (24 bits)
-    Medium,
-    /// Large entropy budget (32 bits)
-    Large,
-}
-
-impl BudgetTierV2 {
-    /// Get the entropy budget in bits for this tier
-    pub fn entropy_bits(&self) -> u32 {
-        match self {
-            BudgetTierV2::Tiny => 8,
-            BudgetTierV2::Small => 16,
-            BudgetTierV2::Medium => 24,
-            BudgetTierV2::Large => 32,
         }
     }
 }

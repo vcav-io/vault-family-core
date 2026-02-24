@@ -309,8 +309,9 @@ pub fn verify_handoff(
 mod tests {
     use super::*;
     use crate::receipt::{
-        BudgetUsageRecord, ExecutionLane, ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
+        BudgetUsageRecord, ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
     };
+    use vault_family_types::ExecutionLane;
     use chrono::{TimeZone, Utc};
     use vault_family_types::{BudgetTier, Purpose};
 
