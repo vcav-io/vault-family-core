@@ -85,12 +85,18 @@ pub fn validate_message(msg: &AfalMessage) -> Result<(), Vec<String>> {
         ));
     }
 
-    if msg.payload.body.len() > MAX_BODY_LENGTH {
+    if msg.payload.body.chars().count() > MAX_BODY_LENGTH {
         errors.push(format!(
             "payload.body exceeds max length ({} > {})",
-            msg.payload.body.len(),
+            msg.payload.body.chars().count(),
             MAX_BODY_LENGTH
         ));
+    }
+
+    if msg.signature.len() != 128
+        || !msg.signature.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    {
+        errors.push("signature must be 128-char lowercase hex".to_string());
     }
 
     if errors.is_empty() {
