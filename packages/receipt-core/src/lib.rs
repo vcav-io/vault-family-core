@@ -45,9 +45,11 @@ pub use attestation::{
     ATTESTATION_CHALLENGE_DOMAIN_PREFIX,
 };
 pub use receipt::{
-    BudgetChainRecord, BudgetUsageRecord, ExecutionLane, PolicyDeclaration, PolicyMode,
+    BudgetChainRecord, BudgetUsageRecord, PolicyDeclaration, PolicyMode,
     Receipt, ReceiptBuilder, ReceiptStatus, SignalClass, UnsignedReceipt, SCHEMA_VERSION,
 };
+// Re-export ExecutionLane (now LaneId alias) from vault-family-types for backward compat
+pub use vault_family_types::{ExecutionLane, LaneId};
 pub use manifest::{
     compute_operator_key_id, create_manifest_signing_message, sign_manifest, verify_manifest,
     ArtefactEntry, ManifestArtefacts, PublicationManifest, RuntimeHashes, UnsignedManifest,

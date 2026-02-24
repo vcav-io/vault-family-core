@@ -176,7 +176,8 @@ pub fn verify_manifest(
 mod tests {
     use super::*;
     use crate::signer::{generate_keypair, public_key_to_hex, sign_receipt};
-    use crate::receipt::{BudgetUsageRecord, ExecutionLane, ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION};
+    use crate::receipt::{BudgetUsageRecord, ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION};
+    use vault_family_types::ExecutionLane;
     use chrono::{TimeZone, Utc};
     use vault_family_types::{BudgetTier, Purpose};
 

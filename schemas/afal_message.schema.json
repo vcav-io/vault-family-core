@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/afal_message.schema.json",
+  "title": "AFAL MESSAGE",
+  "description": "Inter-agent message for AFAL protocol (Binding Spec v1, Section 3.5)",
+  "type": "object",
+  "required": [
+    "message_version", "message_id", "timestamp", "from", "to",
+    "payload", "signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "message_version": { "type": "string", "const": "1" },
+    "message_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "from": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "to": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "payload": {
+      "type": "object",
+      "required": ["content_type", "body"],
+      "additionalProperties": false,
+      "properties": {
+        "content_type": {
+          "type": "string",
+          "enum": ["text/plain", "application/json"]
+        },
+        "body": { "type": "string", "maxLength": 4096 }
+      }
+    },
+    "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
+  }
+}

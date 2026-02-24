@@ -174,8 +174,9 @@ impl BudgetLedger {
 mod tests {
     use super::*;
     use crate::receipt::{
-        BudgetChainRecord, BudgetUsageRecord, ExecutionLane, ReceiptStatus, UnsignedReceipt,
+        BudgetChainRecord, BudgetUsageRecord, ReceiptStatus, UnsignedReceipt,
     };
+    use vault_family_types::ExecutionLane;
     use crate::signer::{compute_receipt_hash, generate_keypair, sign_receipt};
     use chrono::{TimeZone, Utc};
     use vault_family_types::{BudgetTier, Purpose};

@@ -1,0 +1,24 @@
+[package]
+name = "afal-core"
+description = "AFAL (Agent Federation & Admission Layer) protocol primitives"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vault-family-types = { path = "../vault-family-types" }
+receipt-core = { path = "../receipt-core" }
+serde.workspace = true
+serde_json.workspace = true
+ed25519-dalek.workspace = true
+sha2.workspace = true
+hex.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+
+[[bin]]
+name = "afal-generate-vectors"
+path = "src/bin/generate_test_vectors.rs"
+
+[dev-dependencies]
+rand.workspace = true

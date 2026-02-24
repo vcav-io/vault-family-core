@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/afal_admit.schema.json",
+  "title": "AFAL ADMIT Message",
+  "description": "ADMIT message for AFAL protocol (Binding Spec v1, Section 3.2)",
+  "type": "object",
+  "required": [
+    "admission_version", "proposal_id", "outcome", "expires_at",
+    "contract_hash", "model_profile_hash", "output_schema_id",
+    "output_schema_version", "lane_id", "entropy_cap", "budget_tier",
+    "admission_tier_granted", "admit_token_id", "signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "admission_version": { "type": "string", "const": "1" },
+    "proposal_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "outcome": { "type": "string", "const": "ADMIT" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "contract_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "model_profile_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "output_schema_id": { "type": "string" },
+    "output_schema_version": { "type": "string" },
+    "lane_id": {
+      "type": "string",
+      "enum": ["SEALED_LOCAL", "SOFTWARE_LOCAL", "API_MEDIATED"]
+    },
+    "entropy_cap": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "budget_tier": {
+      "type": "string",
+      "enum": ["TINY", "SMALL", "MEDIUM", "LARGE"]
+    },
+    "admission_tier_granted": {
+      "type": "string",
+      "enum": ["TRUSTED", "DEFAULT", "LOW_TRUST"]
+    },
+    "admit_token_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "prev_receipt_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "policy_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
+  }
+}

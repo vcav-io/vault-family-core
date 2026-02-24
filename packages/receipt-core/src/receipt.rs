@@ -4,7 +4,7 @@
 //! Receipts are cryptographic proofs of session execution and constraints.
 
 use chrono::{DateTime, Utc};
-use vault_family_types::{BudgetTier, Purpose};
+use vault_family_types::{BudgetTier, ExecutionLane, Purpose};
 use serde::{Deserialize, Serialize};
 
 use crate::agreement::ModelIdentity;
@@ -115,34 +115,8 @@ impl std::fmt::Display for SignalClass {
     }
 }
 
-/// Execution lane for this session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ExecutionLane {
-    /// Sealed topology with local inference only.
-    #[serde(rename = "SEALED_LOCAL")]
-    SealedLocal,
-    /// Software-attested local inference (auditable runtime, software signing).
-    #[serde(rename = "SOFTWARE_LOCAL")]
-    SoftwareLocal,
-    /// API-mediated inference via external provider.
-    #[serde(rename = "API_MEDIATED")]
-    ApiMediated,
-}
-
-impl std::fmt::Display for ExecutionLane {
-    /// Display uses wire-format values because `.to_string()` feeds into
-    /// `compute_budget_chain_id` (SHA-256 hash).
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ExecutionLane::SealedLocal => write!(f, "SEALED_LOCAL"),
-            ExecutionLane::SoftwareLocal => write!(f, "SOFTWARE_LOCAL"),
-            ExecutionLane::ApiMediated => write!(f, "API_MEDIATED"),
-        }
-    }
-}
-
 fn default_execution_lane() -> ExecutionLane {
-    ExecutionLane::SoftwareLocal
+    ExecutionLane::default()
 }
 
 /// Compare two `Option<Box<RawValue>>` by their underlying JSON byte string.

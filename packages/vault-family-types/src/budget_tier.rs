@@ -26,6 +26,38 @@ pub const DEFAULT_BUDGET_BITS: u32 = 128;
 /// Elevated privacy budget: 512 bits per agent pair per 30-day window
 pub const ELEVATED_BUDGET_BITS: u32 = 512;
 
+// ============================================================================
+// BudgetTierV2
+// ============================================================================
+
+/// Budget tier for Phase 2 (TINY/SMALL/MEDIUM/LARGE).
+///
+/// **Wire format — frozen.** Serde strings appear in signed handoffs and AFAL messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BudgetTierV2 {
+    /// Minimal entropy budget (8 bits)
+    Tiny,
+    /// Small entropy budget (16 bits)
+    Small,
+    /// Medium entropy budget (24 bits)
+    Medium,
+    /// Large entropy budget (32 bits)
+    Large,
+}
+
+impl BudgetTierV2 {
+    /// Get the entropy budget in bits for this tier
+    pub fn entropy_bits(&self) -> u32 {
+        match self {
+            BudgetTierV2::Tiny => 8,
+            BudgetTierV2::Small => 16,
+            BudgetTierV2::Medium => 24,
+            BudgetTierV2::Large => 32,
+        }
+    }
+}
+
 impl BudgetTier {
     /// Returns the budget limit in bits for this tier
     ///
@@ -96,5 +128,34 @@ mod tests {
         assert!(BudgetTier::Elevated.is_enforced());
         assert!(BudgetTier::Custom.is_enforced());
         assert!(!BudgetTier::Research.is_enforced());
+    }
+
+    // BudgetTierV2 tests
+
+    #[test]
+    fn test_budget_tier_v2_entropy_bits() {
+        assert_eq!(BudgetTierV2::Tiny.entropy_bits(), 8);
+        assert_eq!(BudgetTierV2::Small.entropy_bits(), 16);
+        assert_eq!(BudgetTierV2::Medium.entropy_bits(), 24);
+        assert_eq!(BudgetTierV2::Large.entropy_bits(), 32);
+    }
+
+    /// Golden test: serde strings are frozen wire format in signed handoffs.
+    #[test]
+    fn test_budget_tier_v2_serde_golden() {
+        assert_eq!(serde_json::to_string(&BudgetTierV2::Tiny).unwrap(), "\"TINY\"");
+        assert_eq!(serde_json::to_string(&BudgetTierV2::Small).unwrap(), "\"SMALL\"");
+        assert_eq!(serde_json::to_string(&BudgetTierV2::Medium).unwrap(), "\"MEDIUM\"");
+        assert_eq!(serde_json::to_string(&BudgetTierV2::Large).unwrap(), "\"LARGE\"");
+    }
+
+    #[test]
+    fn test_budget_tier_v2_serde_roundtrip() {
+        let tiers = [BudgetTierV2::Tiny, BudgetTierV2::Small, BudgetTierV2::Medium, BudgetTierV2::Large];
+        for tier in &tiers {
+            let json = serde_json::to_string(tier).unwrap();
+            let parsed: BudgetTierV2 = serde_json::from_str(&json).unwrap();
+            assert_eq!(*tier, parsed);
+        }
     }
 }

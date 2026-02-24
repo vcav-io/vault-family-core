@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/afal_agent_descriptor.schema.json",
+  "title": "AFAL Agent Descriptor",
+  "description": "Agent descriptor for AFAL protocol (Binding Spec v1, Section 2)",
+  "type": "object",
+  "required": [
+    "descriptor_version", "agent_id", "issued_at", "expires_at",
+    "identity_key", "envelope_key", "endpoints", "capabilities",
+    "policy_commitments"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "descriptor_version": { "type": "string", "const": "1" },
+    "agent_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "identity_key": {
+      "type": "object",
+      "required": ["algorithm", "public_key_hex"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "type": "string", "const": "ed25519" },
+        "public_key_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "envelope_key": {
+      "type": "object",
+      "required": ["algorithm", "public_key_hex"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "type": "string", "const": "x25519" },
+        "public_key_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "endpoints": {
+      "type": "object",
+      "required": ["propose", "commit"],
+      "additionalProperties": false,
+      "properties": {
+        "propose": { "type": "string", "format": "uri" },
+        "commit": { "type": "string", "format": "uri" },
+        "message": { "type": "string", "format": "uri" },
+        "receipts": { "type": "string", "format": "uri" }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "required": [
+        "supported_purpose_codes", "supported_output_schemas",
+        "supported_lanes", "supported_model_profiles"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "supported_purpose_codes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "supported_output_schemas": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "supported_lanes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["SEALED_LOCAL", "SOFTWARE_LOCAL", "API_MEDIATED"]
+          },
+          "minItems": 1
+        },
+        "max_entropy_bits_by_schema": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "supported_model_profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "version", "hash"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "version": { "type": "string" },
+              "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "policy_commitments": {
+      "type": "object",
+      "required": ["policy_bundle_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "policy_bundle_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "schema_bundle_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "admission_policy_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "label_requirements": {
+      "type": "object",
+      "required": ["supported_confidentiality_domains", "minimum_integrity"],
+      "additionalProperties": false,
+      "properties": {
+        "supported_confidentiality_domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "minimum_integrity": {
+          "type": "string",
+          "enum": ["TRUSTED", "UNTRUSTED"]
+        },
+        "ifc_policy_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
+  }
+}

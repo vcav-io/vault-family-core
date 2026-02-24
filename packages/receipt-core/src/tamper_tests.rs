@@ -28,9 +28,10 @@ mod tests {
         MANIFEST_DOMAIN_PREFIX,
     };
     use crate::receipt::{
-        BudgetChainRecord, BudgetUsageRecord, ExecutionLane, Receipt,
+        BudgetChainRecord, BudgetUsageRecord, Receipt,
         ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
     };
+    use vault_family_types::ExecutionLane;
     use crate::signer::{
         compute_receipt_hash, compute_receipt_key_id,
         generate_keypair,

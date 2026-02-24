@@ -11,6 +11,7 @@ members = [
     "packages/label-registry",
     "packages/ifc-wasm",
     "packages/escalation-interface",
+    "packages/afal-core",
 ]
 
 [workspace.package]
