@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/afal_deny.schema.json",
+  "title": "AFAL DENY Message",
+  "description": "DENY message for AFAL protocol (Binding Spec v1, Section 3.3). Constant shape: exactly 5 fields.",
+  "type": "object",
+  "required": [
+    "admission_version", "proposal_id", "outcome", "expires_at", "signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "admission_version": { "type": "string", "const": "1" },
+    "proposal_id": { "type": "string" },
+    "outcome": { "type": "string", "const": "DENY" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
+  }
+}

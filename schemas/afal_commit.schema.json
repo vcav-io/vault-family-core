@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/afal_commit.schema.json",
+  "title": "AFAL COMMIT Message",
+  "description": "COMMIT message for AFAL protocol (Binding Spec v1, Section 3.4)",
+  "type": "object",
+  "required": [
+    "commit_version", "admit_token_id", "encrypted_input_hash",
+    "agent_descriptor_hash", "signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "commit_version": { "type": "string", "const": "1" },
+    "admit_token_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "encrypted_input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "agent_descriptor_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "encrypted_input_envelopes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ephemeral_public_key_hex", "nonce_hex", "ciphertext_b64", "aad_hex"],
+        "additionalProperties": false,
+        "properties": {
+          "ephemeral_public_key_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "nonce_hex": { "type": "string", "pattern": "^[0-9a-f]{48}$" },
+          "ciphertext_b64": { "type": "string" },
+          "aad_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/afal_propose.schema.json",
+  "title": "AFAL PROPOSE Message",
+  "description": "PROPOSE message for AFAL protocol (Binding Spec v1, Section 3.1)",
+  "type": "object",
+  "required": [
+    "proposal_version", "proposal_id", "timestamp", "from", "to",
+    "descriptor_hash", "purpose_code", "lane_id", "output_schema_id",
+    "output_schema_version", "model_profile_id", "model_profile_version",
+    "model_profile_hash", "requested_entropy_bits", "requested_budget_tier",
+    "admission_tier_requested", "signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "proposal_version": { "type": "string", "const": "1" },
+    "proposal_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "from": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "to": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "descriptor_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "purpose_code": { "type": "string" },
+    "lane_id": {
+      "type": "string",
+      "enum": ["SEALED_LOCAL", "SOFTWARE_LOCAL", "API_MEDIATED"]
+    },
+    "output_schema_id": { "type": "string" },
+    "output_schema_version": { "type": "string" },
+    "model_profile_id": { "type": "string" },
+    "model_profile_version": { "type": "string" },
+    "model_profile_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "requested_entropy_bits": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "requested_budget_tier": {
+      "type": "string",
+      "enum": ["TINY", "SMALL", "MEDIUM", "LARGE"]
+    },
+    "admission_tier_requested": {
+      "type": "string",
+      "enum": ["TRUSTED", "DEFAULT", "LOW_TRUST"]
+    },
+    "prev_receipt_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
+  }
+}
