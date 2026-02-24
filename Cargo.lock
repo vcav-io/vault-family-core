@@ -3,6 +3,22 @@
 version = 4
 
 [[package]]
+name = "afal-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "ed25519-dalek",
+ "hex",
+ "rand 0.8.5",
+ "receipt-core",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "vault-family-types",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"

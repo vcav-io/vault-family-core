@@ -1,0 +1,35 @@
+{
+  "description": "AFAL PROPOSE message: sign and verify",
+  "expected": {
+    "signature_hex": "756ab3e751b9314cdb7e7d88ebd3dfe047baabcac313cafc4e4d5e960e023aa4d344af6738b7c77a9a05ce8cdcdbc845b2ccc790a16d73c6a9ca4708cb9fb20a",
+    "verification_result": "PASS"
+  },
+  "input": {
+    "canonical_json": "{\"admission_tier_requested\":\"DEFAULT\",\"descriptor_hash\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"from\":\"alice-test-agent\",\"lane_id\":\"SEALED_LOCAL\",\"model_profile_hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"model_profile_id\":\"test-model\",\"model_profile_version\":\"1.0\",\"output_schema_id\":\"urn:vcav:schema:dating.d2.v1\",\"output_schema_version\":\"1.0\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"proposal_version\":\"1\",\"purpose_code\":\"COMPATIBILITY\",\"requested_budget_tier\":\"SMALL\",\"requested_entropy_bits\":8,\"timestamp\":\"2026-01-01T00:05:00Z\",\"to\":\"bob-test-agent\"}",
+    "domain_prefix": "VCAV-PROPOSE-V1:",
+    "seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "sha256_digest_hex": "17db7b1b758ce32e6be8f4eeaffbb66029e77891c7307c8e7814dd3f651103d4",
+    "unsigned_propose": {
+      "admission_tier_requested": "DEFAULT",
+      "descriptor_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "from": "alice-test-agent",
+      "lane_id": "SEALED_LOCAL",
+      "model_profile_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "model_profile_id": "test-model",
+      "model_profile_version": "1.0",
+      "output_schema_id": "urn:vcav:schema:dating.d2.v1",
+      "output_schema_version": "1.0",
+      "proposal_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "proposal_version": "1",
+      "purpose_code": "COMPATIBILITY",
+      "requested_budget_tier": "SMALL",
+      "requested_entropy_bits": 8,
+      "timestamp": "2026-01-01T00:05:00Z",
+      "to": "bob-test-agent"
+    },
+    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/afal_propose.schema.json"
+  ]
+}

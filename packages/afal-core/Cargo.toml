@@ -16,5 +16,9 @@ hex.workspace = true
 chrono.workspace = true
 thiserror.workspace = true
 
+[[bin]]
+name = "afal-generate-vectors"
+path = "src/bin/generate_test_vectors.rs"
+
 [dev-dependencies]
 rand.workspace = true

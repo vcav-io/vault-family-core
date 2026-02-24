@@ -1,0 +1,57 @@
+{
+  "description": "AFAL agent descriptor: sign, verify, and hash",
+  "expected": {
+    "descriptor_hash": "f87524d16c34cb6b91f0bfaf52d67c1f444af2e4568df130770af1bf1fdff334",
+    "signature_hex": "0d5cec4d0ea98d9cbbdab78304c5ef8d317f02286b5196fbd5b980560f079b0b13cbfaa1efdfd103c3585c76a6854ca4459642eec48b898014fb9f46381f5209",
+    "verification_result": "PASS"
+  },
+  "input": {
+    "canonical_json": "{\"agent_id\":\"alice-test-agent\",\"capabilities\":{\"supported_lanes\":[\"SEALED_LOCAL\"],\"supported_model_profiles\":[{\"hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"id\":\"test-model\",\"version\":\"1.0\"}],\"supported_output_schemas\":[\"urn:vcav:schema:dating.d2.v1\"],\"supported_purpose_codes\":[\"COMPATIBILITY\"]},\"descriptor_version\":\"1\",\"endpoints\":{\"commit\":\"https://alice.example.com/afal/commit\",\"propose\":\"https://alice.example.com/afal/propose\"},\"envelope_key\":{\"algorithm\":\"x25519\",\"public_key_hex\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"expires_at\":\"2026-01-02T00:00:00Z\",\"identity_key\":{\"algorithm\":\"ed25519\",\"public_key_hex\":\"8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c\"},\"issued_at\":\"2026-01-01T00:00:00Z\",\"policy_commitments\":{\"policy_bundle_hash\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"}}",
+    "domain_prefix": "VCAV-DESCRIPTOR-V1:",
+    "seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "sha256_digest_hex": "fc0f135a8a60e181d5a9584e439b36a80ac18492f91062f4d1b9026da134a6bf",
+    "unsigned_descriptor": {
+      "agent_id": "alice-test-agent",
+      "capabilities": {
+        "supported_lanes": [
+          "SEALED_LOCAL"
+        ],
+        "supported_model_profiles": [
+          {
+            "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "id": "test-model",
+            "version": "1.0"
+          }
+        ],
+        "supported_output_schemas": [
+          "urn:vcav:schema:dating.d2.v1"
+        ],
+        "supported_purpose_codes": [
+          "COMPATIBILITY"
+        ]
+      },
+      "descriptor_version": "1",
+      "endpoints": {
+        "commit": "https://alice.example.com/afal/commit",
+        "propose": "https://alice.example.com/afal/propose"
+      },
+      "envelope_key": {
+        "algorithm": "x25519",
+        "public_key_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "expires_at": "2026-01-02T00:00:00Z",
+      "identity_key": {
+        "algorithm": "ed25519",
+        "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+      },
+      "issued_at": "2026-01-01T00:00:00Z",
+      "policy_commitments": {
+        "policy_bundle_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/afal_agent_descriptor.schema.json"
+  ]
+}

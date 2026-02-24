@@ -1,0 +1,33 @@
+{
+  "aad": {
+    "binding_object": {
+      "admit_token_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "contract_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "lane_id": "SEALED_LOCAL",
+      "model_profile_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "output_schema_id": "urn:vcav:schema:dating.d2.v1"
+    },
+    "canonical_json": "{\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"contract_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"lane_id\":\"SEALED_LOCAL\",\"model_profile_hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"output_schema_id\":\"urn:vcav:schema:dating.d2.v1\"}",
+    "expected_aad_hex": "a113b718e5a8cb81878d9139a25051a35b88486477bca3f56857556f9c1088f5"
+  },
+  "description": "AFAL COMMIT: signing and AAD construction",
+  "expected": {
+    "signature_hex": "2a1418d0170d3a160e6bae768778390ae566e6ccf9704b5055a03a4ccf504f418781cccb630261b3f7a7f6799a98f8819458752bae13ad8452298839ee372600",
+    "verification_result": "PASS"
+  },
+  "input": {
+    "canonical_json": "{\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"agent_descriptor_hash\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"commit_version\":\"1\",\"encrypted_input_hash\":\"1111111111111111111111111111111111111111111111111111111111111111\"}",
+    "domain_prefix": "VCAV-COMMIT-V1:",
+    "seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "unsigned_commit": {
+      "admit_token_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "agent_descriptor_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "commit_version": "1",
+      "encrypted_input_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+  },
+  "schemas": [
+    "https://vcav.io/schemas/afal_commit.schema.json"
+  ]
+}

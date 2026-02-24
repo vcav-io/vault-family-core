@@ -1,0 +1,73 @@
+{
+  "config": {
+    "base_time": "2026-01-01T00:05:00+00:00",
+    "clock_skew_seconds": 300,
+    "max_entries": 10000,
+    "window_seconds": 600
+  },
+  "description": "AFAL replay protection: timestamp bounds and nonce format",
+  "nonce_format_cases": [
+    {
+      "expected_valid": true,
+      "label": "valid_hex64",
+      "nonce": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "expected_valid": true,
+      "label": "valid_mixed_hex",
+      "nonce": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "expected_valid": false,
+      "label": "uppercase_rejected",
+      "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "expected_valid": false,
+      "label": "too_short",
+      "nonce": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "expected_valid": false,
+      "label": "non_hex",
+      "nonce": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+    }
+  ],
+  "timestamp_cases": [
+    {
+      "expected_ok": true,
+      "label": "exact_match",
+      "timestamp": "2026-01-01T00:05:00+00:00"
+    },
+    {
+      "expected_ok": true,
+      "label": "4_min_past",
+      "timestamp": "2026-01-01T00:01:00+00:00"
+    },
+    {
+      "expected_ok": true,
+      "label": "4_min_future",
+      "timestamp": "2026-01-01T00:09:00+00:00"
+    },
+    {
+      "expected_ok": false,
+      "label": "6_min_past",
+      "timestamp": "2025-12-31T23:59:00+00:00"
+    },
+    {
+      "expected_ok": false,
+      "label": "6_min_future",
+      "timestamp": "2026-01-01T00:11:00+00:00"
+    },
+    {
+      "expected_ok": true,
+      "label": "boundary_299s",
+      "timestamp": "2026-01-01T00:00:01+00:00"
+    },
+    {
+      "expected_ok": false,
+      "label": "boundary_301s",
+      "timestamp": "2025-12-31T23:59:59+00:00"
+    }
+  ]
+}
