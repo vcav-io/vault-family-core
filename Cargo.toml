@@ -12,6 +12,7 @@ members = [
     "packages/ifc-wasm",
     "packages/escalation-interface",
     "packages/afal-core",
+    "packages/entropy-core",
 ]
 
 [workspace.package]

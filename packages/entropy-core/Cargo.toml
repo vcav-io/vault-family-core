@@ -1,0 +1,18 @@
+[package]
+name = "entropy-core"
+description = "Entropy ledger accounting and schema entropy measurement"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+receipt-core = { path = "../receipt-core" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+
+[[bin]]
+name = "entropy-generate-vectors"
+path = "src/bin/generate_entropy_vectors.rs"
