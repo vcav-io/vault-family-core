@@ -61,7 +61,7 @@ pub enum EscalationResult {
 
 /// Trait implemented by VCAV to handle incoming escalation requests.
 ///
-/// // TODO: implement in vcav
+/// Implementation provided by the sealed-execution layer. This crate defines the interface only.
 pub trait EscalationHandler {
     /// Evaluate an escalation request and return the outcome.
     fn evaluate(&self, req: EscalationRequest) -> EscalationResult;
