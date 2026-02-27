@@ -92,15 +92,32 @@ mod tests {
     /// Golden test: serde strings are frozen wire format in signed receipts.
     #[test]
     fn test_budget_tier_serde_golden() {
-        assert_eq!(serde_json::to_string(&BudgetTier::Default).unwrap(), "\"DEFAULT\"");
-        assert_eq!(serde_json::to_string(&BudgetTier::Elevated).unwrap(), "\"ELEVATED\"");
-        assert_eq!(serde_json::to_string(&BudgetTier::Custom).unwrap(), "\"CUSTOM\"");
-        assert_eq!(serde_json::to_string(&BudgetTier::Research).unwrap(), "\"RESEARCH\"");
+        assert_eq!(
+            serde_json::to_string(&BudgetTier::Default).unwrap(),
+            "\"DEFAULT\""
+        );
+        assert_eq!(
+            serde_json::to_string(&BudgetTier::Elevated).unwrap(),
+            "\"ELEVATED\""
+        );
+        assert_eq!(
+            serde_json::to_string(&BudgetTier::Custom).unwrap(),
+            "\"CUSTOM\""
+        );
+        assert_eq!(
+            serde_json::to_string(&BudgetTier::Research).unwrap(),
+            "\"RESEARCH\""
+        );
     }
 
     #[test]
     fn test_budget_tier_serde_roundtrip() {
-        let tiers = [BudgetTier::Default, BudgetTier::Elevated, BudgetTier::Custom, BudgetTier::Research];
+        let tiers = [
+            BudgetTier::Default,
+            BudgetTier::Elevated,
+            BudgetTier::Custom,
+            BudgetTier::Research,
+        ];
         for tier in &tiers {
             let json = serde_json::to_string(tier).unwrap();
             let parsed: BudgetTier = serde_json::from_str(&json).unwrap();
@@ -143,15 +160,32 @@ mod tests {
     /// Golden test: serde strings are frozen wire format in signed handoffs.
     #[test]
     fn test_budget_tier_v2_serde_golden() {
-        assert_eq!(serde_json::to_string(&BudgetTierV2::Tiny).unwrap(), "\"TINY\"");
-        assert_eq!(serde_json::to_string(&BudgetTierV2::Small).unwrap(), "\"SMALL\"");
-        assert_eq!(serde_json::to_string(&BudgetTierV2::Medium).unwrap(), "\"MEDIUM\"");
-        assert_eq!(serde_json::to_string(&BudgetTierV2::Large).unwrap(), "\"LARGE\"");
+        assert_eq!(
+            serde_json::to_string(&BudgetTierV2::Tiny).unwrap(),
+            "\"TINY\""
+        );
+        assert_eq!(
+            serde_json::to_string(&BudgetTierV2::Small).unwrap(),
+            "\"SMALL\""
+        );
+        assert_eq!(
+            serde_json::to_string(&BudgetTierV2::Medium).unwrap(),
+            "\"MEDIUM\""
+        );
+        assert_eq!(
+            serde_json::to_string(&BudgetTierV2::Large).unwrap(),
+            "\"LARGE\""
+        );
     }
 
     #[test]
     fn test_budget_tier_v2_serde_roundtrip() {
-        let tiers = [BudgetTierV2::Tiny, BudgetTierV2::Small, BudgetTierV2::Medium, BudgetTierV2::Large];
+        let tiers = [
+            BudgetTierV2::Tiny,
+            BudgetTierV2::Small,
+            BudgetTierV2::Medium,
+            BudgetTierV2::Large,
+        ];
         for tier in &tiers {
             let json = serde_json::to_string(tier).unwrap();
             let parsed: BudgetTierV2 = serde_json::from_str(&json).unwrap();

@@ -4,8 +4,8 @@
 //! Receipts are cryptographic proofs of session execution and constraints.
 
 use chrono::{DateTime, Utc};
-use vault_family_types::{BudgetTier, ExecutionLane, Purpose};
 use serde::{Deserialize, Serialize};
+use vault_family_types::{BudgetTier, ExecutionLane, Purpose};
 
 use crate::agreement::ModelIdentity;
 use crate::attestation::AttestationEvidence;
@@ -1112,7 +1112,11 @@ impl ReceiptBuilder {
                         }
                     }
                 };
-                if valid { Some(pd) } else { None }
+                if valid {
+                    Some(pd)
+                } else {
+                    None
+                }
             }
             None => None,
         };
@@ -1449,8 +1453,7 @@ mod tests {
         };
         use base64::Engine;
 
-        let evidence_b64 =
-            base64::engine::general_purpose::STANDARD.encode(b"mock-evidence-data");
+        let evidence_b64 = base64::engine::general_purpose::STANDARD.encode(b"mock-evidence-data");
         let evidence = AttestationEvidence {
             version: AttestationVersion::V1,
             environment: AttestationEnvironment::Mock,
@@ -1492,9 +1495,18 @@ mod tests {
 
     #[test]
     fn test_execution_lane_serializes_to_wire_format() {
-        assert_eq!(serde_json::to_string(&ExecutionLane::SoftwareLocal).unwrap(), "\"SOFTWARE_LOCAL\"");
-        assert_eq!(serde_json::to_string(&ExecutionLane::ApiMediated).unwrap(), "\"API_MEDIATED\"");
-        assert_eq!(serde_json::to_string(&ExecutionLane::SealedLocal).unwrap(), "\"SEALED_LOCAL\"");
+        assert_eq!(
+            serde_json::to_string(&ExecutionLane::SoftwareLocal).unwrap(),
+            "\"SOFTWARE_LOCAL\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ExecutionLane::ApiMediated).unwrap(),
+            "\"API_MEDIATED\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ExecutionLane::SealedLocal).unwrap(),
+            "\"SEALED_LOCAL\""
+        );
     }
 
     #[test]
@@ -1504,8 +1516,7 @@ mod tests {
         };
         use base64::Engine;
 
-        let evidence_b64 =
-            base64::engine::general_purpose::STANDARD.encode(b"mock-evidence");
+        let evidence_b64 = base64::engine::general_purpose::STANDARD.encode(b"mock-evidence");
         let mut unsigned = sample_unsigned_receipt();
         unsigned.attestation = Some(AttestationEvidence {
             version: AttestationVersion::V1,
@@ -1706,7 +1717,10 @@ mod tests {
 
     #[test]
     fn test_signal_class_display() {
-        assert_eq!(SignalClass::SessionCompleted.to_string(), "SESSION_COMPLETED");
+        assert_eq!(
+            SignalClass::SessionCompleted.to_string(),
+            "SESSION_COMPLETED"
+        );
         assert_eq!(SignalClass::SessionAborted.to_string(), "SESSION_ABORTED");
         assert_eq!(SignalClass::BudgetExhausted.to_string(), "BUDGET_EXHAUSTED");
         assert_eq!(SignalClass::InputRejected.to_string(), "INPUT_REJECTED");
@@ -1814,11 +1828,17 @@ mod tests {
             .expect("Builder should succeed");
 
         assert_eq!(unsigned.contract_hash, Some("a".repeat(64)));
-        assert_eq!(unsigned.output_schema_id, Some("vault_result_compatibility".to_string()));
+        assert_eq!(
+            unsigned.output_schema_id,
+            Some("vault_result_compatibility".to_string())
+        );
 
         let signed = unsigned.sign("e".repeat(128));
         assert_eq!(signed.contract_hash, Some("a".repeat(64)));
-        assert_eq!(signed.output_schema_id, Some("vault_result_compatibility".to_string()));
+        assert_eq!(
+            signed.output_schema_id,
+            Some("vault_result_compatibility".to_string())
+        );
     }
 
     // ==================== Contract Enforcement Binding Tests ====================
@@ -1947,13 +1967,19 @@ mod tests {
 
         assert_eq!(unsigned.entropy_budget_bits, Some(4));
         assert_eq!(unsigned.schema_entropy_ceiling_bits, Some(8));
-        assert_eq!(unsigned.prompt_template_hash, Some("template_hash".to_string()));
+        assert_eq!(
+            unsigned.prompt_template_hash,
+            Some("template_hash".to_string())
+        );
         assert_eq!(unsigned.contract_timing_class, Some("FAST".to_string()));
 
         let signed = unsigned.sign("e".repeat(128));
         assert_eq!(signed.entropy_budget_bits, Some(4));
         assert_eq!(signed.schema_entropy_ceiling_bits, Some(8));
-        assert_eq!(signed.prompt_template_hash, Some("template_hash".to_string()));
+        assert_eq!(
+            signed.prompt_template_hash,
+            Some("template_hash".to_string())
+        );
         assert_eq!(signed.contract_timing_class, Some("FAST".to_string()));
     }
 
@@ -2022,8 +2048,8 @@ mod tests {
     #[test]
     fn test_generate_receipt_v2_vector_02() {
         use crate::{
-            compute_receipt_hash, sign_receipt, verify_receipt,
-            public_key_to_hex, SigningKey, BudgetChainRecord, RECEIPT_HASH_PLACEHOLDER,
+            compute_receipt_hash, public_key_to_hex, sign_receipt, verify_receipt,
+            BudgetChainRecord, SigningKey, RECEIPT_HASH_PLACEHOLDER,
         };
 
         let signing_key = SigningKey::from_bytes(&[0x03u8; 32]);
@@ -2094,8 +2120,7 @@ mod tests {
         let signature = sign_receipt(&unsigned, &signing_key).expect("sign");
 
         // Verify signature
-        verify_receipt(&unsigned, &signature, &verifying_key)
-            .expect("signature must verify");
+        verify_receipt(&unsigned, &signature, &verifying_key).expect("signature must verify");
 
         let signed = unsigned.sign(signature.clone());
 
@@ -2125,17 +2150,12 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../data/test-vectors/receipt_v2_vector_02.json"
         );
-        std::fs::write(
-            vector_path,
-            serde_json::to_string_pretty(&vector).unwrap(),
-        )
-        .expect("write vector file");
+        std::fs::write(vector_path, serde_json::to_string_pretty(&vector).unwrap())
+            .expect("write vector file");
 
         // Verify the vector file can be read back
-        let read_back: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(vector_path).unwrap(),
-        )
-        .unwrap();
+        let read_back: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(vector_path).unwrap()).unwrap();
         assert_eq!(read_back["expected"]["verification_result"], "PASS");
         assert!(read_back["input"]["signed_receipt"]["contract_hash"].is_string());
         assert!(read_back["input"]["signed_receipt"]["output_schema_id"].is_string());
@@ -2233,7 +2253,10 @@ mod tests {
         });
         let json = serde_json::to_value(&receipt).unwrap();
         let round_trip: UnsignedReceipt = serde_json::from_value(json).unwrap();
-        assert_eq!(round_trip.entropy_status_commitment, receipt.entropy_status_commitment);
+        assert_eq!(
+            round_trip.entropy_status_commitment,
+            receipt.entropy_status_commitment
+        );
         assert_eq!(round_trip.policy_declaration, receipt.policy_declaration);
     }
 
@@ -2273,7 +2296,10 @@ mod tests {
 
         let parsed: UnsignedReceipt = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.receipt_payload_type, unsigned.receipt_payload_type);
-        assert_eq!(parsed.receipt_payload_version, unsigned.receipt_payload_version);
+        assert_eq!(
+            parsed.receipt_payload_version,
+            unsigned.receipt_payload_version
+        );
         assert_eq!(
             parsed.payload.as_ref().map(|r| r.get()),
             unsigned.payload.as_ref().map(|r| r.get()),

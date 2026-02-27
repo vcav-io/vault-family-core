@@ -92,8 +92,8 @@ pub fn verify_afal_signature<T: serde::Serialize>(
         })?;
     let signature = ed25519_dalek::Signature::from_bytes(&sig_bytes);
 
-    let verifying_key = VerifyingKey::from_bytes(pubkey_bytes)
-        .map_err(|_| SigningError::InvalidSignature)?;
+    let verifying_key =
+        VerifyingKey::from_bytes(pubkey_bytes).map_err(|_| SigningError::InvalidSignature)?;
 
     verifying_key
         .verify(&digest, &signature)
@@ -240,7 +240,10 @@ mod tests {
         let with_sig = serde_json::json!({"a": 1, "signature": "abc123"});
         let stripped = strip_signature(&with_sig);
         assert!(!stripped.as_object().unwrap().contains_key("signature"));
-        assert_eq!(stripped.as_object().unwrap().get("a").unwrap(), &serde_json::json!(1));
+        assert_eq!(
+            stripped.as_object().unwrap().get("a").unwrap(),
+            &serde_json::json!(1)
+        );
     }
 
     #[test]

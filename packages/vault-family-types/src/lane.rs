@@ -5,13 +5,14 @@ use serde::{Deserialize, Serialize};
 /// **Wire format — frozen.** Serde strings and `Display` output appear in signed
 /// receipts and domain-prefixed hashes (`compute_budget_chain_id`). Changing the
 /// string values is a breaking change.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LaneId {
     /// Sealed topology with local inference only.
     #[serde(rename = "SEALED_LOCAL")]
     SealedLocal,
     /// Software-attested local inference.
     #[serde(rename = "SOFTWARE_LOCAL")]
+    #[default]
     SoftwareLocal,
     /// API-mediated inference via external provider.
     #[serde(rename = "API_MEDIATED")]
@@ -30,12 +31,6 @@ impl std::fmt::Display for LaneId {
     }
 }
 
-impl Default for LaneId {
-    fn default() -> Self {
-        LaneId::SoftwareLocal
-    }
-}
-
 /// Backward-compatible alias. Prefer `LaneId` in new code.
 pub type ExecutionLane = LaneId;
 
@@ -46,14 +41,27 @@ mod tests {
     /// Golden test: serde strings are frozen wire format.
     #[test]
     fn test_lane_id_serde_golden() {
-        assert_eq!(serde_json::to_string(&LaneId::SealedLocal).unwrap(), "\"SEALED_LOCAL\"");
-        assert_eq!(serde_json::to_string(&LaneId::SoftwareLocal).unwrap(), "\"SOFTWARE_LOCAL\"");
-        assert_eq!(serde_json::to_string(&LaneId::ApiMediated).unwrap(), "\"API_MEDIATED\"");
+        assert_eq!(
+            serde_json::to_string(&LaneId::SealedLocal).unwrap(),
+            "\"SEALED_LOCAL\""
+        );
+        assert_eq!(
+            serde_json::to_string(&LaneId::SoftwareLocal).unwrap(),
+            "\"SOFTWARE_LOCAL\""
+        );
+        assert_eq!(
+            serde_json::to_string(&LaneId::ApiMediated).unwrap(),
+            "\"API_MEDIATED\""
+        );
     }
 
     #[test]
     fn test_lane_id_serde_roundtrip() {
-        let lanes = [LaneId::SealedLocal, LaneId::SoftwareLocal, LaneId::ApiMediated];
+        let lanes = [
+            LaneId::SealedLocal,
+            LaneId::SoftwareLocal,
+            LaneId::ApiMediated,
+        ];
         for lane in &lanes {
             let json = serde_json::to_string(lane).unwrap();
             let parsed: LaneId = serde_json::from_str(&json).unwrap();

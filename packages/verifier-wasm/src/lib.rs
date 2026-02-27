@@ -80,10 +80,7 @@ struct BundleVerifyResult {
 
 fn to_json_safe<T: Serialize>(val: &T) -> String {
     serde_json::to_string(val).unwrap_or_else(|e| {
-        format!(
-            r#"{{"ok":false,"error":"Internal serialization error: {}"}}"#,
-            e
-        )
+        format!(r#"{{"ok":false,"error":"Internal serialization error: {e}"}}"#)
     })
 }
 
@@ -108,7 +105,7 @@ fn err_json(msg: &str) -> String {
 /// Verify a receipt's Ed25519 signature, returning Ok(()) on success or Err(message) on failure.
 fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<(), String> {
     let receipt_val: serde_json::Value = serde_json::from_str(receipt_json)
-        .map_err(|e| format!("Failed to parse receipt JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse receipt JSON: {e}"))?;
 
     let signature_hex = receipt_val
         .get("signature")
@@ -116,10 +113,10 @@ fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<(), Stri
         .ok_or_else(|| "Receipt missing 'signature' field".to_string())?;
 
     let public_key = receipt_core::parse_public_key_hex(pubkey_hex)
-        .map_err(|e| format!("Invalid public key: {}", e))?;
+        .map_err(|e| format!("Invalid public key: {e}"))?;
 
     let signature = receipt_core::parse_signature_hex(signature_hex)
-        .map_err(|e| format!("Invalid signature: {}", e))?;
+        .map_err(|e| format!("Invalid signature: {e}"))?;
 
     // Build unsigned receipt: remove the signature field and canonicalize
     let mut unsigned = receipt_val.clone();
@@ -136,7 +133,7 @@ fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<(), Stri
     use ed25519_dalek::Verifier;
     public_key
         .verify(&hash, &signature)
-        .map_err(|e| format!("Signature verification failed: {}", e))
+        .map_err(|e| format!("Signature verification failed: {e}"))
 }
 
 // ============================================================================
@@ -176,7 +173,7 @@ pub fn verify_with_artefacts(
 
     let receipt_val: serde_json::Value = match serde_json::from_str(receipt_json) {
         Ok(v) => v,
-        Err(e) => return err_json(&format!("Failed to parse receipt JSON: {}", e)),
+        Err(e) => return err_json(&format!("Failed to parse receipt JSON: {e}")),
     };
 
     // Verify profile hash if present in receipt
@@ -187,7 +184,7 @@ pub fn verify_with_artefacts(
         match verify_profile_hash_from_str(profile_json, declared_hash) {
             Ok(true) => {}
             Ok(false) => return err_json("Profile hash mismatch"),
-            Err(e) => return err_json(&format!("Profile hash verification failed: {}", e)),
+            Err(e) => return err_json(&format!("Profile hash verification failed: {e}")),
         }
     }
 
@@ -199,7 +196,7 @@ pub fn verify_with_artefacts(
         match verify_policy_hash_from_str(policy_json, declared_hash) {
             Ok(true) => {}
             Ok(false) => return err_json("Policy hash mismatch"),
-            Err(e) => return err_json(&format!("Policy hash verification failed: {}", e)),
+            Err(e) => return err_json(&format!("Policy hash verification failed: {e}")),
         }
     }
 
@@ -225,7 +222,7 @@ pub fn verify_with_manifest(
 
     let receipt_val: serde_json::Value = match serde_json::from_str(receipt_json) {
         Ok(v) => v,
-        Err(e) => return err_json(&format!("Failed to parse receipt JSON: {}", e)),
+        Err(e) => return err_json(&format!("Failed to parse receipt JSON: {e}")),
     };
 
     let profile_hash = receipt_val
@@ -241,9 +238,7 @@ pub fn verify_with_manifest(
         Some(h) => h,
         None => return err_json("Receipt missing 'guardian_policy_hash' field"),
     };
-    let runtime_hash = receipt_val
-        .get("runtime_hash")
-        .and_then(|v| v.as_str());
+    let runtime_hash = receipt_val.get("runtime_hash").and_then(|v| v.as_str());
 
     match verify_manifest_from_str(
         manifest_json,
@@ -316,7 +311,7 @@ pub fn verify_bundle(
                 manifest_policy_covered: None,
                 manifest_runtime_hash_match: None,
                 manifest_guardian_hash_match: None,
-                error: Some(format!("Failed to parse bundle JSON: {}", e)),
+                error: Some(format!("Failed to parse bundle JSON: {e}")),
             })
         }
     };
@@ -336,7 +331,7 @@ pub fn verify_bundle(
                 manifest_policy_covered: None,
                 manifest_runtime_hash_match: None,
                 manifest_guardian_hash_match: None,
-                error: Some(format!("Failed to parse receipt JSON: {}", e)),
+                error: Some(format!("Failed to parse receipt JSON: {e}")),
             })
         }
     };
@@ -370,16 +365,14 @@ pub fn verify_bundle(
     // --- Agreement hash (Tier 1 sub-check) ---
     if let (Some(agreement_fields), Some(declared_hash)) = (
         bundle.get("agreement_fields"),
-        receipt_val
-            .get("agreement_hash")
-            .and_then(|v| v.as_str()),
+        receipt_val.get("agreement_hash").and_then(|v| v.as_str()),
     ) {
         let fields_str = to_json_safe(agreement_fields);
         match verify_agreement_hash_from_str(&fields_str, declared_hash) {
             Ok(valid) => agreement_hash_valid = Some(valid),
             Err(e) => {
                 agreement_hash_valid = Some(false);
-                error = Some(format!("Agreement hash check failed: {}", e));
+                error = Some(format!("Agreement hash check failed: {e}"));
             }
         }
     }
@@ -402,7 +395,7 @@ pub fn verify_bundle(
             Err(e) => {
                 profile_hash_valid = Some(false);
                 if error.is_none() {
-                    error = Some(format!("Profile hash check failed: {}", e));
+                    error = Some(format!("Profile hash check failed: {e}"));
                 }
             }
         }
@@ -426,7 +419,7 @@ pub fn verify_bundle(
             Err(e) => {
                 policy_hash_valid = Some(false);
                 if error.is_none() {
-                    error = Some(format!("Policy hash check failed: {}", e));
+                    error = Some(format!("Policy hash check failed: {e}"));
                 }
             }
         }
@@ -435,9 +428,7 @@ pub fn verify_bundle(
     // --- Tier 2: Contract hash ---
     if let (Some(contract_str), Some(declared_hash)) = (
         bundle.get("contract").and_then(|v| v.as_str()),
-        receipt_val
-            .get("contract_hash")
-            .and_then(|v| v.as_str()),
+        receipt_val.get("contract_hash").and_then(|v| v.as_str()),
     ) {
         match verify_contract_hash_from_bytes(contract_str.as_bytes(), declared_hash) {
             Ok(valid) => {
@@ -449,7 +440,7 @@ pub fn verify_bundle(
             Err(e) => {
                 contract_hash_valid = Some(false);
                 if error.is_none() {
-                    error = Some(format!("Contract hash check failed: {}", e));
+                    error = Some(format!("Contract hash check failed: {e}"));
                 }
             }
         }
@@ -468,9 +459,7 @@ pub fn verify_bundle(
             .get("guardian_policy_hash")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let runtime_hash = receipt_val
-            .get("runtime_hash")
-            .and_then(|v| v.as_str());
+        let runtime_hash = receipt_val.get("runtime_hash").and_then(|v| v.as_str());
 
         match verify_manifest_from_str(
             &manifest_str,
@@ -491,7 +480,7 @@ pub fn verify_bundle(
             }
             Err(e) => {
                 if error.is_none() {
-                    error = Some(format!("Manifest verification failed: {}", e));
+                    error = Some(format!("Manifest verification failed: {e}"));
                 }
             }
         }
@@ -510,21 +499,11 @@ pub fn verify_bundle(
         profile_hash_valid,
         policy_hash_valid,
         contract_hash_valid,
-        manifest_signature_valid: manifest_result
-            .as_ref()
-            .and_then(|m| m.signature_valid),
-        manifest_profile_covered: manifest_result
-            .as_ref()
-            .and_then(|m| m.profile_covered),
-        manifest_policy_covered: manifest_result
-            .as_ref()
-            .and_then(|m| m.policy_covered),
-        manifest_runtime_hash_match: manifest_result
-            .as_ref()
-            .and_then(|m| m.runtime_hash_match),
-        manifest_guardian_hash_match: manifest_result
-            .as_ref()
-            .and_then(|m| m.guardian_hash_match),
+        manifest_signature_valid: manifest_result.as_ref().and_then(|m| m.signature_valid),
+        manifest_profile_covered: manifest_result.as_ref().and_then(|m| m.profile_covered),
+        manifest_policy_covered: manifest_result.as_ref().and_then(|m| m.policy_covered),
+        manifest_runtime_hash_match: manifest_result.as_ref().and_then(|m| m.runtime_hash_match),
+        manifest_guardian_hash_match: manifest_result.as_ref().and_then(|m| m.guardian_hash_match),
         error,
     })
 }

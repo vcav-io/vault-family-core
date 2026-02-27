@@ -72,7 +72,7 @@ impl SchemaRegistry {
 
         for entry in entries {
             let entry = entry.map_err(|e| {
-                SchemaError::LoadDirectory(format!("Failed to read directory entry: {}", e))
+                SchemaError::LoadDirectory(format!("Failed to read directory entry: {e}"))
             })?;
 
             let path = entry.path();
@@ -120,12 +120,13 @@ impl SchemaRegistry {
                 }
             }
 
-            let validator = options
-                .compile(schema_value)
-                .map_err(|e| SchemaError::CompileSchema {
-                    name: schema_name.clone(),
-                    message: e.to_string(),
-                })?;
+            let validator =
+                options
+                    .compile(schema_value)
+                    .map_err(|e| SchemaError::CompileSchema {
+                        name: schema_name.clone(),
+                        message: e.to_string(),
+                    })?;
 
             schemas.insert(schema_name.clone(), validator);
         }

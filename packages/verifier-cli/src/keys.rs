@@ -19,14 +19,10 @@ pub(crate) fn load_public_key_from_file(
     pubkey_path: &str,
 ) -> Result<receipt_core::VerifyingKey, String> {
     let pubkey_content = fs::read_to_string(pubkey_path)
-        .map_err(|e| format!("Failed to read public key file: {}: {}", pubkey_path, e))?;
+        .map_err(|e| format!("Failed to read public key file: {pubkey_path}: {e}"))?;
     let pubkey_hex = pubkey_content.trim();
-    parse_public_key_hex(pubkey_hex).map_err(|e| {
-        format!(
-            "Failed to parse public key (expected 64 hex characters): {}",
-            e
-        )
-    })
+    parse_public_key_hex(pubkey_hex)
+        .map_err(|e| format!("Failed to parse public key (expected 64 hex characters): {e}"))
 }
 
 pub(crate) fn load_public_key_from_keyring(
@@ -193,7 +189,7 @@ fn validate_keyring_trust_root(keyring_dir: &Path) -> Result<(), String> {
                     e
                 )
             })?;
-            actual.insert(format!("retired/{}", file_name), sha256_hex(&content));
+            actual.insert(format!("retired/{file_name}"), sha256_hex(&content));
         }
     }
 

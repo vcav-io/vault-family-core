@@ -21,14 +21,14 @@ use crate::types::DomainPrefix;
 /// Ed25519 identity key for signing AFAL messages.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IdentityKey {
-    pub algorithm: String, // always "ed25519"
+    pub algorithm: String,      // always "ed25519"
     pub public_key_hex: String, // 64 hex chars (32 bytes)
 }
 
 /// X25519 envelope key for encrypted input envelopes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvelopeKey {
-    pub algorithm: String, // always "x25519"
+    pub algorithm: String,      // always "x25519"
     pub public_key_hex: String, // 64 hex chars (32 bytes)
 }
 
@@ -122,12 +122,16 @@ pub enum DescriptorError {
 
 /// 64-char lowercase hex pattern.
 fn is_hex64(s: &str) -> bool {
-    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    s.len() == 64
+        && s.chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
 }
 
 /// 128-char lowercase hex pattern.
 fn is_hex128(s: &str) -> bool {
-    s.len() == 128 && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    s.len() == 128
+        && s.chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
 }
 
 /// Maximum descriptor validity: 7 days.
@@ -137,7 +141,9 @@ const MAX_EXPIRY_DURATION: Duration = Duration::days(7);
 ///
 /// Does NOT verify the signature — use `verify_descriptor_signature` for that.
 /// Returns validation errors as a vector of strings.
-pub fn validate_descriptor(desc: &AgentDescriptor) -> Result<Vec<ValidationWarning>, DescriptorError> {
+pub fn validate_descriptor(
+    desc: &AgentDescriptor,
+) -> Result<Vec<ValidationWarning>, DescriptorError> {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
@@ -152,10 +158,9 @@ pub fn validate_descriptor(desc: &AgentDescriptor) -> Result<Vec<ValidationWarni
     }
 
     // issued_at / expires_at
-    let issued_at = DateTime::parse_from_rfc3339(&desc.issued_at)
-        .map(|dt| dt.with_timezone(&Utc));
-    let expires_at = DateTime::parse_from_rfc3339(&desc.expires_at)
-        .map(|dt| dt.with_timezone(&Utc));
+    let issued_at = DateTime::parse_from_rfc3339(&desc.issued_at).map(|dt| dt.with_timezone(&Utc));
+    let expires_at =
+        DateTime::parse_from_rfc3339(&desc.expires_at).map(|dt| dt.with_timezone(&Utc));
 
     match (&issued_at, &expires_at) {
         (Ok(issued), Ok(expires)) => {
@@ -181,7 +186,8 @@ pub fn validate_descriptor(desc: &AgentDescriptor) -> Result<Vec<ValidationWarni
         errors.push("identity_key.algorithm: must be \"ed25519\"".to_string());
     }
     if !is_hex64(&desc.identity_key.public_key_hex) {
-        errors.push("identity_key.public_key_hex: expected 64-char lowercase hex string".to_string());
+        errors
+            .push("identity_key.public_key_hex: expected 64-char lowercase hex string".to_string());
     }
 
     // envelope_key
@@ -189,7 +195,8 @@ pub fn validate_descriptor(desc: &AgentDescriptor) -> Result<Vec<ValidationWarni
         errors.push("envelope_key.algorithm: must be \"x25519\"".to_string());
     }
     if !is_hex64(&desc.envelope_key.public_key_hex) {
-        errors.push("envelope_key.public_key_hex: expected 64-char lowercase hex string".to_string());
+        errors
+            .push("envelope_key.public_key_hex: expected 64-char lowercase hex string".to_string());
     }
 
     // endpoints
@@ -213,15 +220,23 @@ pub fn validate_descriptor(desc: &AgentDescriptor) -> Result<Vec<ValidationWarni
     if desc.capabilities.supported_model_profiles.is_empty() {
         errors.push("capabilities.supported_model_profiles: must have at least 1 item".to_string());
     }
-    for (i, mp) in desc.capabilities.supported_model_profiles.iter().enumerate() {
+    for (i, mp) in desc
+        .capabilities
+        .supported_model_profiles
+        .iter()
+        .enumerate()
+    {
         if !is_hex64(&mp.hash) {
-            errors.push(format!("capabilities.supported_model_profiles[{i}].hash: expected 64-char hex string"));
+            errors.push(format!(
+                "capabilities.supported_model_profiles[{i}].hash: expected 64-char hex string"
+            ));
         }
     }
 
     // policy_commitments
     if !is_hex64(&desc.policy_commitments.policy_bundle_hash) {
-        errors.push("policy_commitments.policy_bundle_hash: expected 64-char hex string".to_string());
+        errors
+            .push("policy_commitments.policy_bundle_hash: expected 64-char hex string".to_string());
     }
 
     // label_requirements (optional)
@@ -233,7 +248,10 @@ pub fn validate_descriptor(desc: &AgentDescriptor) -> Result<Vec<ValidationWarni
             });
         }
         if lr.minimum_integrity != "TRUSTED" && lr.minimum_integrity != "UNTRUSTED" {
-            errors.push("label_requirements.minimum_integrity: must be \"TRUSTED\" or \"UNTRUSTED\"".to_string());
+            errors.push(
+                "label_requirements.minimum_integrity: must be \"TRUSTED\" or \"UNTRUSTED\""
+                    .to_string(),
+            );
         }
     }
 
@@ -271,11 +289,13 @@ pub fn sign_descriptor(
 
 /// Verify a descriptor's self-signature using its own identity_key.
 pub fn verify_descriptor_signature(descriptor: &AgentDescriptor) -> Result<(), DescriptorError> {
-    let sig = descriptor.signature.as_ref()
+    let sig = descriptor
+        .signature
+        .as_ref()
         .ok_or_else(|| DescriptorError::ValidationErrors(vec!["missing signature".to_string()]))?;
 
     let pubkey_bytes: [u8; 32] = hex::decode(&descriptor.identity_key.public_key_hex)
-        .map_err(|e| SigningError::InvalidHex(e))?
+        .map_err(SigningError::InvalidHex)?
         .try_into()
         .map_err(|v: Vec<u8>| SigningError::InvalidKeyLength {
             expected: 32,

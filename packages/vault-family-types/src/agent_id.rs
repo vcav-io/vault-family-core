@@ -50,7 +50,7 @@ pub fn generate_pair_id(agent_a: &str, agent_b: &str) -> String {
     // Convert to hex manually without external crate
     let mut hex_string = String::with_capacity(64);
     for byte in result.iter() {
-        hex_string.push_str(&format!("{:02x}", byte));
+        hex_string.push_str(&format!("{byte:02x}"));
     }
     hex_string
 }

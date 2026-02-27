@@ -349,11 +349,7 @@ mod tests {
     fn test_entropy_bits_to_type_tag_roundtrip_bounded() {
         for n in 0..=MAX_ENUM_ENTROPY_BITS {
             let tag = entropy_bits_to_type_tag(n);
-            assert_eq!(
-                tag.entropy_bits(),
-                Some(n),
-                "Round-trip failed for n={n}"
-            );
+            assert_eq!(tag.entropy_bits(), Some(n), "Round-trip failed for n={n}");
         }
     }
 
@@ -425,8 +421,7 @@ mod tests {
         );
         let content = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
-        serde_json::from_str(&content)
-            .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
+        serde_json::from_str(&content).unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
     }
 
     #[test]

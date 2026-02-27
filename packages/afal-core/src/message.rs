@@ -52,10 +52,7 @@ impl AfalMessage {
 pub const MAX_BODY_LENGTH: usize = 4096;
 
 /// Valid content types for AFAL messages.
-pub const VALID_CONTENT_TYPES: &[&str] = &[
-    "text/plain",
-    "application/json",
-];
+pub const VALID_CONTENT_TYPES: &[&str] = &["text/plain", "application/json"];
 
 /// Validate an AFAL message structure (does not verify signature).
 pub fn validate_message(msg: &AfalMessage) -> Result<(), Vec<String>> {
@@ -66,7 +63,10 @@ pub fn validate_message(msg: &AfalMessage) -> Result<(), Vec<String>> {
     }
 
     if msg.message_id.len() != 64
-        || !msg.message_id.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        || !msg
+            .message_id
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
     {
         errors.push("message_id must be 64-char hex".to_string());
     }
@@ -80,8 +80,7 @@ pub fn validate_message(msg: &AfalMessage) -> Result<(), Vec<String>> {
 
     if !VALID_CONTENT_TYPES.contains(&msg.payload.content_type.as_str()) {
         errors.push(format!(
-            "payload.content_type must be one of: {:?}",
-            VALID_CONTENT_TYPES
+            "payload.content_type must be one of: {VALID_CONTENT_TYPES:?}"
         ));
     }
 
@@ -94,7 +93,10 @@ pub fn validate_message(msg: &AfalMessage) -> Result<(), Vec<String>> {
     }
 
     if msg.signature.len() != 128
-        || !msg.signature.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        || !msg
+            .signature
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
     {
         errors.push("signature must be 128-char lowercase hex".to_string());
     }

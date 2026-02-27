@@ -34,22 +34,20 @@ pub use agreement::{
     compute_agreement_hash, compute_pre_agreement_hash, ModelIdentity, PreAgreementFields,
     SessionAgreementFields, AGREEMENT_DOMAIN_PREFIX, PRE_AGREEMENT_DOMAIN_PREFIX,
 };
+pub use attestation::{
+    compute_challenge_hash, AttestationChallenge, AttestationClaims, AttestationEnvironment,
+    AttestationError, AttestationEvidence, AttestationVersion, ATTESTATION_CHALLENGE_DOMAIN_PREFIX,
+};
 pub use canonicalize::{canonicalize, canonicalize_serializable};
 pub use handoff::{
     BudgetTierV2, HashRef, SessionHandoff, UnsignedSessionHandoff, UnsignedSessionHandoffBuilder,
 };
 pub use ledger::{ApplyOutcome, BudgetLedger, LedgerError};
-pub use attestation::{
-    compute_challenge_hash, AttestationChallenge, AttestationClaims, AttestationEnvironment,
-    AttestationError, AttestationEvidence, AttestationVersion,
-    ATTESTATION_CHALLENGE_DOMAIN_PREFIX,
-};
 pub use receipt::{
-    BudgetChainRecord, BudgetUsageRecord, PolicyDeclaration, PolicyMode,
-    Receipt, ReceiptBuilder, ReceiptStatus, SignalClass, UnsignedReceipt, SCHEMA_VERSION,
+    BudgetChainRecord, BudgetUsageRecord, PolicyDeclaration, PolicyMode, Receipt, ReceiptBuilder,
+    ReceiptStatus, SignalClass, UnsignedReceipt, SCHEMA_VERSION,
 };
 // Re-export ExecutionLane (now LaneId alias) from vault-family-types for backward compat
-pub use vault_family_types::{ExecutionLane, LaneId};
 pub use manifest::{
     compute_operator_key_id, create_manifest_signing_message, sign_manifest, verify_manifest,
     ArtefactEntry, ManifestArtefacts, PublicationManifest, RuntimeHashes, UnsignedManifest,
@@ -62,6 +60,7 @@ pub use signer::{
     verify_handoff, verify_receipt, SigningError, BUDGET_CHAIN_DOMAIN_PREFIX, DOMAIN_PREFIX,
     RECEIPT_HASH_DOMAIN_PREFIX, RECEIPT_HASH_PLACEHOLDER, SESSION_HANDOFF_DOMAIN_PREFIX,
 };
+pub use vault_family_types::{ExecutionLane, LaneId};
 
 // Re-export ed25519-dalek types for convenience
 pub use ed25519_dalek::{SigningKey, VerifyingKey};

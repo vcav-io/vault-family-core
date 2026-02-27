@@ -10,21 +10,20 @@
 
 use chrono::{TimeZone, Utc};
 use ed25519_dalek::Signer;
-use vault_family_types::{BudgetTier, Purpose};
 use receipt_core::{
     canonicalize, compute_agreement_hash, compute_operator_key_id, compute_pre_agreement_hash,
     compute_receipt_hash, compute_receipt_key_id, create_handoff_signing_message,
     create_manifest_signing_message, create_signing_message, hash_message, public_key_to_hex,
     sign_handoff, sign_manifest, sign_receipt, verify_handoff, verify_manifest, verify_receipt,
-    ArtefactEntry, BudgetChainRecord, BudgetUsageRecord, ExecutionLane, HashRef,
-    ManifestArtefacts, ModelIdentity, PreAgreementFields, PublicationManifest, ReceiptStatus,
-    RuntimeHashes, SessionAgreementFields, SigningKey, UnsignedManifest, UnsignedReceipt,
-    UnsignedSessionHandoff, DOMAIN_PREFIX, MANIFEST_DOMAIN_PREFIX, SCHEMA_VERSION,
-    SESSION_HANDOFF_DOMAIN_PREFIX,
+    ArtefactEntry, BudgetChainRecord, BudgetUsageRecord, ExecutionLane, HashRef, ManifestArtefacts,
+    ModelIdentity, PreAgreementFields, PublicationManifest, ReceiptStatus, RuntimeHashes,
+    SessionAgreementFields, SigningKey, UnsignedManifest, UnsignedReceipt, UnsignedSessionHandoff,
+    DOMAIN_PREFIX, MANIFEST_DOMAIN_PREFIX, SCHEMA_VERSION, SESSION_HANDOFF_DOMAIN_PREFIX,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
+use vault_family_types::{BudgetTier, Purpose};
 
 // ============================================================================
 // Deterministic key material
@@ -210,7 +209,7 @@ fn write_vector(dir: &Path, filename: &str, value: &Value) {
     std::fs::write(&path, format!("{content}\n")).unwrap_or_else(|e| {
         panic!("Failed to write {}: {}", path.display(), e);
     });
-    eprintln!("  wrote {}", filename);
+    eprintln!("  wrote {filename}");
 }
 
 fn compute_pair_id(ids: &[&str]) -> String {
@@ -1121,8 +1120,7 @@ fn generate_manifest_vectors(dir: &Path) {
 
         let canonical =
             receipt_core::canonicalize_serializable(&unsigned).expect("canonicalize manifest");
-        let signing_msg =
-            create_manifest_signing_message(&unsigned).expect("manifest signing msg");
+        let signing_msg = create_manifest_signing_message(&unsigned).expect("manifest signing msg");
         let digest = hash_message(&signing_msg);
         let signature = sign_manifest(&unsigned, &operator_key).expect("sign manifest");
 
@@ -1298,7 +1296,7 @@ fn generate_tier_verification_vectors(dir: &Path) {
             "grammar_constraint_hash": p["grammar_constraint_hash"]
         });
         let canonical = canonicalize(&digest);
-        let prefixed = format!("vcav/model_profile/v1{}", canonical);
+        let prefixed = format!("vcav/model_profile/v1{canonical}");
         let mut hasher = Sha256::new();
         hasher.update(prefixed.as_bytes());
         hex::encode(hasher.finalize())
@@ -1332,7 +1330,7 @@ fn generate_tier_verification_vectors(dir: &Path) {
             "ttl_bounds": p["ttl_bounds"]
         });
         let canonical = canonicalize(&digest);
-        let prefixed = format!("vcav/policy_bundle/v1{}", canonical);
+        let prefixed = format!("vcav/policy_bundle/v1{canonical}");
         let mut hasher = Sha256::new();
         hasher.update(prefixed.as_bytes());
         hex::encode(hasher.finalize())
@@ -1489,8 +1487,7 @@ fn generate_tier_verification_vectors(dir: &Path) {
             }),
         };
 
-        let manifest_sig =
-            sign_manifest(&unsigned_manifest, &operator_key).expect("sign manifest");
+        let manifest_sig = sign_manifest(&unsigned_manifest, &operator_key).expect("sign manifest");
 
         let signed_manifest = PublicationManifest {
             manifest_version: unsigned_manifest.manifest_version.clone(),
@@ -1593,8 +1590,7 @@ fn generate_tier_verification_vectors(dir: &Path) {
             }),
         };
 
-        let manifest_sig =
-            sign_manifest(&unsigned_manifest, &operator_key).expect("sign manifest");
+        let manifest_sig = sign_manifest(&unsigned_manifest, &operator_key).expect("sign manifest");
 
         let signed_manifest = PublicationManifest {
             manifest_version: unsigned_manifest.manifest_version.clone(),

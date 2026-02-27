@@ -59,10 +59,7 @@ mod tests {
         Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).unwrap()
     }
 
-    fn make_entry(
-        session_id: &str,
-        ts: chrono::DateTime<Utc>,
-    ) -> EntropyLedgerEntry {
+    fn make_entry(session_id: &str, ts: chrono::DateTime<Utc>) -> EntropyLedgerEntry {
         EntropyLedgerEntry {
             session_id: session_id.to_string(),
             pair_id: "pair".to_string(),
@@ -95,15 +92,16 @@ mod tests {
 
         store.append(make_entry("s1", t1)).unwrap();
         let err = store.append(make_entry("s2", t0)).unwrap_err();
-        assert!(matches!(err, EntropyLedgerError::TimestampRegression { .. }));
+        assert!(matches!(
+            err,
+            EntropyLedgerError::TimestampRegression { .. }
+        ));
     }
 
     #[test]
     fn test_in_memory_store_ledger_access() {
         let mut store = InMemoryEntropyLedgerStore::new();
-        store
-            .append(make_entry("s1", ts(2025, 1, 1, 0)))
-            .unwrap();
+        store.append(make_entry("s1", ts(2025, 1, 1, 0))).unwrap();
 
         let ledger = store.ledger();
         assert_eq!(ledger.entries().len(), 1);

@@ -9,10 +9,10 @@
 use base64::Engine;
 use ed25519_dalek::Verifier;
 use receipt_core::{
-    compute_agreement_hash, canonicalize::canonicalize_serializable,
-    parse_public_key_hex, verify_manifest, PublicationManifest, SessionAgreementFields,
-    attestation::{AttestationEnvironment, AttestationEvidence, compute_challenge_hash},
-    hash_message,
+    attestation::{compute_challenge_hash, AttestationEnvironment, AttestationEvidence},
+    canonicalize::canonicalize_serializable,
+    compute_agreement_hash, hash_message, parse_public_key_hex, verify_manifest,
+    PublicationManifest, SessionAgreementFields,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -142,8 +142,8 @@ pub struct PolicyBundle {
 /// `SHA-256("vcav/model_profile/v1" || canonicalize(digest))`
 pub fn compute_profile_hash(digest: &ProfileDigestV1) -> Result<String, String> {
     let canonical = canonicalize_serializable(digest)
-        .map_err(|e| format!("Failed to canonicalize profile digest: {}", e))?;
-    let prefixed = format!("{}{}", PROFILE_HASH_DOMAIN_PREFIX, canonical);
+        .map_err(|e| format!("Failed to canonicalize profile digest: {e}"))?;
+    let prefixed = format!("{PROFILE_HASH_DOMAIN_PREFIX}{canonical}");
     let mut hasher = Sha256::new();
     hasher.update(prefixed.as_bytes());
     Ok(hex::encode(hasher.finalize()))
@@ -153,8 +153,8 @@ pub fn compute_profile_hash(digest: &ProfileDigestV1) -> Result<String, String> 
 /// `SHA-256("vcav/policy_bundle/v1" || canonicalize(digest))`
 pub fn compute_policy_bundle_hash(digest: &PolicyDigestV1) -> Result<String, String> {
     let canonical = canonicalize_serializable(digest)
-        .map_err(|e| format!("Failed to canonicalize policy digest: {}", e))?;
-    let prefixed = format!("{}{}", POLICY_BUNDLE_DOMAIN_PREFIX, canonical);
+        .map_err(|e| format!("Failed to canonicalize policy digest: {e}"))?;
+    let prefixed = format!("{POLICY_BUNDLE_DOMAIN_PREFIX}{canonical}");
     let mut hasher = Sha256::new();
     hasher.update(prefixed.as_bytes());
     Ok(hex::encode(hasher.finalize()))
@@ -247,21 +247,21 @@ pub fn verify_contract_enforcement(
     strict: bool,
 ) -> Result<ContractEnforcementResult, String> {
     let receipt: serde_json::Value = serde_json::from_str(receipt_json)
-        .map_err(|e| format!("Failed to parse receipt JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse receipt JSON: {e}"))?;
     let contract: serde_json::Value = serde_json::from_str(contract_json)
-        .map_err(|e| format!("Failed to parse contract JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse contract JSON: {e}"))?;
 
     let mut result = ContractEnforcementResult::default();
 
     // 1. Entropy budget: receipt.entropy_budget_bits == contract.entropy_budget_bits
     if let Some(receipt_entropy) = receipt.get("entropy_budget_bits").and_then(|v| v.as_u64()) {
-        if let Some(contract_entropy) = contract.get("entropy_budget_bits").and_then(|v| v.as_u64()) {
+        if let Some(contract_entropy) = contract.get("entropy_budget_bits").and_then(|v| v.as_u64())
+        {
             let matches = receipt_entropy == contract_entropy;
             result.entropy_budget_matches = Some(matches);
             if !matches {
                 let msg = format!(
-                    "entropy_budget_bits mismatch: receipt={} contract={}",
-                    receipt_entropy, contract_entropy
+                    "entropy_budget_bits mismatch: receipt={receipt_entropy} contract={contract_entropy}"
                 );
                 if strict {
                     return Err(msg);
@@ -272,16 +272,15 @@ pub fn verify_contract_enforcement(
     }
 
     // 2. Timing class: receipt.contract_timing_class == contract.timing_class
-    let receipt_timing = receipt.get("contract_timing_class").and_then(|v| v.as_str());
+    let receipt_timing = receipt
+        .get("contract_timing_class")
+        .and_then(|v| v.as_str());
     let contract_timing = contract.get("timing_class").and_then(|v| v.as_str());
     if let (Some(r_tc), Some(c_tc)) = (receipt_timing, contract_timing) {
         let matches = r_tc.eq_ignore_ascii_case(c_tc);
         result.timing_class_matches = Some(matches);
         if !matches {
-            let msg = format!(
-                "timing_class mismatch: receipt={} contract={}",
-                r_tc, c_tc
-            );
+            let msg = format!("timing_class mismatch: receipt={r_tc} contract={c_tc}");
             if strict {
                 return Err(msg);
             }
@@ -294,13 +293,15 @@ pub fn verify_contract_enforcement(
     if let Some(c_tc) = contract_timing {
         match timing_class_window_seconds(c_tc) {
             Some(expected_window) => {
-                if let Some(receipt_window) = receipt.get("fixed_window_duration_seconds").and_then(|v| v.as_u64()) {
+                if let Some(receipt_window) = receipt
+                    .get("fixed_window_duration_seconds")
+                    .and_then(|v| v.as_u64())
+                {
                     let consistent = receipt_window == expected_window;
                     result.timing_window_consistent = Some(consistent);
                     if !consistent {
                         let msg = format!(
-                            "timing window inconsistent: receipt fixed_window={}s but contract timing_class={} expects {}s",
-                            receipt_window, c_tc, expected_window
+                            "timing window inconsistent: receipt fixed_window={receipt_window}s but contract timing_class={c_tc} expects {expected_window}s"
                         );
                         if strict {
                             return Err(msg);
@@ -311,8 +312,7 @@ pub fn verify_contract_enforcement(
             }
             None => {
                 let msg = format!(
-                    "unrecognized timing_class '{}' in contract — cannot verify window consistency",
-                    c_tc
+                    "unrecognized timing_class '{c_tc}' in contract — cannot verify window consistency"
                 );
                 if strict {
                     return Err(msg);
@@ -324,15 +324,14 @@ pub fn verify_contract_enforcement(
 
     // 4. Prompt template hash: receipt.prompt_template_hash == contract.prompt_template_hash
     let receipt_pth = receipt.get("prompt_template_hash").and_then(|v| v.as_str());
-    let contract_pth = contract.get("prompt_template_hash").and_then(|v| v.as_str());
+    let contract_pth = contract
+        .get("prompt_template_hash")
+        .and_then(|v| v.as_str());
     if let (Some(r_pth), Some(c_pth)) = (receipt_pth, contract_pth) {
         let matches = r_pth == c_pth;
         result.prompt_template_hash_matches = Some(matches);
         if !matches {
-            let msg = format!(
-                "prompt_template_hash mismatch: receipt={} contract={}",
-                r_pth, c_pth
-            );
+            let msg = format!("prompt_template_hash mismatch: receipt={r_pth} contract={c_pth}");
             if strict {
                 return Err(msg);
             }
@@ -360,8 +359,8 @@ pub enum ManifestVerifyError {
 impl std::fmt::Display for ManifestVerifyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ManifestVerifyError::StrictRuntimeMismatch(msg) => write!(f, "{}", msg),
-            ManifestVerifyError::Other(msg) => write!(f, "{}", msg),
+            ManifestVerifyError::StrictRuntimeMismatch(msg) => write!(f, "{msg}"),
+            ManifestVerifyError::Other(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -434,10 +433,10 @@ pub fn verify_agreement_hash_from_str(
     declared_hash: &str,
 ) -> Result<bool, String> {
     let fields: SessionAgreementFields = serde_json::from_str(agreement_fields_json)
-        .map_err(|e| format!("Failed to parse agreement fields JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse agreement fields JSON: {e}"))?;
 
     let recomputed = compute_agreement_hash(&fields)
-        .map_err(|e| format!("Failed to compute agreement hash: {}", e))?;
+        .map_err(|e| format!("Failed to compute agreement hash: {e}"))?;
 
     Ok(recomputed == declared_hash)
 }
@@ -448,7 +447,7 @@ pub fn verify_profile_hash_from_str(
     declared_hash: &str,
 ) -> Result<bool, String> {
     let profile: ModelProfile = serde_json::from_str(profile_json)
-        .map_err(|e| format!("Failed to parse profile JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse profile JSON: {e}"))?;
 
     let digest = build_profile_digest(&profile);
     let recomputed = compute_profile_hash(&digest)?;
@@ -457,12 +456,9 @@ pub fn verify_profile_hash_from_str(
 }
 
 /// Verify the policy bundle hash from a JSON string containing the policy bundle.
-pub fn verify_policy_hash_from_str(
-    policy_json: &str,
-    declared_hash: &str,
-) -> Result<bool, String> {
+pub fn verify_policy_hash_from_str(policy_json: &str, declared_hash: &str) -> Result<bool, String> {
     let bundle: PolicyBundle = serde_json::from_str(policy_json)
-        .map_err(|e| format!("Failed to parse policy JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse policy JSON: {e}"))?;
 
     let digest = build_policy_digest(&bundle);
     let recomputed = compute_policy_bundle_hash(&digest)?;
@@ -493,10 +489,11 @@ pub fn verify_model_identity_against_profile(
     profile_json: &str,
 ) -> Result<bool, String> {
     let profile: ModelProfile = serde_json::from_str(profile_json)
-        .map_err(|e| format!("Failed to parse profile JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse profile JSON: {e}"))?;
 
-    let provider_matches =
-        receipt_identity.provider.eq_ignore_ascii_case(&profile.provider);
+    let provider_matches = receipt_identity
+        .provider
+        .eq_ignore_ascii_case(&profile.provider);
     let model_id_matches = receipt_identity.model_id == profile.model_id;
 
     Ok(provider_matches && model_id_matches)
@@ -526,11 +523,12 @@ pub fn verify_manifest_from_str(
     strict_runtime: bool,
 ) -> Result<ManifestResult, ManifestVerifyError> {
     let manifest: PublicationManifest = serde_json::from_str(manifest_json)
-        .map_err(|e| ManifestVerifyError::Other(format!("Failed to parse manifest JSON: {}", e)))?;
+        .map_err(|e| ManifestVerifyError::Other(format!("Failed to parse manifest JSON: {e}")))?;
 
     // Parse operator public key from the manifest
-    let public_key = parse_public_key_hex(&manifest.operator_public_key_hex)
-        .map_err(|e| ManifestVerifyError::Other(format!("Invalid operator public key in manifest: {}", e)))?;
+    let public_key = parse_public_key_hex(&manifest.operator_public_key_hex).map_err(|e| {
+        ManifestVerifyError::Other(format!("Invalid operator public key in manifest: {e}"))
+    })?;
 
     // Verify manifest signature
     let signature_valid = verify_manifest(&manifest, &public_key).is_ok();
@@ -589,8 +587,7 @@ pub fn verify_manifest_from_str(
     // Check runtime hashes (only if manifest declares them)
     let (runtime_hash_match, guardian_hash_match) =
         if let Some(ref manifest_rt) = manifest.runtime_hashes {
-            let rt_match = receipt_runtime_hash
-                .map(|rh| rh == manifest_rt.runtime_hash);
+            let rt_match = receipt_runtime_hash.map(|rh| rh == manifest_rt.runtime_hash);
 
             let gp_match = Some(receipt_guardian_hash == manifest_rt.guardian_policy_hash);
 
@@ -642,7 +639,9 @@ pub struct CompartmentResult {
 
 /// Validate that a string is a well-formed 64-char lowercase hex compartment ID.
 fn is_valid_compartment_hex(s: &str) -> bool {
-    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    s.len() == 64
+        && s.chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
 }
 
 /// Recompute a compartment ID from pair_id and a JCS-canonicalized confidentiality value.
@@ -703,19 +702,17 @@ pub fn verify_compartment_id(
 
     // Recompute and verify derivation if confidentiality data is available
     match ifc_joined_confidentiality {
-        Some(conf) => {
-            match recompute_compartment_id(pair_id, conf) {
-                Ok(expected) => {
-                    result.derivation_valid = Some(cid == expected);
-                }
-                Err(e) => {
-                    result.derivation_valid = Some(false);
-                    result.warnings.push(format!(
-                        "Failed to recompute compartment_id: {}", e
-                    ));
-                }
+        Some(conf) => match recompute_compartment_id(pair_id, conf) {
+            Ok(expected) => {
+                result.derivation_valid = Some(cid == expected);
             }
-        }
+            Err(e) => {
+                result.derivation_valid = Some(false);
+                result
+                    .warnings
+                    .push(format!("Failed to recompute compartment_id: {e}"));
+            }
+        },
         None => {
             result.warnings.push(
                 "compartment_id present but ifc_joined_confidentiality absent; \
@@ -828,7 +825,9 @@ pub fn verify_attestation(
             return AttestationVerificationResult {
                 status: Some("invalid".to_string()),
                 environment: Some(environment_str),
-                error_detail: Some("missing or non-string budget_usage.pair_id in receipt".to_string()),
+                error_detail: Some(
+                    "missing or non-string budget_usage.pair_id in receipt".to_string(),
+                ),
                 ..Default::default()
             };
         }
@@ -854,24 +853,27 @@ pub fn verify_attestation(
     };
 
     // Recompute challenge hash and verify it matches
-    let expected_challenge = match compute_challenge_hash(session_id, pair_id, contract_hash, session_start) {
-        Ok(h) => h,
-        Err(e) => {
-            return AttestationVerificationResult {
-                status: Some("invalid".to_string()),
-                environment: Some(environment_str),
-                error_detail: Some(format!("challenge hash computation failed: {e}")),
-                ..Default::default()
-            };
-        }
-    };
+    let expected_challenge =
+        match compute_challenge_hash(session_id, pair_id, contract_hash, session_start) {
+            Ok(h) => h,
+            Err(e) => {
+                return AttestationVerificationResult {
+                    status: Some("invalid".to_string()),
+                    environment: Some(environment_str),
+                    error_detail: Some(format!("challenge hash computation failed: {e}")),
+                    ..Default::default()
+                };
+            }
+        };
 
     if expected_challenge != evidence.challenge_hash {
         return AttestationVerificationResult {
             status: Some("invalid".to_string()),
             environment: Some(environment_str),
             challenge_bound: Some(false),
-            error_detail: Some("challenge hash mismatch: recomputed hash does not match evidence".to_string()),
+            error_detail: Some(
+                "challenge hash mismatch: recomputed hash does not match evidence".to_string(),
+            ),
         };
     }
 
@@ -882,7 +884,10 @@ pub fn verify_attestation(
                 status: Some("invalid".to_string()),
                 environment: Some(environment_str),
                 challenge_bound: Some(true),
-                error_detail: Some(format!("measurement {} not in allowlist", evidence.measurement)),
+                error_detail: Some(format!(
+                    "measurement {} not in allowlist",
+                    evidence.measurement
+                )),
             };
         }
     }
@@ -897,7 +902,10 @@ pub fn verify_attestation(
                         status: Some("invalid".to_string()),
                         environment: Some(environment_str),
                         challenge_bound: Some(true),
-                        error_detail: Some("Mock attestation present but no mock_root_public_key configured".to_string()),
+                        error_detail: Some(
+                            "Mock attestation present but no mock_root_public_key configured"
+                                .to_string(),
+                        ),
                     };
                 }
             };
@@ -932,17 +940,18 @@ pub fn verify_attestation(
             let signing_hash = hash_message(&signing_input);
 
             // Decode evidence bytes from base64
-            let sig_bytes = match base64::engine::general_purpose::STANDARD.decode(&evidence.evidence) {
-                Ok(b) => b,
-                Err(e) => {
-                    return AttestationVerificationResult {
-                        status: Some("invalid".to_string()),
-                        environment: Some(environment_str),
-                        challenge_bound: Some(true),
-                        error_detail: Some(format!("evidence base64 decode failed: {e}")),
-                    };
-                }
-            };
+            let sig_bytes =
+                match base64::engine::general_purpose::STANDARD.decode(&evidence.evidence) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        return AttestationVerificationResult {
+                            status: Some("invalid".to_string()),
+                            environment: Some(environment_str),
+                            challenge_bound: Some(true),
+                            error_detail: Some(format!("evidence base64 decode failed: {e}")),
+                        };
+                    }
+                };
 
             let signature = match ed25519_dalek::Signature::from_slice(&sig_bytes) {
                 Ok(s) => s,
@@ -1100,8 +1109,8 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../data/test-vectors/profile-digest-v1.json"
         );
-        let fixtures_str = std::fs::read_to_string(fixtures_path)
-            .expect("Failed to read profile-digest-v1.json");
+        let fixtures_str =
+            std::fs::read_to_string(fixtures_path).expect("Failed to read profile-digest-v1.json");
         let fixture: serde_json::Value =
             serde_json::from_str(&fixtures_str).expect("Failed to parse fixture");
 
@@ -1126,15 +1135,33 @@ mod tests {
             },
             prompt_template_hash: ed["prompt_template_hash"].as_str().unwrap().to_string(),
             system_prompt_hash: ed["system_prompt_hash"].as_str().unwrap().to_string(),
-            model_weights_hash: ed.get("model_weights_hash").and_then(|v| v.as_str()).map(String::from),
-            tokenizer_hash: ed.get("tokenizer_hash").and_then(|v| v.as_str()).map(String::from),
-            engine_version: ed.get("engine_version").and_then(|v| v.as_str()).map(String::from),
-            grammar_constraint_hash: ed.get("grammar_constraint_hash").and_then(|v| v.as_str()).map(String::from),
-            policy_bundle_hash: ed.get("policy_bundle_hash").and_then(|v| v.as_str()).map(String::from),
+            model_weights_hash: ed
+                .get("model_weights_hash")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            tokenizer_hash: ed
+                .get("tokenizer_hash")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            engine_version: ed
+                .get("engine_version")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            grammar_constraint_hash: ed
+                .get("grammar_constraint_hash")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            policy_bundle_hash: ed
+                .get("policy_bundle_hash")
+                .and_then(|v| v.as_str())
+                .map(String::from),
         };
 
         let computed = compute_profile_hash(&digest).unwrap();
-        assert_eq!(computed, expected_hash, "Profile hash must match golden vector");
+        assert_eq!(
+            computed, expected_hash,
+            "Profile hash must match golden vector"
+        );
     }
 
     #[test]
@@ -1255,11 +1282,11 @@ mod tests {
     // Runtime hash verification tests
     // =========================================================================
 
+    use receipt_core::signer::{generate_keypair, public_key_to_hex};
     use receipt_core::{
         compute_operator_key_id, sign_manifest, ArtefactEntry, ManifestArtefacts,
         PublicationManifest, RuntimeHashes, UnsignedManifest,
     };
-    use receipt_core::signer::{generate_keypair, public_key_to_hex};
 
     fn build_test_manifest(runtime_hashes: Option<RuntimeHashes>) -> String {
         let (sk, vk) = generate_keypair();
@@ -1487,8 +1514,7 @@ mod tests {
         );
         let content = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
-        serde_json::from_str(&content)
-            .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
+        serde_json::from_str(&content).unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
     }
 
     /// Helper: extract the unsigned receipt fields from a signed receipt JSON value,
@@ -1581,13 +1607,13 @@ mod tests {
 
         // Tier 1 negative: signature verification should fail
         let result = receipt_core::verify_receipt(&unsigned, &sig, &pubkey);
-        assert!(result.is_err(), "Tier 1 negative: tampered receipt should fail signature verification");
+        assert!(
+            result.is_err(),
+            "Tier 1 negative: tampered receipt should fail signature verification"
+        );
 
         assert_eq!(v["expected"]["signature_valid"].as_bool(), Some(false));
-        assert_eq!(
-            v["expected"]["error"].as_str(),
-            Some("SIGNATURE_MISMATCH")
-        );
+        assert_eq!(v["expected"]["error"].as_str(), Some("SIGNATURE_MISMATCH"));
     }
 
     #[test]
@@ -1603,14 +1629,22 @@ mod tests {
 
         // Tier 2: profile hash verification
         let profile_json_str = serde_json::to_string(&v["input"]["profile"]).unwrap();
-        let declared_profile_hash = unsigned.model_profile_hash.as_ref().expect("receipt must have profile hash");
-        let profile_valid = verify_profile_hash_from_str(&profile_json_str, declared_profile_hash).unwrap();
+        let declared_profile_hash = unsigned
+            .model_profile_hash
+            .as_ref()
+            .expect("receipt must have profile hash");
+        let profile_valid =
+            verify_profile_hash_from_str(&profile_json_str, declared_profile_hash).unwrap();
         assert!(profile_valid, "Tier 2: profile hash should match");
 
         // Tier 2: policy hash verification
         let policy_json_str = serde_json::to_string(&v["input"]["policy"]).unwrap();
-        let declared_policy_hash = unsigned.policy_bundle_hash.as_ref().expect("receipt must have policy hash");
-        let policy_valid = verify_policy_hash_from_str(&policy_json_str, declared_policy_hash).unwrap();
+        let declared_policy_hash = unsigned
+            .policy_bundle_hash
+            .as_ref()
+            .expect("receipt must have policy hash");
+        let policy_valid =
+            verify_policy_hash_from_str(&policy_json_str, declared_policy_hash).unwrap();
         assert!(policy_valid, "Tier 2: policy hash should match");
 
         // Check expected fields
@@ -1655,7 +1689,11 @@ mod tests {
         assert_eq!(result.profile_covered, Some(true), "profile covered");
         assert_eq!(result.policy_covered, Some(true), "policy covered");
         assert_eq!(result.runtime_hash_match, Some(true), "runtime hash match");
-        assert_eq!(result.guardian_hash_match, Some(true), "guardian hash match");
+        assert_eq!(
+            result.guardian_hash_match,
+            Some(true),
+            "guardian hash match"
+        );
 
         assert_eq!(v["expected"]["tier_achieved"].as_u64(), Some(3));
     }
@@ -1684,8 +1722,16 @@ mod tests {
         .expect("Tier 3 negative: should succeed with warning (non-strict)");
 
         assert_eq!(result.signature_valid, Some(true), "manifest sig valid");
-        assert_eq!(result.runtime_hash_match, Some(false), "runtime hash should NOT match");
-        assert_eq!(result.guardian_hash_match, Some(true), "guardian hash should match");
+        assert_eq!(
+            result.runtime_hash_match,
+            Some(false),
+            "runtime hash should NOT match"
+        );
+        assert_eq!(
+            result.guardian_hash_match,
+            Some(true),
+            "guardian hash should match"
+        );
 
         assert_eq!(v["expected"]["runtime_hash_match"].as_bool(), Some(false));
     }
@@ -1734,15 +1780,8 @@ mod tests {
         });
 
         let json = serde_json::to_string(&manifest).unwrap();
-        let result = verify_manifest_from_str(
-            &json,
-            None,
-            None,
-            &"x".repeat(64),
-            None,
-            false,
-        )
-        .unwrap();
+        let result =
+            verify_manifest_from_str(&json, None, None, &"x".repeat(64), None, false).unwrap();
         // Signature should be invalid because runtime_hashes were tampered
         assert_eq!(result.signature_valid, Some(false));
     }
@@ -1779,8 +1818,8 @@ mod tests {
             model_id: "gpt-4.1".to_string(),
             model_version: None,
         };
-        let result = verify_model_identity_against_profile(&identity, &test_profile_json_str())
-            .unwrap();
+        let result =
+            verify_model_identity_against_profile(&identity, &test_profile_json_str()).unwrap();
         assert!(result, "identity should match profile");
     }
 
@@ -1791,8 +1830,8 @@ mod tests {
             model_id: "gpt-4.1".to_string(),
             model_version: None,
         };
-        let result = verify_model_identity_against_profile(&identity, &test_profile_json_str())
-            .unwrap();
+        let result =
+            verify_model_identity_against_profile(&identity, &test_profile_json_str()).unwrap();
         assert!(result, "provider comparison should be case-insensitive");
     }
 
@@ -1803,8 +1842,8 @@ mod tests {
             model_id: "gpt-4.1".to_string(),
             model_version: None,
         };
-        let result = verify_model_identity_against_profile(&identity, &test_profile_json_str())
-            .unwrap();
+        let result =
+            verify_model_identity_against_profile(&identity, &test_profile_json_str()).unwrap();
         assert!(!result, "mismatched provider should fail");
     }
 
@@ -1815,8 +1854,8 @@ mod tests {
             model_id: "gpt-4o".to_string(),
             model_version: None,
         };
-        let result = verify_model_identity_against_profile(&identity, &test_profile_json_str())
-            .unwrap();
+        let result =
+            verify_model_identity_against_profile(&identity, &test_profile_json_str()).unwrap();
         assert!(!result, "mismatched model_id should fail");
     }
 
@@ -1957,7 +1996,10 @@ mod tests {
         let contract = make_contract_json(&serde_json::json!({}));
         let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
         assert_eq!(result.prompt_template_hash_matches, Some(false));
-        assert!(result.warnings.iter().any(|w| w.contains("prompt_template_hash")));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.contains("prompt_template_hash")));
     }
 
     #[test]
@@ -1968,12 +2010,9 @@ mod tests {
             "fixed_window_duration_seconds": 120
         });
         let contract = make_contract_json(&serde_json::json!({}));
-        let result = verify_contract_enforcement(
-            &serde_json::to_string(&receipt).unwrap(),
-            &contract,
-            true,
-        )
-        .unwrap();
+        let result =
+            verify_contract_enforcement(&serde_json::to_string(&receipt).unwrap(), &contract, true)
+                .unwrap();
         // Nothing checked = no failures
         assert_eq!(result.entropy_budget_matches, None);
         assert_eq!(result.timing_class_matches, None);
@@ -1989,12 +2028,9 @@ mod tests {
         // Contract has no optional fields — nothing to cross-check
         let receipt = make_receipt_json(&serde_json::json!({}));
         let contract = serde_json::json!({"contract_id": "test"});
-        let result = verify_contract_enforcement(
-            &receipt,
-            &serde_json::to_string(&contract).unwrap(),
-            true,
-        )
-        .unwrap();
+        let result =
+            verify_contract_enforcement(&receipt, &serde_json::to_string(&contract).unwrap(), true)
+                .unwrap();
         assert_eq!(result.entropy_budget_matches, None);
         assert_eq!(result.timing_class_matches, None);
         assert_eq!(result.timing_window_consistent, None);
@@ -2036,7 +2072,10 @@ mod tests {
         // timing_class_matches should still be checked (both present, case-insensitive match)
         assert_eq!(result.timing_class_matches, Some(true));
         // But window consistency could not be verified → warning
-        assert!(result.warnings.iter().any(|w| w.contains("unrecognized timing_class")));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.contains("unrecognized timing_class")));
         assert_eq!(result.timing_window_consistent, None);
     }
 
@@ -2124,7 +2163,10 @@ mod tests {
         }));
         let result = verify_contract_enforcement(&receipt, &contract, false).unwrap();
         assert_eq!(result.entropy_budget_matches, Some(false));
-        assert!(result.warnings.iter().any(|w| w.contains("256") && w.contains("8")));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.contains("256") && w.contains("8")));
     }
 
     // Attack 5: Timing class/window inconsistency (FAST class with 120s window)
@@ -2155,8 +2197,8 @@ mod tests {
                 let receipt_str = serde_json::to_string(&receipt).unwrap();
                 let contract_str = serde_json::to_string(&contract).unwrap();
 
-                let err = verify_contract_enforcement(&receipt_str, &contract_str, true)
-                    .unwrap_err();
+                let err =
+                    verify_contract_enforcement(&receipt_str, &contract_str, true).unwrap_err();
                 assert!(
                     err.contains("timing window inconsistent"),
                     "Expected window inconsistency for {class} with {wrong_window}s window, got: {err}"
@@ -2175,11 +2217,9 @@ mod tests {
             "prompt_template_hash": "a".repeat(64),
         });
         let contract = make_contract_json(&serde_json::json!({}));
-        let result = verify_contract_enforcement(
-            &serde_json::to_string(&receipt).unwrap(),
-            &contract,
-            true,
-        ).unwrap();
+        let result =
+            verify_contract_enforcement(&serde_json::to_string(&receipt).unwrap(), &contract, true)
+                .unwrap();
         // Entropy check returns None (not checked), not Err
         assert_eq!(result.entropy_budget_matches, None);
         // Other checks still pass
@@ -2199,11 +2239,9 @@ mod tests {
             "prompt_template_hash": "a".repeat(64),
         });
         let contract = make_contract_json(&serde_json::json!({}));
-        let result = verify_contract_enforcement(
-            &serde_json::to_string(&receipt).unwrap(),
-            &contract,
-            true,
-        ).unwrap();
+        let result =
+            verify_contract_enforcement(&serde_json::to_string(&receipt).unwrap(), &contract, true)
+                .unwrap();
         // Timing class check returns None (receipt has no contract_timing_class)
         assert_eq!(result.timing_class_matches, None);
         // Window consistency is still checked (contract has timing_class, receipt has window)
@@ -2218,11 +2256,9 @@ mod tests {
             "fixed_window_duration_seconds": 120,
         });
         let contract = make_contract_json(&serde_json::json!({}));
-        let result = verify_contract_enforcement(
-            &serde_json::to_string(&receipt).unwrap(),
-            &contract,
-            true,
-        ).unwrap();
+        let result =
+            verify_contract_enforcement(&serde_json::to_string(&receipt).unwrap(), &contract, true)
+                .unwrap();
         assert_eq!(result.prompt_template_hash_matches, None);
         // Other checks still pass
         assert_eq!(result.entropy_budget_matches, Some(true));
@@ -2241,11 +2277,9 @@ mod tests {
             "fixed_window_duration_seconds": 120,
         });
         let contract = make_contract_json(&serde_json::json!({}));
-        let result = verify_contract_enforcement(
-            &serde_json::to_string(&receipt).unwrap(),
-            &contract,
-            true,
-        ).unwrap();
+        let result =
+            verify_contract_enforcement(&serde_json::to_string(&receipt).unwrap(), &contract, true)
+                .unwrap();
         // All checks skipped — no errors, all None
         assert_eq!(result.entropy_budget_matches, None);
         assert_eq!(result.timing_class_matches, None);
@@ -2322,11 +2356,7 @@ mod tests {
 
     #[test]
     fn compartment_rejects_short_hex() {
-        let result = verify_compartment_id(
-            "a".repeat(64).as_str(),
-            Some("abcdef1234"),
-            None,
-        );
+        let result = verify_compartment_id("a".repeat(64).as_str(), Some("abcdef1234"), None);
         assert_eq!(result.format_valid, Some(false));
     }
 
@@ -2350,7 +2380,8 @@ mod tests {
     fn compartment_recompute_golden_public() {
         let pair_id = "a".repeat(64);
         let expected = "581b530a462f976c69d6a98b2019088ed436add01c3ab292826e8f6d16f4e12a";
-        let result = verify_compartment_id(&pair_id, Some(expected), Some(&serde_json::Value::Null));
+        let result =
+            verify_compartment_id(&pair_id, Some(expected), Some(&serde_json::Value::Null));
         assert_eq!(result.format_valid, Some(true));
         assert_eq!(result.derivation_valid, Some(true));
     }
@@ -2383,7 +2414,10 @@ mod tests {
         let result = verify_compartment_id("e".repeat(64).as_str(), Some(&cid), None);
         assert_eq!(result.format_valid, Some(true));
         assert!(result.derivation_valid.is_none());
-        assert!(result.warnings.iter().any(|w| w.contains("cannot verify derivation")));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.contains("cannot verify derivation")));
     }
 
     #[test]
@@ -2472,9 +2506,7 @@ mod tests {
     // ========================================================================
 
     use ed25519_dalek::Signer;
-    use receipt_core::attestation::{
-        AttestationClaims, AttestationEvidence, AttestationVersion,
-    };
+    use receipt_core::attestation::{AttestationClaims, AttestationEvidence, AttestationVersion};
 
     /// Build a mock receipt JSON with a valid Mock attestation, returning (receipt_json, public_key_hex).
     fn build_test_mock_evidence(
@@ -2516,8 +2548,7 @@ mod tests {
 
         let signature = signing_key.sign(&signing_hash);
         let sig_bytes = signature.to_bytes();
-        let evidence_b64 =
-            base64::engine::general_purpose::STANDARD.encode(sig_bytes.as_ref());
+        let evidence_b64 = base64::engine::general_purpose::STANDARD.encode(sig_bytes.as_ref());
 
         let evidence = AttestationEvidence {
             version: AttestationVersion::V1,
@@ -2592,7 +2623,10 @@ mod tests {
         let contract_hash = "";
 
         let challenge_hash = receipt_core::attestation::compute_challenge_hash(
-            session_id, pair_id, contract_hash, timestamp,
+            session_id,
+            pair_id,
+            contract_hash,
+            timestamp,
         )
         .unwrap();
 

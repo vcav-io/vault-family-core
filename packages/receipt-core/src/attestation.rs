@@ -147,12 +147,16 @@ pub struct AttestationEvidence {
 /// Validate that a string is 64-96 lowercase hex characters.
 fn is_valid_measurement(s: &str) -> bool {
     let len = s.len();
-    (64..=96).contains(&len) && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    (64..=96).contains(&len)
+        && s.chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
 }
 
 /// Validate that a string is exactly 64 lowercase hex characters.
 fn is_valid_hex64(s: &str) -> bool {
-    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    s.len() == 64
+        && s.chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
 }
 
 /// Validate that a string is valid standard (not URL-safe) base64.

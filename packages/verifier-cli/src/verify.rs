@@ -197,7 +197,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                 output_schema_valid: None,
                 output_schema_id: None,
                 tier_result: tiers::TierResult::default(),
-                error: Some(format!("Failed to parse receipt JSON: {}", e)),
+                error: Some(format!("Failed to parse receipt JSON: {e}")),
             };
         }
     };
@@ -259,7 +259,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
             output_schema_valid: None,
             output_schema_id: None,
             tier_result: tiers::TierResult::default(),
-            error: Some(format!("Signature verification failed: {}", e)),
+            error: Some(format!("Signature verification failed: {e}")),
         };
     }
 
@@ -290,7 +290,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                     output_schema_valid: None,
                     output_schema_id: None,
                     tier_result: tiers::TierResult::default(),
-                    error: Some(format!("Failed to compute receipt_hash: {}", e)),
+                    error: Some(format!("Failed to compute receipt_hash: {e}")),
                 };
             }
         }
@@ -299,8 +299,10 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
     // ---------------------------------------------------------------
     // Tier 1: Agreement hash verification (when --agreement-fields provided)
     // ---------------------------------------------------------------
-    let mut tier = tiers::TierResult::default();
-    tier.tier = 1; // baseline is Tier 1
+    let mut tier = tiers::TierResult {
+        tier: 1,
+        ..Default::default()
+    };
 
     if let Some(ref agreement_fields_path) = args.agreement_fields {
         if let Some(ref declared_hash) = receipt.agreement_hash {
@@ -326,7 +328,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                 }
                 Err(e) => {
                     tier.agreement_hash_valid = Some(false);
-                    tier.error = Some(format!("Agreement hash verification error: {}", e));
+                    tier.error = Some(format!("Agreement hash verification error: {e}"));
                     let err = tier.error.clone();
                     return VerifyDetails {
                         receipt: Some(receipt),
@@ -395,7 +397,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                     }
                     Err(e) => {
                         tier.profile_hash_valid = Some(false);
-                        tier.error = Some(format!("Profile hash verification error: {}", e));
+                        tier.error = Some(format!("Profile hash verification error: {e}"));
                         let err = tier.error.clone();
                         return VerifyDetails {
                             receipt: Some(receipt),
@@ -437,7 +439,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                     }
                     Err(e) => {
                         tier.policy_hash_valid = Some(false);
-                        tier.error = Some(format!("Policy hash verification error: {}", e));
+                        tier.error = Some(format!("Policy hash verification error: {e}"));
                         let err = tier.error.clone();
                         return VerifyDetails {
                             receipt: Some(receipt),
@@ -457,7 +459,9 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
         if let Some(ref contract_path) = args.contract {
             // Prefer receipt.contract_hash when present; fall back to
             // guardian_policy_hash for legacy receipts without the field.
-            let declared_hash = receipt.contract_hash.as_deref()
+            let declared_hash = receipt
+                .contract_hash
+                .as_deref()
                 .unwrap_or(&receipt.guardian_policy_hash);
             match tiers::verify_contract_hash(Path::new(contract_path), declared_hash) {
                 Ok(true) => {
@@ -481,7 +485,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                 }
                 Err(e) => {
                     tier.contract_hash_valid = Some(false);
-                    tier.error = Some(format!("Contract hash verification error: {}", e));
+                    tier.error = Some(format!("Contract hash verification error: {e}"));
                     let err = tier.error.clone();
                     return VerifyDetails {
                         receipt: Some(receipt),
@@ -522,7 +526,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                         } else {
                             VerificationStatus::FailContractEnforcement
                         };
-                        tier.error = Some(format!("Contract enforcement: {}", msg));
+                        tier.error = Some(format!("Contract enforcement: {msg}"));
                         let err = tier.error.clone();
                         return VerifyDetails {
                             receipt: Some(receipt),
@@ -537,10 +541,8 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                 }
             }
             Err(e) => {
-                let msg = format!(
-                    "Failed to re-read contract file for enforcement cross-check: {}",
-                    e
-                );
+                let msg =
+                    format!("Failed to re-read contract file for enforcement cross-check: {e}");
                 if args.strict {
                     tier.error = Some(msg.clone());
                     return VerifyDetails {
@@ -553,7 +555,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                         error: Some(msg),
                     };
                 } else {
-                    eprintln!("WARNING: {}", msg);
+                    eprintln!("WARNING: {msg}");
                 }
             }
         }
@@ -576,8 +578,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
             Ok(result) => {
                 if result.signature_valid == Some(false) {
                     tier.manifest = Some(result);
-                    tier.error =
-                        Some("Manifest signature verification failed".to_string());
+                    tier.error = Some("Manifest signature verification failed".to_string());
                     let err = tier.error.clone();
                     return VerifyDetails {
                         receipt: Some(receipt),
@@ -592,9 +593,8 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
 
                 if result.profile_covered == Some(false) {
                     tier.manifest = Some(result);
-                    tier.error = Some(
-                        "Receipt model_profile_hash not covered by manifest".to_string(),
-                    );
+                    tier.error =
+                        Some("Receipt model_profile_hash not covered by manifest".to_string());
                     let err = tier.error.clone();
                     return VerifyDetails {
                         receipt: Some(receipt),
@@ -609,9 +609,8 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
 
                 if result.policy_covered == Some(false) {
                     tier.manifest = Some(result);
-                    tier.error = Some(
-                        "Receipt policy/guardian hash not covered by manifest".to_string(),
-                    );
+                    tier.error =
+                        Some("Receipt policy/guardian hash not covered by manifest".to_string());
                     let err = tier.error.clone();
                     return VerifyDetails {
                         receipt: Some(receipt),
@@ -627,15 +626,20 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                 tier.manifest = Some(result);
             }
             Err(e) => {
-                let is_runtime_err = matches!(e, tiers::ManifestVerifyError::StrictRuntimeMismatch(_));
+                let is_runtime_err =
+                    matches!(e, tiers::ManifestVerifyError::StrictRuntimeMismatch(_));
                 tier.manifest = Some(tiers::ManifestResult {
-                    signature_valid: if is_runtime_err { Some(true) } else { Some(false) },
+                    signature_valid: if is_runtime_err {
+                        Some(true)
+                    } else {
+                        Some(false)
+                    },
                     profile_covered: None,
                     policy_covered: None,
                     runtime_hash_match: None,
                     guardian_hash_match: None,
                 });
-                tier.error = Some(format!("Manifest verification error: {}", e));
+                tier.error = Some(format!("Manifest verification error: {e}"));
                 let err = tier.error.clone();
                 return VerifyDetails {
                     receipt: Some(receipt),
@@ -679,7 +683,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                 output_schema_valid: None,
                 output_schema_id: None,
                 tier_result: tier,
-                error: Some(format!("Failed to load embedded schemas: {}", e)),
+                error: Some(format!("Failed to load embedded schemas: {e}")),
             };
         }
     };
@@ -696,7 +700,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                     output_schema_valid: None,
                     output_schema_id: None,
                     tier_result: tier,
-                    error: Some(format!("Failed to load schemas from {}: {}", schema_dir, e)),
+                    error: Some(format!("Failed to load schemas from {schema_dir}: {e}")),
                 };
             }
         }
@@ -720,8 +724,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                 output_schema_id: None,
                 tier_result: tier,
                 error: Some(format!(
-                    "Failed to serialize receipt for schema validation: {}",
-                    e
+                    "Failed to serialize receipt for schema validation: {e}"
                 )),
             };
         }
@@ -735,7 +738,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
             output_schema_valid: None,
             output_schema_id: None,
             tier_result: tier,
-            error: Some(format!("Receipt failed schema validation: {}", e)),
+            error: Some(format!("Receipt failed schema validation: {e}")),
         };
     }
 
@@ -743,7 +746,9 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
     let (output_schema_valid, output_schema_id) = if args.validate_output {
         if let Some(ref output) = receipt.output {
             // Determine output schema ID: CLI arg > receipt field > purpose-based fallback
-            let schema_id = args.output_schema_id.clone()
+            let schema_id = args
+                .output_schema_id
+                .clone()
                 .or_else(|| receipt.output_schema_id.clone())
                 .unwrap_or_else(|| {
                     // Infer schema from purpose code
@@ -751,8 +756,12 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
                         vault_family_types::Purpose::Compatibility => {
                             "vault_result_compatibility".to_string()
                         }
-                        vault_family_types::Purpose::Scheduling => "vault_result_scheduling".to_string(),
-                        vault_family_types::Purpose::Mediation => "vault_result_mediation".to_string(),
+                        vault_family_types::Purpose::Scheduling => {
+                            "vault_result_scheduling".to_string()
+                        }
+                        vault_family_types::Purpose::Mediation => {
+                            "vault_result_mediation".to_string()
+                        }
                         vault_family_types::Purpose::Negotiation => {
                             "vault_result_negotiation".to_string()
                         }
@@ -818,12 +827,12 @@ mod tests {
     use crate::cli::OutputFormat;
     use crate::keys::sha256_hex;
     use chrono::{TimeZone, Utc};
-    use vault_family_types::{BudgetTier, Purpose};
     use receipt_core::{
         generate_keypair, public_key_to_hex, sign_receipt, BudgetChainRecord, BudgetUsageRecord,
     };
     use std::io::Write;
     use tempfile::{NamedTempFile, TempDir};
+    use vault_family_types::{BudgetTier, Purpose};
 
     /// Path to vcav schemas directory (for output schema validation tests).
     /// Post repo-split: vcav schemas live in a separate repo.
@@ -1658,7 +1667,9 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_valid() {
-        let Some(schema_dir) = vcav_schema_dir() else { return; };
+        let Some(schema_dir) = vcav_schema_dir() else {
+            return;
+        };
         let (receipt_file, pubkey_file, _receipt) = create_d2_test_files();
 
         let args = Args {
@@ -1692,7 +1703,9 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_invalid_wrong_schema() {
-        let Some(schema_dir) = vcav_schema_dir() else { return; };
+        let Some(schema_dir) = vcav_schema_dir() else {
+            return;
+        };
         let (receipt_file, pubkey_file, _receipt) = create_d2_test_files();
 
         let args = Args {
@@ -1722,7 +1735,9 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_all_enum_values() {
-        let Some(schema_dir) = vcav_schema_dir() else { return; };
+        let Some(schema_dir) = vcav_schema_dir() else {
+            return;
+        };
         let decisions = ["PROCEED", "DO_NOT_PROCEED", "INCONCLUSIVE"];
         let confidence_buckets = ["LOW", "MEDIUM", "HIGH"];
         let reason_codes = [
@@ -1817,7 +1832,9 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_invalid_enum_value() {
-        let Some(_schema_dir) = vcav_schema_dir() else { return; };
+        let Some(_schema_dir) = vcav_schema_dir() else {
+            return;
+        };
         let (signing_key, verifying_key) = generate_keypair();
 
         let mut unsigned = UnsignedReceipt {
@@ -1874,7 +1891,9 @@ mod tests {
 
     #[test]
     fn test_verify_d2_output_missing_output_b() {
-        let Some(_schema_dir) = vcav_schema_dir() else { return; };
+        let Some(_schema_dir) = vcav_schema_dir() else {
+            return;
+        };
         let (signing_key, verifying_key) = generate_keypair();
 
         let mut unsigned = UnsignedReceipt {
@@ -2929,8 +2948,14 @@ mod tests {
         let mut unsigned: UnsignedReceipt =
             serde_json::from_value(vector["input"]["unsigned_receipt"].clone()).unwrap();
 
-        let profile_hash = unsigned.model_profile_hash.clone().unwrap_or_else(|| "a".repeat(64));
-        let policy_hash = unsigned.policy_bundle_hash.clone().unwrap_or_else(|| "b".repeat(64));
+        let profile_hash = unsigned
+            .model_profile_hash
+            .clone()
+            .unwrap_or_else(|| "a".repeat(64));
+        let policy_hash = unsigned
+            .policy_bundle_hash
+            .clone()
+            .unwrap_or_else(|| "b".repeat(64));
         let guardian_hash = unsigned.guardian_policy_hash.clone();
 
         let (re_signing_key, re_verifying_key) = generate_keypair();
@@ -2965,7 +2990,12 @@ mod tests {
         let receipt2 = unsigned2.sign(sig2);
 
         let mut receipt_file2 = NamedTempFile::new().unwrap();
-        writeln!(receipt_file2, "{}", serde_json::to_string(&receipt2).unwrap()).unwrap();
+        writeln!(
+            receipt_file2,
+            "{}",
+            serde_json::to_string(&receipt2).unwrap()
+        )
+        .unwrap();
 
         let mut agreement_file = NamedTempFile::new().unwrap();
         writeln!(

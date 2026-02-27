@@ -117,9 +117,10 @@ where
         || parts[2].len() != 4
         || parts[3].len() != 4
         || parts[4].len() != 12
-        || !parts
-            .iter()
-            .all(|p| p.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()))
+        || !parts.iter().all(|p| {
+            p.chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        })
     {
         return Err(serde::de::Error::custom(
             "invalid UUID format: expected 8-4-4-4-12 lowercase hex",
@@ -607,8 +608,7 @@ mod tests {
         // Cryptographic verification still passes
         assert!(verify_grant(&grant).is_ok());
         // But runtime can detect expiry
-        let expires =
-            chrono::DateTime::parse_from_rfc3339(&grant.expires_at).unwrap();
+        let expires = chrono::DateTime::parse_from_rfc3339(&grant.expires_at).unwrap();
         assert!(expires < chrono::Utc::now());
     }
 

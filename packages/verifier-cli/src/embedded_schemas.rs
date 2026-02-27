@@ -28,13 +28,13 @@ impl std::fmt::Display for EmbeddedSchemaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EmbeddedSchemaError::TempDirFailed(e) => {
-                write!(f, "Failed to create temp directory: {}", e)
+                write!(f, "Failed to create temp directory: {e}")
             }
             EmbeddedSchemaError::WriteFileFailed { filename, error } => {
-                write!(f, "Failed to write schema file '{}': {}", filename, error)
+                write!(f, "Failed to write schema file '{filename}': {error}")
             }
             EmbeddedSchemaError::LoadFailed(e) => {
-                write!(f, "Failed to load schemas: {}", e)
+                write!(f, "Failed to load schemas: {e}")
             }
         }
     }

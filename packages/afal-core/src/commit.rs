@@ -15,9 +15,9 @@ use crate::signing::{content_hash, SigningError};
 /// COMMIT message as per AFAL Binding Spec §3.4.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommitMessage {
-    pub commit_version: String, // "1"
-    pub admit_token_id: String, // 64 hex, from ADMIT.admit_token_id
-    pub encrypted_input_hash: String, // 64 hex, SHA-256 of encrypted envelope bytes
+    pub commit_version: String,        // "1"
+    pub admit_token_id: String,        // 64 hex, from ADMIT.admit_token_id
+    pub encrypted_input_hash: String,  // 64 hex, SHA-256 of encrypted envelope bytes
     pub agent_descriptor_hash: String, // 64 hex, SHA-256 of committer's unsigned descriptor
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encrypted_input_envelopes: Option<Vec<EncryptedInputEnvelope>>,
@@ -79,8 +79,7 @@ pub fn compute_aad_hex(binding: &AadBinding) -> Result<String, SigningError> {
 
 /// Compute the canonical form of the AAD binding (JCS, not hashed).
 pub fn compute_aad_canonical(binding: &AadBinding) -> Result<String, SigningError> {
-    canonicalize_serializable(binding)
-        .map_err(|e| SigningError::Canonicalization(e.to_string()))
+    canonicalize_serializable(binding).map_err(|e| SigningError::Canonicalization(e.to_string()))
 }
 
 #[cfg(test)]

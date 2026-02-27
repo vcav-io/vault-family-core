@@ -34,7 +34,12 @@ fn main() {
 
         println!("cargo:rerun-if-changed={}", src.display());
         fs::copy(&src, family_out.join(name)).unwrap_or_else(|e| {
-            panic!("copy failed: {} → {}: {}", src.display(), family_out.join(name).display(), e)
+            panic!(
+                "copy failed: {} → {}: {}",
+                src.display(),
+                family_out.join(name).display(),
+                e
+            )
         });
     }
 }

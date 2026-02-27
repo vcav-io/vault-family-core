@@ -173,12 +173,10 @@ impl BudgetLedger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::receipt::{
-        BudgetChainRecord, BudgetUsageRecord, ReceiptStatus, UnsignedReceipt,
-    };
-    use vault_family_types::ExecutionLane;
+    use crate::receipt::{BudgetChainRecord, BudgetUsageRecord, ReceiptStatus, UnsignedReceipt};
     use crate::signer::{compute_receipt_hash, generate_keypair, sign_receipt};
     use chrono::{TimeZone, Utc};
+    use vault_family_types::ExecutionLane;
     use vault_family_types::{BudgetTier, Purpose};
 
     fn chain_id() -> String {

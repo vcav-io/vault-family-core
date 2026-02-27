@@ -1,10 +1,10 @@
 //! Generates a test receipt and key for manual CLI testing
 
 use chrono::{TimeZone, Utc};
-use vault_family_types::{BudgetTier, Purpose};
 use receipt_core::{
     generate_keypair, public_key_to_hex, sign_receipt, BudgetUsageRecord, UnsignedReceipt,
 };
+use vault_family_types::{BudgetTier, Purpose};
 
 fn main() {
     let (signing_key, verifying_key) = generate_keypair();

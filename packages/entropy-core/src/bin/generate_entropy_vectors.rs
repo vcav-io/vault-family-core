@@ -49,7 +49,7 @@ fn generate_entropy_status_vectors() -> serde_json::Value {
         },
     ];
 
-    let entry_hashes: Vec<String> = entries.iter().map(|e| compute_entry_hash(e)).collect();
+    let entry_hashes: Vec<String> = entries.iter().map(compute_entry_hash).collect();
     let ledger_head_hash = compute_ledger_head_hash(&entries);
 
     let mut ledger = EntropyLedger::new();
