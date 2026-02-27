@@ -17,6 +17,9 @@
 //! - [`canonicalize`] - RFC 8785 JSON Canonicalization Scheme
 //! - [`signer`] - Ed25519 signing with domain separation
 //! - [`manifest`] - Signed publication manifest for operator artefact bundles
+//! - [`agreement`] - Session agreement hash computation
+//! - [`attestation`] - Attestation challenge and evidence types
+//! - [`ledger`] - Budget ledger with apply/check semantics
 
 pub mod agreement;
 pub mod attestation;
