@@ -98,13 +98,13 @@ fn format_canonical_float(f: f64) -> String {
     let abs = f.abs();
     if abs >= 1e21 || (abs < 1e-6 && abs > 0.0) {
         // Use exponential notation
-        format!("{:e}", f)
+        format!("{f:e}")
             .replace("e", "E")
             .replace("E+", "E")
             .replace("E0", "E+0")
     } else {
         // Regular notation, remove trailing zeros
-        let s = format!("{}", f);
+        let s = format!("{f}");
         s
     }
 }

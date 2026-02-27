@@ -142,8 +142,8 @@ fn sha256_hex_two(prefix: &str, a: &str, b: &str) -> String {
 
 /// Compute the entry hash for a ledger entry using domain-separated SHA-256.
 pub fn compute_entry_hash(entry: &EntropyLedgerEntry) -> String {
-    let canonical = canonicalize_serializable(entry)
-        .expect("EntropyLedgerEntry must be serializable");
+    let canonical =
+        canonicalize_serializable(entry).expect("EntropyLedgerEntry must be serializable");
     sha256_hex_prefixed(ENTRY_HASH_PREFIX, &canonical)
 }
 
@@ -166,16 +166,14 @@ pub fn compute_ledger_head_hash(entries: &[EntropyLedgerEntry]) -> String {
 ///
 /// The hashes must be ordered by ascending (timestamp, session_id) before calling.
 pub fn compute_delta_commitment(prefix: &str, entry_hashes: &[String]) -> String {
-    let json_value = serde_json::to_value(entry_hashes)
-        .expect("Vec<String> must be serializable");
+    let json_value = serde_json::to_value(entry_hashes).expect("Vec<String> must be serializable");
     let canonical = receipt_core::canonicalize(&json_value);
     sha256_hex_prefixed(prefix, &canonical)
 }
 
 /// Compute the entropy status commitment (hash of the status object itself).
 pub fn compute_entropy_status_commitment(status: &EntropyStatus) -> String {
-    let canonical = canonicalize_serializable(status)
-        .expect("EntropyStatus must be serializable");
+    let canonical = canonicalize_serializable(status).expect("EntropyStatus must be serializable");
     sha256_hex_prefixed(STATUS_COMMITMENT_PREFIX, &canonical)
 }
 
@@ -303,8 +301,11 @@ impl EntropyLedger {
             .copied()
             .filter(|e| e.timestamp >= window_7d_start)
             .collect();
-        counterparty_7d_entries
-            .sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.session_id.cmp(&b.session_id)));
+        counterparty_7d_entries.sort_by(|a, b| {
+            a.timestamp
+                .cmp(&b.timestamp)
+                .then(a.session_id.cmp(&b.session_id))
+        });
         let counterparty_hashes: Vec<String> = counterparty_7d_entries
             .iter()
             .map(|e| compute_entry_hash(e))
@@ -318,8 +319,11 @@ impl EntropyLedger {
             .iter()
             .filter(|e| e.contract_key == contract_key && e.timestamp >= window_7d_start)
             .collect();
-        contract_7d_entries
-            .sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.session_id.cmp(&b.session_id)));
+        contract_7d_entries.sort_by(|a, b| {
+            a.timestamp
+                .cmp(&b.timestamp)
+                .then(a.session_id.cmp(&b.session_id))
+        });
         let contract_hashes: Vec<String> = contract_7d_entries
             .iter()
             .map(|e| compute_entry_hash(e))
@@ -381,7 +385,13 @@ mod tests {
     fn test_append_enforces_timestamp_ascending() {
         let mut ledger = EntropyLedger::new();
         ledger
-            .append(make_entry("s1", "p", CONTRACT_KEY_NONE, 100, ts(2025, 1, 1, 5)))
+            .append(make_entry(
+                "s1",
+                "p",
+                CONTRACT_KEY_NONE,
+                100,
+                ts(2025, 1, 1, 5),
+            ))
             .unwrap();
         // Earlier timestamp should be rejected
         let result = ledger.append(make_entry(
@@ -722,7 +732,13 @@ mod tests {
     fn test_delta_commitment_contract() {
         let mut ledger = EntropyLedger::new();
         let now = ts(2025, 6, 10, 12);
-        let e1 = make_entry("s1", "pair1", "contract_x", 100, now - chrono::Duration::days(1));
+        let e1 = make_entry(
+            "s1",
+            "pair1",
+            "contract_x",
+            100,
+            now - chrono::Duration::days(1),
+        );
         let e2 = make_entry(
             "s2",
             "pair2",
@@ -785,22 +801,22 @@ mod tests {
             EntropyLedgerEntry {
                 session_id: "session-aaa".to_string(),
                 pair_id: "pair-alice-bob".to_string(),
-                contract_key:
-                    "abc123def456abc123def456abc123def456abc123def456abc123def456abc1".to_string(),
+                contract_key: "abc123def456abc123def456abc123def456abc123def456abc123def456abc1"
+                    .to_string(),
                 entropy_millibits: 8000,
                 timestamp: Utc.with_ymd_and_hms(2026, 1, 8, 10, 0, 0).unwrap(),
-                receipt_hash:
-                    "0000000000000000000000000000000000000000000000000000000000000001".to_string(),
+                receipt_hash: "0000000000000000000000000000000000000000000000000000000000000001"
+                    .to_string(),
             },
             EntropyLedgerEntry {
                 session_id: "session-bbb".to_string(),
                 pair_id: "pair-alice-bob".to_string(),
-                contract_key:
-                    "abc123def456abc123def456abc123def456abc123def456abc123def456abc1".to_string(),
+                contract_key: "abc123def456abc123def456abc123def456abc123def456abc123def456abc1"
+                    .to_string(),
                 entropy_millibits: 12000,
                 timestamp: Utc.with_ymd_and_hms(2026, 1, 14, 20, 0, 0).unwrap(),
-                receipt_hash:
-                    "0000000000000000000000000000000000000000000000000000000000000002".to_string(),
+                receipt_hash: "0000000000000000000000000000000000000000000000000000000000000002"
+                    .to_string(),
             },
             EntropyLedgerEntry {
                 session_id: "session-ccc".to_string(),
@@ -808,8 +824,8 @@ mod tests {
                 contract_key: CONTRACT_KEY_NONE.to_string(),
                 entropy_millibits: 5000,
                 timestamp: Utc.with_ymd_and_hms(2026, 1, 15, 9, 0, 0).unwrap(),
-                receipt_hash:
-                    "0000000000000000000000000000000000000000000000000000000000000003".to_string(),
+                receipt_hash: "0000000000000000000000000000000000000000000000000000000000000003"
+                    .to_string(),
             },
         ];
 
@@ -876,9 +892,27 @@ mod tests {
         let mut ledger = EntropyLedger::new();
         let now = ts(2025, 6, 10, 12);
 
-        let e1 = make_entry("s1", "pair1", "ckey1", 1000, now - chrono::Duration::days(6));
-        let e2 = make_entry("s2", "pair1", "ckey1", 2000, now - chrono::Duration::hours(20));
-        let e3 = make_entry("s3", "pair2", "ckey1", 500, now - chrono::Duration::hours(10));
+        let e1 = make_entry(
+            "s1",
+            "pair1",
+            "ckey1",
+            1000,
+            now - chrono::Duration::days(6),
+        );
+        let e2 = make_entry(
+            "s2",
+            "pair1",
+            "ckey1",
+            2000,
+            now - chrono::Duration::hours(20),
+        );
+        let e3 = make_entry(
+            "s3",
+            "pair2",
+            "ckey1",
+            500,
+            now - chrono::Duration::hours(10),
+        );
 
         ledger.append(e1.clone()).unwrap();
         ledger.append(e2.clone()).unwrap();

@@ -281,7 +281,8 @@ fn test_full_pipeline_tier1_receipt_signature_passes() {
     let signature = sign_receipt(&unsigned, &sk).expect("signing succeeds");
 
     // Tier 1: verify receipt signature via library API
-    verify_receipt(&unsigned, &signature, &vk).expect("Tier 1 receipt signature verification passes");
+    verify_receipt(&unsigned, &signature, &vk)
+        .expect("Tier 1 receipt signature verification passes");
 }
 
 #[test]
@@ -290,9 +291,18 @@ fn test_full_pipeline_tier2_artefact_hashes_match() {
     let artefacts = create_test_artefacts();
 
     // Recompute hashes from the raw content
-    assert_eq!(sha256_hex(artefacts.profile_json.as_bytes()), artefacts.profile_hash);
-    assert_eq!(sha256_hex(artefacts.policy_json.as_bytes()), artefacts.policy_hash);
-    assert_eq!(sha256_hex(artefacts.contract_json.as_bytes()), artefacts.contract_hash);
+    assert_eq!(
+        sha256_hex(artefacts.profile_json.as_bytes()),
+        artefacts.profile_hash
+    );
+    assert_eq!(
+        sha256_hex(artefacts.policy_json.as_bytes()),
+        artefacts.policy_hash
+    );
+    assert_eq!(
+        sha256_hex(artefacts.contract_json.as_bytes()),
+        artefacts.contract_hash
+    );
 }
 
 #[test]
@@ -318,9 +328,18 @@ fn test_full_pipeline_manifest_covers_all_artefacts() {
     assert_eq!(manifest.artefacts.policies.len(), 1);
 
     // Verify hashes in manifest match artefact content hashes
-    assert_eq!(manifest.artefacts.contracts[0].content_hash, artefacts.contract_hash);
-    assert_eq!(manifest.artefacts.profiles[0].content_hash, artefacts.profile_hash);
-    assert_eq!(manifest.artefacts.policies[0].content_hash, artefacts.policy_hash);
+    assert_eq!(
+        manifest.artefacts.contracts[0].content_hash,
+        artefacts.contract_hash
+    );
+    assert_eq!(
+        manifest.artefacts.profiles[0].content_hash,
+        artefacts.profile_hash
+    );
+    assert_eq!(
+        manifest.artefacts.policies[0].content_hash,
+        artefacts.policy_hash
+    );
 }
 
 // ============================================================================
@@ -340,7 +359,10 @@ fn test_tampered_receipt_signature_fails() {
 
     // Tier 1: signature verification must fail on tampered receipt
     let result = verify_receipt(&tampered, &signature, &vk);
-    assert!(result.is_err(), "Tampered receipt must fail Tier 1 verification");
+    assert!(
+        result.is_err(),
+        "Tampered receipt must fail Tier 1 verification"
+    );
 }
 
 #[test]
@@ -410,7 +432,10 @@ fn test_artefact_substitution_contract_hash_mismatch() {
     .to_string();
 
     let tampered_hash = sha256_hex(tampered_contract.as_bytes());
-    assert_ne!(original_hash, tampered_hash, "Tampered contract must produce different hash");
+    assert_ne!(
+        original_hash, tampered_hash,
+        "Tampered contract must produce different hash"
+    );
 }
 
 // ============================================================================
@@ -428,7 +453,10 @@ fn test_manifest_tampered_artefact_list_fails_verification() {
 
     // Manifest signature verification must fail
     let result = verify_manifest(&manifest, &vk);
-    assert!(result.is_err(), "Tampered manifest must fail signature verification");
+    assert!(
+        result.is_err(),
+        "Tampered manifest must fail signature verification"
+    );
 }
 
 #[test]
@@ -441,7 +469,10 @@ fn test_manifest_tampered_operator_id_fails_verification() {
     manifest.operator_id = "operator-evil-001".to_string();
 
     let result = verify_manifest(&manifest, &vk);
-    assert!(result.is_err(), "Tampered operator_id must fail manifest verification");
+    assert!(
+        result.is_err(),
+        "Tampered operator_id must fail manifest verification"
+    );
 }
 
 #[test]
@@ -579,7 +610,11 @@ fn test_cli_tier1_tampered_receipt_fails() {
     let mut receipt_json: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&receipt_path).unwrap()).unwrap();
     receipt_json["purpose_code"] = serde_json::json!("SCHEDULING");
-    fs::write(&receipt_path, serde_json::to_string_pretty(&receipt_json).unwrap()).unwrap();
+    fs::write(
+        &receipt_path,
+        serde_json::to_string_pretty(&receipt_json).unwrap(),
+    )
+    .unwrap();
 
     // Write public key file
     let pubkey_path = dir.path().join("vault.pub");
@@ -654,7 +689,11 @@ fn test_cli_json_output_tampered_receipt() {
     let mut receipt_json: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&receipt_path).unwrap()).unwrap();
     receipt_json["output_entropy_bits"] = serde_json::json!(999);
-    fs::write(&receipt_path, serde_json::to_string_pretty(&receipt_json).unwrap()).unwrap();
+    fs::write(
+        &receipt_path,
+        serde_json::to_string_pretty(&receipt_json).unwrap(),
+    )
+    .unwrap();
 
     let pubkey_path = dir.path().join("vault.pub");
     fs::write(&pubkey_path, public_key_to_hex(&vk)).unwrap();
@@ -725,13 +764,11 @@ fn test_e2e_full_pipeline_all_tiers() {
 
     // Verify manifest covers the same artefacts referenced by the receipt
     assert_eq!(
-        manifest.artefacts.profiles[0].content_hash,
-        *receipt_profile_hash,
+        manifest.artefacts.profiles[0].content_hash, *receipt_profile_hash,
         "Manifest profile hash matches receipt"
     );
     assert_eq!(
-        manifest.artefacts.policies[0].content_hash,
-        *receipt_policy_hash,
+        manifest.artefacts.policies[0].content_hash, *receipt_policy_hash,
         "Manifest policy hash matches receipt"
     );
 }

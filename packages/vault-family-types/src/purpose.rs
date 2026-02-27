@@ -97,7 +97,10 @@ mod tests {
         assert_eq!(Purpose::Scheduling.to_string(), "SCHEDULING");
         assert_eq!(Purpose::Mediation.to_string(), "MEDIATION");
         assert_eq!(Purpose::Negotiation.to_string(), "NEGOTIATION");
-        assert_eq!(Purpose::SchedulingCompatV1.to_string(), "SCHEDULING_COMPAT_V1");
+        assert_eq!(
+            Purpose::SchedulingCompatV1.to_string(),
+            "SCHEDULING_COMPAT_V1"
+        );
     }
 
     #[test]
@@ -111,17 +114,38 @@ mod tests {
 
     #[test]
     fn test_purpose_serde_golden() {
-        assert_eq!(serde_json::to_string(&Purpose::Compatibility).unwrap(), "\"COMPATIBILITY\"");
-        assert_eq!(serde_json::to_string(&Purpose::Scheduling).unwrap(), "\"SCHEDULING\"");
-        assert_eq!(serde_json::to_string(&Purpose::Mediation).unwrap(), "\"MEDIATION\"");
-        assert_eq!(serde_json::to_string(&Purpose::Negotiation).unwrap(), "\"NEGOTIATION\"");
-        assert_eq!(serde_json::to_string(&Purpose::SchedulingCompatV1).unwrap(), "\"SCHEDULING_COMPAT_V1\"");
+        assert_eq!(
+            serde_json::to_string(&Purpose::Compatibility).unwrap(),
+            "\"COMPATIBILITY\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Purpose::Scheduling).unwrap(),
+            "\"SCHEDULING\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Purpose::Mediation).unwrap(),
+            "\"MEDIATION\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Purpose::Negotiation).unwrap(),
+            "\"NEGOTIATION\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Purpose::SchedulingCompatV1).unwrap(),
+            "\"SCHEDULING_COMPAT_V1\""
+        );
     }
 
     #[test]
     fn test_purpose_from_str() {
-        assert_eq!("COMPATIBILITY".parse::<Purpose>().unwrap(), Purpose::Compatibility);
-        assert_eq!("scheduling".parse::<Purpose>().unwrap(), Purpose::Scheduling);
+        assert_eq!(
+            "COMPATIBILITY".parse::<Purpose>().unwrap(),
+            Purpose::Compatibility
+        );
+        assert_eq!(
+            "scheduling".parse::<Purpose>().unwrap(),
+            Purpose::Scheduling
+        );
         assert!("INVALID".parse::<Purpose>().is_err());
     }
 

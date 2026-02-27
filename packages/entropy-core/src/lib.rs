@@ -33,9 +33,9 @@ pub mod store;
 // ---------------------------------------------------------------------------
 
 pub use ledger::{
-    compute_delta_commitment, compute_entry_hash, compute_entropy_status_commitment,
-    compute_ledger_head_hash, EntropyLedger, EntropyLedgerEntry, EntropyLedgerError,
-    EntropyStatus, WindowBoundary, CONTRACT_KEY_NONE, ENTROPY_STATUS_SCHEMA_VERSION,
+    compute_delta_commitment, compute_entropy_status_commitment, compute_entry_hash,
+    compute_ledger_head_hash, EntropyLedger, EntropyLedgerEntry, EntropyLedgerError, EntropyStatus,
+    WindowBoundary, CONTRACT_KEY_NONE, ENTROPY_STATUS_SCHEMA_VERSION,
 };
 
 // ---------------------------------------------------------------------------
@@ -44,8 +44,7 @@ pub use ledger::{
 
 pub use measurement::{
     calculate_schema_entropy, calculate_schema_entropy_upper_bound,
-    ensure_schema_entropy_within_ceiling, enum_entropy_bits, EntropyError,
-    ENTROPY_UPPER_BOUND_KEY,
+    ensure_schema_entropy_within_ceiling, enum_entropy_bits, EntropyError, ENTROPY_UPPER_BOUND_KEY,
 };
 
 // ---------------------------------------------------------------------------

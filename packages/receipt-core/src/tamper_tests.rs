@@ -16,35 +16,31 @@
 #[cfg(test)]
 mod tests {
     use crate::agreement::{
-        compute_agreement_hash, compute_pre_agreement_hash, ModelIdentity,
-        PreAgreementFields, SessionAgreementFields, AGREEMENT_DOMAIN_PREFIX,
-        PRE_AGREEMENT_DOMAIN_PREFIX,
+        compute_agreement_hash, compute_pre_agreement_hash, ModelIdentity, PreAgreementFields,
+        SessionAgreementFields, AGREEMENT_DOMAIN_PREFIX, PRE_AGREEMENT_DOMAIN_PREFIX,
     };
     use crate::canonicalize::{canonicalize, canonicalize_serializable};
+    use crate::handoff::{BudgetTierV2, HashRef, UnsignedSessionHandoff};
     use crate::ledger::{ApplyOutcome, BudgetLedger, LedgerError};
     use crate::manifest::{
-        sign_manifest, verify_manifest,
-        ManifestArtefacts, PublicationManifest, UnsignedManifest,
+        sign_manifest, verify_manifest, ManifestArtefacts, PublicationManifest, UnsignedManifest,
         MANIFEST_DOMAIN_PREFIX,
     };
     use crate::receipt::{
-        BudgetChainRecord, BudgetUsageRecord, Receipt,
-        ReceiptStatus, UnsignedReceipt, SCHEMA_VERSION,
+        BudgetChainRecord, BudgetUsageRecord, Receipt, ReceiptStatus, UnsignedReceipt,
+        SCHEMA_VERSION,
     };
-    use vault_family_types::ExecutionLane;
     use crate::signer::{
-        compute_receipt_hash, compute_receipt_key_id,
-        generate_keypair,
-        hash_message, public_key_to_hex, sign_handoff, sign_receipt,
-        verify_handoff, verify_receipt, SigningError, BUDGET_CHAIN_DOMAIN_PREFIX,
-        DOMAIN_PREFIX, RECEIPT_HASH_DOMAIN_PREFIX, RECEIPT_HASH_PLACEHOLDER,
-        SESSION_HANDOFF_DOMAIN_PREFIX,
+        compute_receipt_hash, compute_receipt_key_id, generate_keypair, hash_message,
+        public_key_to_hex, sign_handoff, sign_receipt, verify_handoff, verify_receipt,
+        SigningError, BUDGET_CHAIN_DOMAIN_PREFIX, DOMAIN_PREFIX, RECEIPT_HASH_DOMAIN_PREFIX,
+        RECEIPT_HASH_PLACEHOLDER, SESSION_HANDOFF_DOMAIN_PREFIX,
     };
-    use crate::handoff::{BudgetTierV2, HashRef, UnsignedSessionHandoff};
     use chrono::{TimeZone, Utc};
     use ed25519_dalek::{Signer, SigningKey, Verifier};
-    use vault_family_types::{BudgetTier, Purpose};
     use sha2::{Digest, Sha256};
+    use vault_family_types::ExecutionLane;
+    use vault_family_types::{BudgetTier, Purpose};
 
     // =========================================================================
     // Helpers
@@ -789,14 +785,7 @@ mod tests {
                 Some(h1.clone()),
                 &signing_key,
             );
-            let r2_b = make_chain_receipt(
-                &"2b".repeat(32),
-                window,
-                11,
-                22,
-                Some(h1),
-                &signing_key,
-            );
+            let r2_b = make_chain_receipt(&"2b".repeat(32), window, 11, 22, Some(h1), &signing_key);
 
             let mut ledger = BudgetLedger::new();
             assert_eq!(ledger.apply_receipt(&r1).unwrap(), ApplyOutcome::Applied);
@@ -867,8 +856,7 @@ mod tests {
         fn escaped_vs_raw_characters_produce_same_canonical() {
             // \u0041 is 'A' — after JSON parsing, both become the same character
             let raw: serde_json::Value = serde_json::from_str(r#"{"key": "A"}"#).unwrap();
-            let escaped: serde_json::Value =
-                serde_json::from_str(r#"{"key": "\u0041"}"#).unwrap();
+            let escaped: serde_json::Value = serde_json::from_str(r#"{"key": "\u0041"}"#).unwrap();
 
             assert_eq!(canonicalize(&raw), canonicalize(&escaped));
         }
@@ -909,8 +897,7 @@ mod tests {
 
         #[test]
         fn whitespace_variations_do_not_affect_canonical() {
-            let compact: serde_json::Value =
-                serde_json::from_str(r#"{"a":1,"b":2}"#).unwrap();
+            let compact: serde_json::Value = serde_json::from_str(r#"{"a":1,"b":2}"#).unwrap();
             let spaced: serde_json::Value =
                 serde_json::from_str(r#"{ "a" : 1 , "b" : 2 }"#).unwrap();
             let multiline: serde_json::Value = serde_json::from_str(
@@ -976,16 +963,16 @@ mod tests {
 
         /// All 10 domain prefixes in the VCAV system
         const ALL_PREFIXES: [&str; 10] = [
-            "VCAV-RECEIPT-V1:",       // DOMAIN_PREFIX
-            "VCAV-HANDOFF-V1:",       // SESSION_HANDOFF_DOMAIN_PREFIX
-            "VCAV-AGREEMENT-V1:",     // AGREEMENT_DOMAIN_PREFIX
-            "VCAV-PREAGREEMENT-V1:",  // PRE_AGREEMENT_DOMAIN_PREFIX
-            "VCAV-MANIFEST-V1:",      // MANIFEST_DOMAIN_PREFIX
-            "VCAV-MSG-V1:",           // ENVELOPE_DOMAIN_PREFIX (message-envelope)
-            "vcav/receipt_hash/v1",   // RECEIPT_HASH_DOMAIN_PREFIX
-            "vcav/budget_chain/v1",   // BUDGET_CHAIN_DOMAIN_PREFIX
-            "vcav/model_profile/v1",  // PROFILE_HASH_DOMAIN_PREFIX
-            "vcav/policy_bundle/v1",  // POLICY_BUNDLE_DOMAIN_PREFIX
+            "VCAV-RECEIPT-V1:",      // DOMAIN_PREFIX
+            "VCAV-HANDOFF-V1:",      // SESSION_HANDOFF_DOMAIN_PREFIX
+            "VCAV-AGREEMENT-V1:",    // AGREEMENT_DOMAIN_PREFIX
+            "VCAV-PREAGREEMENT-V1:", // PRE_AGREEMENT_DOMAIN_PREFIX
+            "VCAV-MANIFEST-V1:",     // MANIFEST_DOMAIN_PREFIX
+            "VCAV-MSG-V1:",          // ENVELOPE_DOMAIN_PREFIX (message-envelope)
+            "vcav/receipt_hash/v1",  // RECEIPT_HASH_DOMAIN_PREFIX
+            "vcav/budget_chain/v1",  // BUDGET_CHAIN_DOMAIN_PREFIX
+            "vcav/model_profile/v1", // PROFILE_HASH_DOMAIN_PREFIX
+            "vcav/policy_bundle/v1", // POLICY_BUNDLE_DOMAIN_PREFIX
         ];
 
         #[test]

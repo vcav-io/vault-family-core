@@ -17,12 +17,16 @@ pub const RECEIPT_SCHEMA: &str =
     include_str!(concat!(env!("OUT_DIR"), "/family/receipt.schema.json"));
 pub const RECEIPT_V2_SCHEMA: &str =
     include_str!(concat!(env!("OUT_DIR"), "/family/receipt.v2.schema.json"));
-pub const ENCRYPTED_INPUT_SCHEMA: &str =
-    include_str!(concat!(env!("OUT_DIR"), "/family/encrypted_input.schema.json"));
+pub const ENCRYPTED_INPUT_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/encrypted_input.schema.json"
+));
 pub const SIGNED_INPUT_SCHEMA: &str =
     include_str!(concat!(env!("OUT_DIR"), "/family/signed_input.schema.json"));
-pub const INPUT_CIPHERTEXT_ENVELOPE_V1_SCHEMA: &str =
-    include_str!(concat!(env!("OUT_DIR"), "/family/input_ciphertext_envelope_v1.schema.json"));
+pub const INPUT_CIPHERTEXT_ENVELOPE_V1_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/input_ciphertext_envelope_v1.schema.json"
+));
 
 /// All embedded schemas as a static array.
 pub const SCHEMAS: &[EmbeddedSchemaEntry] = &[

@@ -10,13 +10,19 @@ use sha2::{Digest, Sha256};
 
 fn main() {
     let descriptor_vectors = generate_descriptor_vectors();
-    write_vector("data/test-vectors/afal-descriptor-v1.json", &descriptor_vectors);
+    write_vector(
+        "data/test-vectors/afal-descriptor-v1.json",
+        &descriptor_vectors,
+    );
 
     let propose_vectors = generate_propose_vectors();
     write_vector("data/test-vectors/afal-propose-v1.json", &propose_vectors);
 
     let admit_deny_vectors = generate_admit_deny_vectors();
-    write_vector("data/test-vectors/afal-admit-deny-v1.json", &admit_deny_vectors);
+    write_vector(
+        "data/test-vectors/afal-admit-deny-v1.json",
+        &admit_deny_vectors,
+    );
 
     let commit_vectors = generate_commit_vectors();
     write_vector("data/test-vectors/afal-commit-v1.json", &commit_vectors);
@@ -95,7 +101,7 @@ fn generate_descriptor_vectors() -> serde_json::Value {
 
     // Compute the canonical JSON and digest for cross-language verification
     let canonical = canonicalize_serializable(&descriptor).unwrap();
-    let prefixed = format!("{}{}",DomainPrefix::Descriptor.as_str(), canonical);
+    let prefixed = format!("{}{}", DomainPrefix::Descriptor.as_str(), canonical);
     let digest = hex::encode(Sha256::digest(prefixed.as_bytes()));
 
     serde_json::json!({
@@ -296,15 +302,39 @@ fn generate_replay_vectors() -> serde_json::Value {
     let window = ReplayWindow::default();
 
     // Test cases for timestamp validation
-    let cases = vec![
+    let cases = [
         // (label, timestamp, expected_ok)
         ("exact_match", base_time.to_rfc3339(), true),
-        ("4_min_past", (base_time - Duration::minutes(4)).to_rfc3339(), true),
-        ("4_min_future", (base_time + Duration::minutes(4)).to_rfc3339(), true),
-        ("6_min_past", (base_time - Duration::minutes(6)).to_rfc3339(), false),
-        ("6_min_future", (base_time + Duration::minutes(6)).to_rfc3339(), false),
-        ("boundary_299s", (base_time - Duration::seconds(299)).to_rfc3339(), true),
-        ("boundary_301s", (base_time - Duration::seconds(301)).to_rfc3339(), false),
+        (
+            "4_min_past",
+            (base_time - Duration::minutes(4)).to_rfc3339(),
+            true,
+        ),
+        (
+            "4_min_future",
+            (base_time + Duration::minutes(4)).to_rfc3339(),
+            true,
+        ),
+        (
+            "6_min_past",
+            (base_time - Duration::minutes(6)).to_rfc3339(),
+            false,
+        ),
+        (
+            "6_min_future",
+            (base_time + Duration::minutes(6)).to_rfc3339(),
+            false,
+        ),
+        (
+            "boundary_299s",
+            (base_time - Duration::seconds(299)).to_rfc3339(),
+            true,
+        ),
+        (
+            "boundary_301s",
+            (base_time - Duration::seconds(301)).to_rfc3339(),
+            false,
+        ),
     ];
 
     let test_cases: Vec<serde_json::Value> = cases
@@ -319,7 +349,7 @@ fn generate_replay_vectors() -> serde_json::Value {
         .collect();
 
     // Nonce format validation
-    let nonce_cases = vec![
+    let nonce_cases = [
         ("valid_hex64", "a".repeat(64), true),
         ("valid_mixed_hex", "0123456789abcdef".repeat(4), true),
         ("uppercase_rejected", "A".repeat(64), false),

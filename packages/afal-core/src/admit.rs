@@ -21,11 +21,11 @@ use crate::types::AdmissionTier;
 /// Signed ADMIT message as per AFAL Binding Spec §3.2.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdmitMessage {
-    pub admission_version: String, // "1"
-    pub proposal_id: String,       // echoed from PROPOSE
-    pub outcome: String,           // "ADMIT"
-    pub expires_at: String,        // ISO 8601, ≤10 min from now
-    pub contract_hash: String,     // 64 hex
+    pub admission_version: String,  // "1"
+    pub proposal_id: String,        // echoed from PROPOSE
+    pub outcome: String,            // "ADMIT"
+    pub expires_at: String,         // ISO 8601, ≤10 min from now
+    pub contract_hash: String,      // 64 hex
     pub model_profile_hash: String, // 64 hex
     pub output_schema_id: String,
     pub output_schema_version: String,

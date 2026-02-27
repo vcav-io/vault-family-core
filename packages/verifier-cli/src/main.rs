@@ -52,7 +52,7 @@ fn main() -> Result<()> {
                     );
 
                     if let Some(ref agreement_hash) = receipt.agreement_hash {
-                        println!("Agreement hash: {}", agreement_hash);
+                        println!("Agreement hash: {agreement_hash}");
                     }
 
                     // Tier verification results
@@ -60,60 +60,60 @@ fn main() -> Result<()> {
                         println!("Verification tier: {}", details.tier_result.tier);
                     }
                     if let Some(valid) = details.tier_result.agreement_hash_valid {
-                        println!("Agreement hash valid: {}", valid);
+                        println!("Agreement hash valid: {valid}");
                     }
                     if let Some(valid) = details.tier_result.profile_hash_valid {
-                        println!("Profile hash valid: {}", valid);
+                        println!("Profile hash valid: {valid}");
                     }
                     if let Some(valid) = details.tier_result.policy_hash_valid {
-                        println!("Policy hash valid: {}", valid);
+                        println!("Policy hash valid: {valid}");
                     }
                     if let Some(valid) = details.tier_result.contract_hash_valid {
-                        println!("Contract hash valid: {}", valid);
+                        println!("Contract hash valid: {valid}");
                     }
 
                     // Manifest (Tier 3) results
                     if let Some(ref manifest) = details.tier_result.manifest {
                         if let Some(valid) = manifest.signature_valid {
-                            println!("Manifest signature valid: {}", valid);
+                            println!("Manifest signature valid: {valid}");
                         }
                         if let Some(covered) = manifest.profile_covered {
-                            println!("Manifest profile covered: {}", covered);
+                            println!("Manifest profile covered: {covered}");
                         }
                         if let Some(covered) = manifest.policy_covered {
-                            println!("Manifest policy covered: {}", covered);
+                            println!("Manifest policy covered: {covered}");
                         }
                         if let Some(matched) = manifest.runtime_hash_match {
-                            println!("Manifest runtime hash match: {}", matched);
+                            println!("Manifest runtime hash match: {matched}");
                         }
                         if let Some(matched) = manifest.guardian_hash_match {
-                            println!("Manifest guardian hash match: {}", matched);
+                            println!("Manifest guardian hash match: {matched}");
                         }
                     }
 
                     // Contract enforcement results
                     if let Some(ref ce) = details.tier_result.contract_enforcement {
                         if let Some(matches) = ce.entropy_budget_matches {
-                            println!("Contract enforcement entropy matches: {}", matches);
+                            println!("Contract enforcement entropy matches: {matches}");
                         }
                         if let Some(matches) = ce.timing_class_matches {
-                            println!("Contract enforcement timing matches: {}", matches);
+                            println!("Contract enforcement timing matches: {matches}");
                         }
                         if let Some(consistent) = ce.timing_window_consistent {
-                            println!("Contract enforcement timing window consistent: {}", consistent);
+                            println!("Contract enforcement timing window consistent: {consistent}");
                         }
                         if let Some(matches) = ce.prompt_template_hash_matches {
-                            println!("Contract enforcement prompt template matches: {}", matches);
+                            println!("Contract enforcement prompt template matches: {matches}");
                         }
                         for warning in &ce.warnings {
-                            eprintln!("WARNING: {}", warning);
+                            eprintln!("WARNING: {warning}");
                         }
                     }
 
                     if let Some(schema_id) = &details.output_schema_id {
-                        println!("Output schema: {}", schema_id);
+                        println!("Output schema: {schema_id}");
                         if let Some(valid) = details.output_schema_valid {
-                            println!("Output schema valid: {}", valid);
+                            println!("Output schema valid: {valid}");
                         }
                     }
 
@@ -124,7 +124,7 @@ fn main() -> Result<()> {
                 }
 
                 if let Some(error) = &details.error {
-                    println!("Error: {}", error);
+                    println!("Error: {error}");
                 }
             } else {
                 // Quiet mode: just print status
@@ -180,9 +180,7 @@ fn main() -> Result<()> {
                     .manifest
                     .as_ref()
                     .and_then(|m| m.guardian_hash_match),
-                model_identity_matches_profile: details
-                    .tier_result
-                    .model_identity_matches_profile,
+                model_identity_matches_profile: details.tier_result.model_identity_matches_profile,
                 contract_enforcement_entropy_matches: details
                     .tier_result
                     .contract_enforcement

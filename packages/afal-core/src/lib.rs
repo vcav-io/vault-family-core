@@ -32,30 +32,28 @@ pub mod types;
 // ---------------------------------------------------------------------------
 
 pub use admit::{
-    AdmitMessage, DenyMessage, UnsignedAdmit, UnsignedDeny,
-    validate_deny_canonical_form, SEALED_MODE_DENY_FIELDS,
+    validate_deny_canonical_form, AdmitMessage, DenyMessage, UnsignedAdmit, UnsignedDeny,
+    SEALED_MODE_DENY_FIELDS,
 };
 pub use commit::{
-    AadBinding, CommitMessage, EncryptedInputEnvelope, UnsignedCommit,
-    compute_aad_hex,
+    compute_aad_hex, AadBinding, CommitMessage, EncryptedInputEnvelope, UnsignedCommit,
 };
 pub use descriptor::{
-    AgentDescriptor, Capabilities, EnvelopeKey, Endpoints, IdentityKey,
-    LabelRequirements, ModelProfileRef, PolicyCommitments, ValidationWarning,
-    compute_descriptor_hash, is_descriptor_expired, is_descriptor_expired_at,
-    sign_descriptor, validate_descriptor, verify_descriptor_signature,
+    compute_descriptor_hash, is_descriptor_expired, is_descriptor_expired_at, sign_descriptor,
+    validate_descriptor, verify_descriptor_signature, AgentDescriptor, Capabilities, Endpoints,
+    EnvelopeKey, IdentityKey, LabelRequirements, ModelProfileRef, PolicyCommitments,
+    ValidationWarning,
 };
-pub use message::{AfalMessage, MessagePayload, UnsignedAfalMessage, validate_message};
-pub use propose::{ProposeMessage, UnsignedPropose, validate_propose};
+pub use message::{validate_message, AfalMessage, MessagePayload, UnsignedAfalMessage};
+pub use propose::{validate_propose, ProposeMessage, UnsignedPropose};
 
 // ---------------------------------------------------------------------------
 // Re-exports: signing
 // ---------------------------------------------------------------------------
 
 pub use signing::{
-    SigningError, compute_digest, compute_digest_hex, content_hash,
-    sign_afal_message, verify_afal_signature,
-    sign_json_value, verify_json_signature, strip_signature,
+    compute_digest, compute_digest_hex, content_hash, sign_afal_message, sign_json_value,
+    strip_signature, verify_afal_signature, verify_json_signature, SigningError,
 };
 
 // ---------------------------------------------------------------------------
@@ -68,9 +66,7 @@ pub use types::{AdmissionTier, DomainPrefix, TrustTier};
 // Re-exports: replay
 // ---------------------------------------------------------------------------
 
-pub use replay::{
-    NonceFormat, ReplayError, ReplayWindow, check_replay, validate_nonce,
-};
+pub use replay::{check_replay, validate_nonce, NonceFormat, ReplayError, ReplayWindow};
 
 // ---------------------------------------------------------------------------
 // Re-exports from vault-family-types (cross-cutting vocabulary)

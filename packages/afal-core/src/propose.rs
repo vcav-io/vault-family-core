@@ -82,12 +82,16 @@ impl ProposeMessage {
 
 /// 64-char lowercase hex pattern.
 fn is_hex64(s: &str) -> bool {
-    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    s.len() == 64
+        && s.chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
 }
 
 /// 128-char lowercase hex pattern.
 fn is_hex128(s: &str) -> bool {
-    s.len() == 128 && s.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    s.len() == 128
+        && s.chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
 }
 
 /// Validate a PROPOSE message structure (does not verify signature).

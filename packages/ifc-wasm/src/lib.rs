@@ -92,8 +92,7 @@ fn error_response(msg: &str) -> String {
 fn to_json_safe<T: Serialize>(val: &T) -> String {
     serde_json::to_string(val).unwrap_or_else(|e| {
         format!(
-            r#"{{"ok":false,"status":"ERROR","data":null,"error":{{"message":"serialization error: {}"}}}}"#,
-            e
+            r#"{{"ok":false,"status":"ERROR","data":null,"error":{{"message":"serialization error: {e}"}}}}"#
         )
     })
 }
@@ -463,20 +462,15 @@ impl IfcRuntime {
             }
 
             // 4. pair_id must match issuer+recipient
-            let expected_pair_id = vault_family_types::generate_pair_id(
-                self.agent_id.as_str(),
-                recipient.as_str(),
-            );
+            let expected_pair_id =
+                vault_family_types::generate_pair_id(self.agent_id.as_str(), recipient.as_str());
             if cap_grant.scope.pair_id != expected_pair_id {
                 return blocked_response("grant pair_id does not match agent+recipient");
             }
 
             // 5. Purpose must be in grant scope
             if !cap_grant.scope.purposes.contains(&purpose) {
-                return blocked_response(&format!(
-                    "purpose not allowed: {:?}",
-                    purpose
-                ));
+                return blocked_response(&format!("purpose not allowed: {purpose:?}"));
             }
 
             // 6. Label ceiling check: outbound label must flow_to grant label
@@ -502,7 +496,7 @@ impl IfcRuntime {
                 return format_policy_decision(&decision);
             }
             PolicyDecision::Block { reason } => {
-                return blocked_response(&format!("{:?}", reason));
+                return blocked_response(&format!("{reason:?}"));
             }
         };
 
@@ -605,9 +599,10 @@ impl IfcRuntime {
             || uuid_parts[2].len() != 4
             || uuid_parts[3].len() != 4
             || uuid_parts[4].len() != 12
-            || !uuid_parts
-                .iter()
-                .all(|p| p.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()))
+            || !uuid_parts.iter().all(|p| {
+                p.chars()
+                    .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+            })
         {
             return error_response("session_id must be a valid lowercase UUID");
         }
@@ -628,10 +623,8 @@ impl IfcRuntime {
         };
 
         // Compute pair_id internally
-        let pair_id = vault_family_types::generate_pair_id(
-            self.agent_id.as_str(),
-            audience.as_str(),
-        );
+        let pair_id =
+            vault_family_types::generate_pair_id(self.agent_id.as_str(), audience.as_str());
 
         let now = chrono::Utc::now();
         let issued_at = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
@@ -748,15 +741,15 @@ fn format_policy_decision(decision: &PolicyDecision) -> String {
             label_receipt,
         } => {
             let (reason_kind, reason_detail) = match reason {
-                EscalationReason::BoundedExchange { entropy_bits } => {
-                    ("SENSITIVITY_HIGH", serde_json::json!({ "entropy_bits": entropy_bits }))
-                }
-                EscalationReason::SealedVault => {
-                    ("CONSENT_REQUIRED", serde_json::Value::Null)
-                }
-                EscalationReason::PurposeOverride { purpose } => {
-                    ("PURPOSE_OVERRIDE", serde_json::json!({ "purpose": format!("{:?}", purpose) }))
-                }
+                EscalationReason::BoundedExchange { entropy_bits } => (
+                    "SENSITIVITY_HIGH",
+                    serde_json::json!({ "entropy_bits": entropy_bits }),
+                ),
+                EscalationReason::SealedVault => ("CONSENT_REQUIRED", serde_json::Value::Null),
+                EscalationReason::PurposeOverride { purpose } => (
+                    "PURPOSE_OVERRIDE",
+                    serde_json::json!({ "purpose": format!("{:?}", purpose) }),
+                ),
             };
             escalated_response(serde_json::json!({
                 "decision": "ESCALATE",
@@ -766,7 +759,7 @@ fn format_policy_decision(decision: &PolicyDecision) -> String {
                 "label_receipt": serde_json::to_value(label_receipt).unwrap_or_default(),
             }))
         }
-        PolicyDecision::Block { reason } => blocked_response(&format!("{:?}", reason)),
+        PolicyDecision::Block { reason } => blocked_response(&format!("{reason:?}")),
     }
 }
 
@@ -1006,8 +999,7 @@ mod tests {
     fn test_create_grant_valid() {
         let mut rt = IfcRuntime::new(&runtime_json()).unwrap();
         let input = create_grant_input(&rt);
-        let resp: serde_json::Value =
-            serde_json::from_str(&rt.create_grant(&input)).unwrap();
+        let resp: serde_json::Value = serde_json::from_str(&rt.create_grant(&input)).unwrap();
         assert_eq!(resp["ok"], true);
         assert_eq!(resp["status"], "SUCCESS");
         let data = &resp["data"];
@@ -1024,8 +1016,7 @@ mod tests {
     fn test_create_grant_content_addressed_id() {
         let mut rt = IfcRuntime::new(&runtime_json()).unwrap();
         let input = create_grant_input(&rt);
-        let resp1: serde_json::Value =
-            serde_json::from_str(&rt.create_grant(&input)).unwrap();
+        let resp1: serde_json::Value = serde_json::from_str(&rt.create_grant(&input)).unwrap();
         // Second runtime with same key to check determinism isn't possible
         // since keys are random, but we can verify grant_id format
         let id = resp1["data"]["grant_id"].as_str().unwrap();
@@ -1395,13 +1386,11 @@ mod tests {
     fn test_grant_idempotent_storage() {
         let mut rt = IfcRuntime::new(&runtime_json()).unwrap();
         let input = create_grant_input(&rt);
-        let resp1: serde_json::Value =
-            serde_json::from_str(&rt.create_grant(&input)).unwrap();
+        let resp1: serde_json::Value = serde_json::from_str(&rt.create_grant(&input)).unwrap();
         assert_eq!(resp1["ok"], true);
 
         // Storing same grant again should be a no-op (idempotent)
-        let summary1: serde_json::Value =
-            serde_json::from_str(&rt.grant_summary()).unwrap();
+        let summary1: serde_json::Value = serde_json::from_str(&rt.grant_summary()).unwrap();
         assert_eq!(summary1["data"]["total"], 1);
         assert_eq!(summary1["data"]["issued"], 1);
     }
@@ -1429,8 +1418,7 @@ mod tests {
                 i,
                 "b".repeat(64)
             );
-            let resp: serde_json::Value =
-                serde_json::from_str(&rt.create_grant(&input)).unwrap();
+            let resp: serde_json::Value = serde_json::from_str(&rt.create_grant(&input)).unwrap();
             assert_eq!(resp["ok"], true, "grant {} failed", i);
         }
 
@@ -1451,8 +1439,7 @@ mod tests {
         }}"#,
             "b".repeat(64)
         );
-        let resp: serde_json::Value =
-            serde_json::from_str(&rt.create_grant(&input)).unwrap();
+        let resp: serde_json::Value = serde_json::from_str(&rt.create_grant(&input)).unwrap();
         assert_eq!(resp["ok"], false);
     }
 
@@ -1481,8 +1468,7 @@ mod tests {
 
         // create_grant success
         let input = create_grant_input(&rt);
-        let resp: serde_json::Value =
-            serde_json::from_str(&rt.create_grant(&input)).unwrap();
+        let resp: serde_json::Value = serde_json::from_str(&rt.create_grant(&input)).unwrap();
         assert!(resp.get("ok").is_some());
         assert!(resp.get("status").is_some());
         assert!(resp.get("data").is_some());
@@ -1499,8 +1485,7 @@ mod tests {
         assert!(vresp.get("error").is_some());
 
         // grant_summary
-        let sresp: serde_json::Value =
-            serde_json::from_str(&rt.grant_summary()).unwrap();
+        let sresp: serde_json::Value = serde_json::from_str(&rt.grant_summary()).unwrap();
         assert!(sresp.get("ok").is_some());
         assert!(sresp.get("status").is_some());
         assert!(sresp.get("data").is_some());

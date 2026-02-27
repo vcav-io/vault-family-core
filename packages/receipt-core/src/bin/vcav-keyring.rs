@@ -8,6 +8,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 
@@ -38,7 +39,9 @@ fn usage_rotate() {
     eprintln!("Usage: vcav-keyring rotate --signing-dir <DIR> --verifier-dir <DIR>");
     eprintln!();
     eprintln!("Options:");
-    eprintln!("  --signing-dir    Directory containing the signing keyring (active.json + TRUST_ROOT)");
+    eprintln!(
+        "  --signing-dir    Directory containing the signing keyring (active.json + TRUST_ROOT)"
+    );
     eprintln!("  --verifier-dir   Directory containing the verifier keyring (verifying keys)");
 }
 
@@ -71,20 +74,19 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }
-    let result = a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y));
+    let result = a
+        .iter()
+        .zip(b.iter())
+        .fold(0u8, |acc, (x, y)| acc | (x ^ y));
     result == 0
 }
 
 fn hex_encode_bytes(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// Build the JSON bytes for an active.json file.
-fn build_active_json(
-    key_id: &str,
-    signing_key_hex: &str,
-    verifying_key_hex: &str,
-) -> Vec<u8> {
+fn build_active_json(key_id: &str, signing_key_hex: &str, verifying_key_hex: &str) -> Vec<u8> {
     let value = serde_json::json!({
         "key_id": key_id,
         "signing_key_hex": signing_key_hex,
@@ -121,29 +123,30 @@ fn write_keyring(dir: &PathBuf, active_bytes: &[u8]) -> Result<(), String> {
 }
 
 /// Read and parse active.json from a directory.
-fn read_active_json(dir: &PathBuf) -> Result<(serde_json::Value, Vec<u8>), String> {
+fn read_active_json(dir: &Path) -> Result<(serde_json::Value, Vec<u8>), String> {
     let path = dir.join("active.json");
-    let bytes = fs::read(&path)
-        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+    let bytes = fs::read(&path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
     let value: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
     Ok((value, bytes))
 }
 
 /// Read and parse TRUST_ROOT from a directory.
-fn read_trust_root(dir: &PathBuf) -> Result<BTreeMap<String, String>, String> {
+fn read_trust_root(dir: &Path) -> Result<BTreeMap<String, String>, String> {
     let path = dir.join("TRUST_ROOT");
     let content = fs::read_to_string(&path)
         .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
     let root: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse {}: {}", path.display(), e))?;
-    let files = root.get("files")
+    let files = root
+        .get("files")
         .and_then(|f| f.as_object())
         .ok_or_else(|| "TRUST_ROOT missing 'files' object".to_string())?;
     let mut map = BTreeMap::new();
     for (k, v) in files {
-        let hash = v.as_str()
-            .ok_or_else(|| format!("TRUST_ROOT file hash for '{}' is not a string", k))?;
+        let hash = v
+            .as_str()
+            .ok_or_else(|| format!("TRUST_ROOT file hash for '{k}' is not a string"))?;
         map.insert(k.clone(), hash.to_string());
     }
     Ok(map)
@@ -169,7 +172,7 @@ fn cmd_generate(args: &[String]) -> Result<(), String> {
                 usage_generate();
                 process::exit(0);
             }
-            other => return Err(format!("Unknown argument: {}", other)),
+            other => return Err(format!("Unknown argument: {other}")),
         }
     }
 
@@ -219,7 +222,7 @@ fn cmd_rotate(args: &[String]) -> Result<(), String> {
                 usage_rotate();
                 process::exit(0);
             }
-            other => return Err(format!("Unknown argument: {}", other)),
+            other => return Err(format!("Unknown argument: {other}")),
         }
     }
 
@@ -230,29 +233,33 @@ fn cmd_rotate(args: &[String]) -> Result<(), String> {
     let (old_active, old_bytes) = read_active_json(&signing_dir)?;
     let trust_files = read_trust_root(&signing_dir)?;
     let actual_hash = sha256_hex(&old_bytes);
-    let expected_hash = trust_files.get("active.json")
+    let expected_hash = trust_files
+        .get("active.json")
         .ok_or("TRUST_ROOT has no entry for active.json")?;
     if !constant_time_eq(actual_hash.as_bytes(), expected_hash.as_bytes()) {
-        return Err("TRUST_ROOT integrity check failed for old keyring — refusing to rotate".to_string());
+        return Err(
+            "TRUST_ROOT integrity check failed for old keyring — refusing to rotate".to_string(),
+        );
     }
 
-    let old_key_id = old_active.get("key_id")
+    let old_key_id = old_active
+        .get("key_id")
         .and_then(|v| v.as_str())
         .ok_or("active.json missing 'key_id'")?
         .to_string();
-    let old_verifying_hex = old_active.get("verifying_key_hex")
+    let old_verifying_hex = old_active
+        .get("verifying_key_hex")
         .and_then(|v| v.as_str())
         .ok_or("active.json missing 'verifying_key_hex'")?
         .to_string();
 
     // 2. Archive old key in signing dir
     let archive_dir = signing_dir.join("archived");
-    fs::create_dir_all(&archive_dir)
-        .map_err(|e| format!("Failed to create archive dir: {}", e))?;
-    let archive_path = archive_dir.join(format!("{}.json", old_key_id));
+    fs::create_dir_all(&archive_dir).map_err(|e| format!("Failed to create archive dir: {e}"))?;
+    let archive_path = archive_dir.join(format!("{old_key_id}.json"));
     let old_active_path = signing_dir.join("active.json");
     fs::copy(&old_active_path, &archive_path)
-        .map_err(|e| format!("Failed to archive old key: {}", e))?;
+        .map_err(|e| format!("Failed to archive old key: {e}"))?;
 
     // 3. Generate new keypair
     let (signing_key, verifying_key) = generate_keypair();
@@ -265,18 +272,20 @@ fn cmd_rotate(args: &[String]) -> Result<(), String> {
     write_keyring(&signing_dir, &active_bytes)?;
 
     // 5. Update verifier dir: add old key to known verifiers, set new active
-    fs::create_dir_all(&verifier_dir)
-        .map_err(|e| format!("Failed to create verifier dir: {}", e))?;
+    fs::create_dir_all(&verifier_dir).map_err(|e| format!("Failed to create verifier dir: {e}"))?;
 
     // Write old verifying key as a retired key file
-    let retired_path = verifier_dir.join(format!("{}.json", old_key_id));
+    let retired_path = verifier_dir.join(format!("{old_key_id}.json"));
     let retired_value = serde_json::json!({
         "key_id": old_key_id,
         "verifying_key_hex": old_verifying_hex,
         "status": "retired"
     });
-    fs::write(&retired_path, serde_json::to_vec_pretty(&retired_value).unwrap())
-        .map_err(|e| format!("Failed to write retired key: {}", e))?;
+    fs::write(
+        &retired_path,
+        serde_json::to_vec_pretty(&retired_value).unwrap(),
+    )
+    .map_err(|e| format!("Failed to write retired key: {e}"))?;
 
     // Write new active verifier + TRUST_ROOT for verifier dir
     let active_verifier = serde_json::json!({
@@ -287,7 +296,7 @@ fn cmd_rotate(args: &[String]) -> Result<(), String> {
     let active_verifier_bytes = serde_json::to_vec_pretty(&active_verifier).unwrap();
     let active_verifier_path = verifier_dir.join("active.json");
     fs::write(&active_verifier_path, &active_verifier_bytes)
-        .map_err(|e| format!("Failed to write active verifier: {}", e))?;
+        .map_err(|e| format!("Failed to write active verifier: {e}"))?;
 
     // Write TRUST_ROOT for verifier directory
     let verifier_hash = sha256_hex(&active_verifier_bytes);
@@ -296,7 +305,7 @@ fn cmd_rotate(args: &[String]) -> Result<(), String> {
     let verifier_trust_root = build_trust_root(&verifier_files);
     let verifier_trust_root_path = verifier_dir.join("TRUST_ROOT");
     fs::write(&verifier_trust_root_path, &verifier_trust_root)
-        .map_err(|e| format!("Failed to write verifier TRUST_ROOT: {}", e))?;
+        .map_err(|e| format!("Failed to write verifier TRUST_ROOT: {e}"))?;
 
     let result = serde_json::json!({
         "status": "ok",
@@ -328,7 +337,7 @@ fn cmd_verify(args: &[String]) -> Result<(), String> {
                 usage_verify();
                 process::exit(0);
             }
-            other => return Err(format!("Unknown argument: {}", other)),
+            other => return Err(format!("Unknown argument: {other}")),
         }
     }
 
@@ -344,30 +353,37 @@ fn cmd_verify(args: &[String]) -> Result<(), String> {
 
     // 3. Validate hash
     let actual_hash = sha256_hex(&active_bytes);
-    let expected_hash = trust_files.get("active.json")
+    let expected_hash = trust_files
+        .get("active.json")
         .ok_or("TRUST_ROOT has no entry for active.json")?;
 
     let hash_ok = constant_time_eq(actual_hash.as_bytes(), expected_hash.as_bytes());
 
     // 4. Parse and validate key consistency
     let active: serde_json::Value = serde_json::from_slice(&active_bytes)
-        .map_err(|e| format!("Failed to parse active.json: {}", e))?;
+        .map_err(|e| format!("Failed to parse active.json: {e}"))?;
 
-    let signing_hex = active.get("signing_key_hex")
+    let signing_hex = active
+        .get("signing_key_hex")
         .and_then(|v| v.as_str())
         .ok_or("active.json missing 'signing_key_hex'")?;
-    let verifying_hex = active.get("verifying_key_hex")
+    let verifying_hex = active
+        .get("verifying_key_hex")
         .and_then(|v| v.as_str())
         .ok_or("active.json missing 'verifying_key_hex'")?;
-    let stored_key_id = active.get("key_id")
+    let stored_key_id = active
+        .get("key_id")
         .and_then(|v| v.as_str())
         .ok_or("active.json missing 'key_id'")?;
 
     // Decode signing key and derive verifying key
-    let signing_bytes = hex::decode(signing_hex)
-        .map_err(|e| format!("Invalid signing_key_hex: {}", e))?;
+    let signing_bytes =
+        hex::decode(signing_hex).map_err(|e| format!("Invalid signing_key_hex: {e}"))?;
     if signing_bytes.len() != 32 {
-        return Err(format!("signing_key_hex must be 64 hex chars (32 bytes), got {}", signing_hex.len()));
+        return Err(format!(
+            "signing_key_hex must be 64 hex chars (32 bytes), got {}",
+            signing_hex.len()
+        ));
     }
     let mut key_bytes = [0u8; 32];
     key_bytes.copy_from_slice(&signing_bytes);
@@ -414,17 +430,19 @@ fn cmd_info(args: &[String]) -> Result<(), String> {
                 usage_info();
                 process::exit(0);
             }
-            other => return Err(format!("Unknown argument: {}", other)),
+            other => return Err(format!("Unknown argument: {other}")),
         }
     }
 
     let dir = PathBuf::from(dir.ok_or("--dir is required")?);
     let (active, _bytes) = read_active_json(&dir)?;
 
-    let key_id = active.get("key_id")
+    let key_id = active
+        .get("key_id")
         .and_then(|v| v.as_str())
         .ok_or("active.json missing 'key_id'")?;
-    let verifying_hex = active.get("verifying_key_hex")
+    let verifying_hex = active
+        .get("verifying_key_hex")
         .and_then(|v| v.as_str())
         .ok_or("active.json missing 'verifying_key_hex'")?;
 
@@ -486,14 +504,14 @@ fn run() -> Result<(), String> {
         }
         other => {
             usage();
-            Err(format!("Unknown command: {}", other))
+            Err(format!("Unknown command: {other}"))
         }
     }
 }
 
 fn main() {
     if let Err(e) = run() {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
         process::exit(1);
     }
 }

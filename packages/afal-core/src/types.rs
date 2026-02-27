@@ -177,22 +177,48 @@ mod tests {
 
     #[test]
     fn trust_tier_lower() {
-        assert_eq!(TrustTier::Trusted.lower(TrustTier::Default), TrustTier::Default);
-        assert_eq!(TrustTier::Quarantined.lower(TrustTier::Trusted), TrustTier::Quarantined);
-        assert_eq!(TrustTier::Default.lower(TrustTier::Default), TrustTier::Default);
+        assert_eq!(
+            TrustTier::Trusted.lower(TrustTier::Default),
+            TrustTier::Default
+        );
+        assert_eq!(
+            TrustTier::Quarantined.lower(TrustTier::Trusted),
+            TrustTier::Quarantined
+        );
+        assert_eq!(
+            TrustTier::Default.lower(TrustTier::Default),
+            TrustTier::Default
+        );
     }
 
     #[test]
     fn trust_tier_serde_golden() {
-        assert_eq!(serde_json::to_string(&TrustTier::Trusted).unwrap(), "\"TRUSTED\"");
-        assert_eq!(serde_json::to_string(&TrustTier::Default).unwrap(), "\"DEFAULT\"");
-        assert_eq!(serde_json::to_string(&TrustTier::LowTrust).unwrap(), "\"LOW_TRUST\"");
-        assert_eq!(serde_json::to_string(&TrustTier::Quarantined).unwrap(), "\"QUARANTINED\"");
+        assert_eq!(
+            serde_json::to_string(&TrustTier::Trusted).unwrap(),
+            "\"TRUSTED\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TrustTier::Default).unwrap(),
+            "\"DEFAULT\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TrustTier::LowTrust).unwrap(),
+            "\"LOW_TRUST\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TrustTier::Quarantined).unwrap(),
+            "\"QUARANTINED\""
+        );
     }
 
     #[test]
     fn trust_tier_serde_roundtrip() {
-        for tier in [TrustTier::Trusted, TrustTier::Default, TrustTier::LowTrust, TrustTier::Quarantined] {
+        for tier in [
+            TrustTier::Trusted,
+            TrustTier::Default,
+            TrustTier::LowTrust,
+            TrustTier::Quarantined,
+        ] {
             let json = serde_json::to_string(&tier).unwrap();
             let parsed: TrustTier = serde_json::from_str(&json).unwrap();
             assert_eq!(tier, parsed);
@@ -201,14 +227,26 @@ mod tests {
 
     #[test]
     fn admission_tier_serde_golden() {
-        assert_eq!(serde_json::to_string(&AdmissionTier::Trusted).unwrap(), "\"TRUSTED\"");
-        assert_eq!(serde_json::to_string(&AdmissionTier::Default).unwrap(), "\"DEFAULT\"");
-        assert_eq!(serde_json::to_string(&AdmissionTier::LowTrust).unwrap(), "\"LOW_TRUST\"");
+        assert_eq!(
+            serde_json::to_string(&AdmissionTier::Trusted).unwrap(),
+            "\"TRUSTED\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AdmissionTier::Default).unwrap(),
+            "\"DEFAULT\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AdmissionTier::LowTrust).unwrap(),
+            "\"LOW_TRUST\""
+        );
     }
 
     #[test]
     fn admission_tier_from_trust_tier() {
-        assert_eq!(AdmissionTier::from_trust_tier(TrustTier::Trusted), Some(AdmissionTier::Trusted));
+        assert_eq!(
+            AdmissionTier::from_trust_tier(TrustTier::Trusted),
+            Some(AdmissionTier::Trusted)
+        );
         assert_eq!(AdmissionTier::from_trust_tier(TrustTier::Quarantined), None);
     }
 

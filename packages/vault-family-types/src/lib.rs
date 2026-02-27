@@ -8,12 +8,12 @@
 //! This crate has no enforcement logic. It defines enums, identifiers, and
 //! deterministic derivation functions only.
 
-mod purpose;
-mod budget_tier;
 mod agent_id;
+mod budget_tier;
 mod lane;
+mod purpose;
 
-pub use purpose::Purpose;
+pub use agent_id::{generate_pair_id, normalize_agent_id, PAIR_ID_DOMAIN_PREFIX};
 pub use budget_tier::{BudgetTier, BudgetTierV2, DEFAULT_BUDGET_BITS, ELEVATED_BUDGET_BITS};
-pub use agent_id::{normalize_agent_id, generate_pair_id, PAIR_ID_DOMAIN_PREFIX};
-pub use lane::{LaneId, ExecutionLane};
+pub use lane::{ExecutionLane, LaneId};
+pub use purpose::Purpose;

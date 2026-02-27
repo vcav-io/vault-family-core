@@ -263,9 +263,7 @@ fn chain_check(args: &Args) -> Report {
                 }
             }
         } else {
-            pinned_pubkey
-                .clone()
-                .expect("pinned_pubkey set when keyring_dir is not provided")
+            pinned_pubkey.expect("pinned_pubkey set when keyring_dir is not provided")
         };
 
         if let Err(e) = verify_receipt(&unsigned, &receipt.signature, &verifying_key) {
@@ -556,14 +554,10 @@ fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
 
 fn load_public_key_from_file(pubkey_path: &str) -> Result<receipt_core::VerifyingKey, String> {
     let pubkey_content = fs::read_to_string(pubkey_path)
-        .map_err(|e| format!("Failed to read public key file: {}: {}", pubkey_path, e))?;
+        .map_err(|e| format!("Failed to read public key file: {pubkey_path}: {e}"))?;
     let pubkey_hex = pubkey_content.trim();
-    parse_public_key_hex(pubkey_hex).map_err(|e| {
-        format!(
-            "Failed to parse public key (expected 64 hex characters): {}",
-            e
-        )
-    })
+    parse_public_key_hex(pubkey_hex)
+        .map_err(|e| format!("Failed to parse public key (expected 64 hex characters): {e}"))
 }
 
 fn load_public_key_from_keyring(
@@ -730,7 +724,7 @@ fn validate_keyring_trust_root(keyring_dir: &Path) -> Result<(), String> {
                     e
                 )
             })?;
-            actual.insert(format!("retired/{}", file_name), sha256_hex(&content));
+            actual.insert(format!("retired/{file_name}"), sha256_hex(&content));
         }
     }
 
@@ -754,12 +748,12 @@ fn sha256_hex(data: &[u8]) -> String {
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
-    use vault_family_types::{BudgetTier, Purpose};
     use receipt_core::{
         generate_keypair, public_key_to_hex, sign_receipt, BudgetChainRecord, BudgetUsageRecord,
     };
     use std::io::Write;
     use tempfile::{NamedTempFile, TempDir};
+    use vault_family_types::{BudgetTier, Purpose};
 
     fn chain_id() -> String {
         format!("chain-{}", "1".repeat(64))

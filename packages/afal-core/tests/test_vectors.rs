@@ -17,8 +17,8 @@ fn load_vector(filename: &str) -> serde_json::Value {
         env!("CARGO_MANIFEST_DIR").replace("/packages/afal-core", ""),
         filename
     );
-    let contents = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
+    let contents =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
     serde_json::from_str(&contents).unwrap()
 }
 
@@ -41,7 +41,10 @@ fn descriptor_signing_matches_vector() {
 
     // Verify public key derivation
     let expected_pubkey = input["verifying_key_hex"].as_str().unwrap();
-    assert_eq!(hex::encode(alice.verifying_key().to_bytes()), expected_pubkey);
+    assert_eq!(
+        hex::encode(alice.verifying_key().to_bytes()),
+        expected_pubkey
+    );
 
     // Deserialize unsigned descriptor
     let descriptor: AgentDescriptor =
@@ -118,8 +121,7 @@ fn admit_signing_matches_vector() {
     assert_eq!(hex::encode(bob.verifying_key().to_bytes()), expected_pubkey);
 
     // Deserialize unsigned admit
-    let unsigned: UnsignedAdmit =
-        serde_json::from_value(admit["unsigned_admit"].clone()).unwrap();
+    let unsigned: UnsignedAdmit = serde_json::from_value(admit["unsigned_admit"].clone()).unwrap();
 
     // Verify canonical JSON matches
     let canonical = canonicalize_serializable(&unsigned).unwrap();
@@ -143,8 +145,7 @@ fn deny_signing_matches_vector() {
     let bob = keypair_from_seed_hex(input["seed_hex"].as_str().unwrap());
 
     // Deserialize unsigned deny
-    let unsigned: UnsignedDeny =
-        serde_json::from_value(deny["unsigned_deny"].clone()).unwrap();
+    let unsigned: UnsignedDeny = serde_json::from_value(deny["unsigned_deny"].clone()).unwrap();
 
     // Verify canonical JSON matches
     let canonical = canonicalize_serializable(&unsigned).unwrap();
@@ -212,8 +213,7 @@ fn commit_aad_construction_matches_vector() {
     let aad = &v["aad"];
 
     // Deserialize AAD binding
-    let binding: AadBinding =
-        serde_json::from_value(aad["binding_object"].clone()).unwrap();
+    let binding: AadBinding = serde_json::from_value(aad["binding_object"].clone()).unwrap();
 
     // Verify canonical JSON matches
     let canonical = canonicalize_serializable(&binding).unwrap();

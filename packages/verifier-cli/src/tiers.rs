@@ -141,8 +141,8 @@ pub struct PolicyBundle {
 /// `SHA-256("vcav/model_profile/v1" || canonicalize(digest))`
 pub fn compute_profile_hash(digest: &ProfileDigestV1) -> Result<String, String> {
     let canonical = canonicalize_serializable(digest)
-        .map_err(|e| format!("Failed to canonicalize profile digest: {}", e))?;
-    let prefixed = format!("{}{}", PROFILE_HASH_DOMAIN_PREFIX, canonical);
+        .map_err(|e| format!("Failed to canonicalize profile digest: {e}"))?;
+    let prefixed = format!("{PROFILE_HASH_DOMAIN_PREFIX}{canonical}");
     let mut hasher = Sha256::new();
     hasher.update(prefixed.as_bytes());
     Ok(hex::encode(hasher.finalize()))
@@ -152,8 +152,8 @@ pub fn compute_profile_hash(digest: &ProfileDigestV1) -> Result<String, String> 
 /// `SHA-256("vcav/policy_bundle/v1" || canonicalize(digest))`
 pub fn compute_policy_bundle_hash(digest: &PolicyDigestV1) -> Result<String, String> {
     let canonical = canonicalize_serializable(digest)
-        .map_err(|e| format!("Failed to canonicalize policy digest: {}", e))?;
-    let prefixed = format!("{}{}", POLICY_BUNDLE_DOMAIN_PREFIX, canonical);
+        .map_err(|e| format!("Failed to canonicalize policy digest: {e}"))?;
+    let prefixed = format!("{POLICY_BUNDLE_DOMAIN_PREFIX}{canonical}");
     let mut hasher = Sha256::new();
     hasher.update(prefixed.as_bytes());
     Ok(hex::encode(hasher.finalize()))
@@ -240,13 +240,13 @@ pub fn verify_agreement_hash(
     declared_hash: &str,
 ) -> Result<bool, String> {
     let content = fs::read_to_string(agreement_fields_path)
-        .map_err(|e| format!("Failed to read agreement fields file: {}", e))?;
+        .map_err(|e| format!("Failed to read agreement fields file: {e}"))?;
 
     let fields: SessionAgreementFields = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse agreement fields JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse agreement fields JSON: {e}"))?;
 
     let recomputed = compute_agreement_hash(&fields)
-        .map_err(|e| format!("Failed to compute agreement hash: {}", e))?;
+        .map_err(|e| format!("Failed to compute agreement hash: {e}"))?;
 
     Ok(recomputed == declared_hash)
 }
@@ -255,10 +255,10 @@ pub fn verify_agreement_hash(
 /// digest, and computing the content-addressed hash.
 pub fn verify_profile_hash(profile_path: &Path, declared_hash: &str) -> Result<bool, String> {
     let content = fs::read_to_string(profile_path)
-        .map_err(|e| format!("Failed to read profile file: {}", e))?;
+        .map_err(|e| format!("Failed to read profile file: {e}"))?;
 
-    let profile: ModelProfile = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse profile JSON: {}", e))?;
+    let profile: ModelProfile =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse profile JSON: {e}"))?;
 
     let digest = build_profile_digest(&profile);
     let recomputed = compute_profile_hash(&digest)?;
@@ -269,11 +269,11 @@ pub fn verify_profile_hash(profile_path: &Path, declared_hash: &str) -> Result<b
 /// Verify the policy bundle hash by loading the policy JSON, building a
 /// digest, and computing the content-addressed hash.
 pub fn verify_policy_hash(policy_path: &Path, declared_hash: &str) -> Result<bool, String> {
-    let content = fs::read_to_string(policy_path)
-        .map_err(|e| format!("Failed to read policy file: {}", e))?;
+    let content =
+        fs::read_to_string(policy_path).map_err(|e| format!("Failed to read policy file: {e}"))?;
 
-    let bundle: PolicyBundle = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse policy JSON: {}", e))?;
+    let bundle: PolicyBundle =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse policy JSON: {e}"))?;
 
     let digest = build_policy_digest(&bundle);
     let recomputed = compute_policy_bundle_hash(&digest)?;
@@ -284,7 +284,7 @@ pub fn verify_policy_hash(policy_path: &Path, declared_hash: &str) -> Result<boo
 /// Verify a contract file hash by computing SHA-256 of the file content.
 pub fn verify_contract_hash(contract_path: &Path, declared_hash: &str) -> Result<bool, String> {
     let content =
-        fs::read(contract_path).map_err(|e| format!("Failed to read contract file: {}", e))?;
+        fs::read(contract_path).map_err(|e| format!("Failed to read contract file: {e}"))?;
 
     let mut hasher = Sha256::new();
     hasher.update(&content);
@@ -304,7 +304,7 @@ pub fn verify_manifest_tier(
     strict_runtime: bool,
 ) -> Result<ManifestResult, ManifestVerifyError> {
     let content = fs::read_to_string(manifest_path)
-        .map_err(|e| ManifestVerifyError::Other(format!("Failed to read manifest file: {}", e)))?;
+        .map_err(|e| ManifestVerifyError::Other(format!("Failed to read manifest file: {e}")))?;
 
     verifier_core::tiers::verify_manifest_from_str(
         &content,

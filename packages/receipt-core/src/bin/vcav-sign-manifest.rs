@@ -18,14 +18,16 @@ use receipt_core::manifest::{
     compute_operator_key_id, ArtefactEntry, ManifestArtefacts, PublicationManifest,
     UnsignedManifest,
 };
-use receipt_core::signer::public_key_to_hex;
 use receipt_core::sign_manifest;
+use receipt_core::signer::public_key_to_hex;
 
 fn usage() {
     eprintln!("Usage: vcav-sign-manifest --dir <DIR> --key <KEY_FILE> --operator-id <ID>");
     eprintln!();
     eprintln!("Options:");
-    eprintln!("  --dir           Publication directory containing contracts/, profiles/, policies/");
+    eprintln!(
+        "  --dir           Publication directory containing contracts/, profiles/, policies/"
+    );
     eprintln!("  --key           Path to Ed25519 signing key (32 bytes raw or 64-char hex)");
     eprintln!("  --operator-id   Operator identifier (e.g. operator-acme-001)");
     eprintln!("  --protocol-version  Protocol version (default: 1.0.0)");
@@ -74,7 +76,7 @@ fn parse_args() -> Result<Args, String> {
                 process::exit(0);
             }
             other => {
-                return Err(format!("Unknown argument: {}", other));
+                return Err(format!("Unknown argument: {other}"));
             }
         }
     }
@@ -98,7 +100,7 @@ struct Args {
 ///
 /// Accepts either 32 raw bytes or a 64-character hex string.
 fn read_signing_key(path: &Path) -> Result<SigningKey, String> {
-    let data = fs::read(path).map_err(|e| format!("Failed to read key file: {}", e))?;
+    let data = fs::read(path).map_err(|e| format!("Failed to read key file: {e}"))?;
 
     // Try as 32-byte raw key
     if data.len() == 32 {
@@ -120,7 +122,7 @@ fn read_signing_key(path: &Path) -> Result<SigningKey, String> {
         ));
     }
 
-    let bytes = hex::decode(hex_str).map_err(|e| format!("Invalid hex in key file: {}", e))?;
+    let bytes = hex::decode(hex_str).map_err(|e| format!("Invalid hex in key file: {e}"))?;
     let bytes: [u8; 32] = bytes
         .try_into()
         .map_err(|_| "Failed to convert decoded hex to 32 bytes".to_string())?;
@@ -142,7 +144,7 @@ fn collect_artefacts(base_dir: &Path, subdir: &str) -> Result<Vec<ArtefactEntry>
         fs::read_dir(&dir).map_err(|e| format!("Failed to read {}: {}", dir.display(), e))?;
 
     for entry in read_dir {
-        let entry = entry.map_err(|e| format!("Failed to read dir entry: {}", e))?;
+        let entry = entry.map_err(|e| format!("Failed to read dir entry: {e}"))?;
         let path = entry.path();
 
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
@@ -191,7 +193,10 @@ fn run() -> Result<(), String> {
 
     let total = contracts.len() + profiles.len() + policies.len();
     if total == 0 {
-        return Err("No .json artefacts found in contracts/, profiles/, or policies/ subdirectories".to_string());
+        return Err(
+            "No .json artefacts found in contracts/, profiles/, or policies/ subdirectories"
+                .to_string(),
+        );
     }
 
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
@@ -214,7 +219,7 @@ fn run() -> Result<(), String> {
     };
 
     let signature = sign_manifest(&unsigned, &signing_key)
-        .map_err(|e| format!("Failed to sign manifest: {}", e))?;
+        .map_err(|e| format!("Failed to sign manifest: {e}"))?;
 
     let manifest = PublicationManifest {
         manifest_version: unsigned.manifest_version,
@@ -229,7 +234,7 @@ fn run() -> Result<(), String> {
     };
 
     let json = serde_json::to_string_pretty(&manifest)
-        .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
+        .map_err(|e| format!("Failed to serialize manifest: {e}"))?;
 
     let output_path = args.dir.join("publication-manifest.json");
     fs::write(&output_path, &json)
@@ -246,7 +251,7 @@ fn run() -> Result<(), String> {
 
 fn main() {
     if let Err(e) = run() {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
         process::exit(1);
     }
 }
