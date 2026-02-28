@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/vault_result_compatibility.schema.json",
+  "title": "VaultResultCompatibility",
+  "description": "Constant-shape output for COMPATIBILITY purpose. Max entropy: 8 bits.",
+  "type": "object",
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": [
+        "PROCEED",
+        "DO_NOT_PROCEED",
+        "INCONCLUSIVE"
+      ],
+      "description": "Primary decision signal (3 values = ~1.58 bits)"
+    },
+    "confidence_bucket": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "description": "Confidence level (3 values = ~1.58 bits)"
+    },
+    "reason_code": {
+      "type": "string",
+      "enum": [
+        "GOALS_MISMATCH",
+        "COMMUNICATION_STYLE",
+        "LOGISTICS",
+        "MUTUAL_INTEREST_UNCLEAR",
+        "RESERVED_01",
+        "RESERVED_02",
+        "RESERVED_03",
+        "RESERVED_04",
+        "RESERVED_05",
+        "RESERVED_06",
+        "RESERVED_07",
+        "RESERVED_08",
+        "UNKNOWN"
+      ],
+      "description": "Reason classification (13 values = ~3.7 bits). RESERVED codes for future use."
+    }
+  },
+  "required": [
+    "decision",
+    "confidence_bucket",
+    "reason_code"
+  ],
+  "additionalProperties": false,
+  "x-vcav-prompt-instruction": "Based on this conversation between two agents evaluating compatibility, provide a structured assessment.",
+  "x-vcav-prompt-context": "Conversation:\n{dialogue}",
+  "x-vcav-prompt-output-format": "Respond with valid JSON using ONLY these values:\n- decision: \"PROCEED\" | \"DO_NOT_PROCEED\" | \"INCONCLUSIVE\"\n- confidence_bucket: \"LOW\" | \"MEDIUM\" | \"HIGH\"\n- reason_code: \"GOALS_MISMATCH\" | \"COMMUNICATION_STYLE\" | \"LOGISTICS\" | \"MUTUAL_INTEREST_UNCLEAR\" | \"RESERVED_01\" | \"RESERVED_02\" | \"RESERVED_03\" | \"RESERVED_04\" | \"RESERVED_05\" | \"RESERVED_06\" | \"RESERVED_07\" | \"RESERVED_08\" | \"UNKNOWN\"",
+  "$comment": "Total entropy: ~6.86 bits. Budgeted as 8 bits."
+}

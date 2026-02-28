@@ -1,8 +1,9 @@
 //! Embedded JSON schema constants for offline verification.
 //!
-//! These schemas are embedded at compile time via build.rs. Only vault-family-core
-//! envelope schemas are included. Protocol-specific schemas (vcav, agentvault) must
-//! be provided at runtime via --schema-dir or schema bundles.
+//! These schemas are embedded at compile time via build.rs. vault-family-core
+//! envelope schemas and vault result schemas are included. Protocol-specific
+//! schemas (vcav, agentvault) must be provided at runtime via --schema-dir or
+//! schema bundles.
 
 /// A named embedded schema entry.
 pub struct EmbeddedSchemaEntry {
@@ -28,6 +29,52 @@ pub const INPUT_CIPHERTEXT_ENVELOPE_V1_SCHEMA: &str = include_str!(concat!(
     "/family/input_ciphertext_envelope_v1.schema.json"
 ));
 
+// vault result schemas
+pub const VAULT_RESULT_COMPATIBILITY_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_compatibility.schema.json"
+));
+pub const VAULT_RESULT_COMPATIBILITY_D2_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_compatibility_d2.schema.json"
+));
+pub const VAULT_RESULT_DATING_COMPAT_V1_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_dating_compat_v1.schema.json"
+));
+pub const VAULT_RESULT_INJECTION_ESCALATION_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_injection_escalation.schema.json"
+));
+pub const VAULT_RESULT_MEDIATION_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_mediation.schema.json"
+));
+pub const VAULT_RESULT_MEDIATION_E6_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_mediation_e6.schema.json"
+));
+pub const VAULT_RESULT_MEDIATION_E10_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_mediation_e10.schema.json"
+));
+pub const VAULT_RESULT_MEDIATION_E18_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_mediation_e18.schema.json"
+));
+pub const VAULT_RESULT_NEGOTIATION_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_negotiation.schema.json"
+));
+pub const VAULT_RESULT_SCHEDULING_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_scheduling.schema.json"
+));
+pub const VAULT_RESULT_SCHEDULING_COMPAT_V1_SCHEMA: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/family/vault_result_scheduling_compat_v1.schema.json"
+));
+
 /// All embedded schemas as a static array.
 pub const SCHEMAS: &[EmbeddedSchemaEntry] = &[
     EmbeddedSchemaEntry {
@@ -50,6 +97,50 @@ pub const SCHEMAS: &[EmbeddedSchemaEntry] = &[
         filename: "input_ciphertext_envelope_v1.schema.json",
         content: INPUT_CIPHERTEXT_ENVELOPE_V1_SCHEMA,
     },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_compatibility.schema.json",
+        content: VAULT_RESULT_COMPATIBILITY_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_compatibility_d2.schema.json",
+        content: VAULT_RESULT_COMPATIBILITY_D2_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_dating_compat_v1.schema.json",
+        content: VAULT_RESULT_DATING_COMPAT_V1_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_injection_escalation.schema.json",
+        content: VAULT_RESULT_INJECTION_ESCALATION_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_mediation.schema.json",
+        content: VAULT_RESULT_MEDIATION_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_mediation_e6.schema.json",
+        content: VAULT_RESULT_MEDIATION_E6_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_mediation_e10.schema.json",
+        content: VAULT_RESULT_MEDIATION_E10_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_mediation_e18.schema.json",
+        content: VAULT_RESULT_MEDIATION_E18_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_negotiation.schema.json",
+        content: VAULT_RESULT_NEGOTIATION_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_scheduling.schema.json",
+        content: VAULT_RESULT_SCHEDULING_SCHEMA,
+    },
+    EmbeddedSchemaEntry {
+        filename: "vault_result_scheduling_compat_v1.schema.json",
+        content: VAULT_RESULT_SCHEDULING_COMPAT_V1_SCHEMA,
+    },
 ];
 
 #[cfg(test)]
@@ -70,6 +161,6 @@ mod tests {
 
     #[test]
     fn test_schema_count() {
-        assert_eq!(SCHEMAS.len(), 5, "Should have 5 embedded family schemas");
+        assert_eq!(SCHEMAS.len(), 16, "Should have 16 embedded family schemas");
     }
 }

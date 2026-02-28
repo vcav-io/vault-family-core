@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/vault_result_compatibility_d2.schema.json",
+  "title": "VaultResultCompatibilityD2",
+  "description": "Dual-output for D2 dating template. Two bounded outputs, one per agent. Max entropy: 20 bits.",
+  "type": "object",
+  "properties": {
+    "output_a": {
+      "$ref": "#/$defs/agent_output"
+    },
+    "output_b": {
+      "$ref": "#/$defs/agent_output"
+    }
+  },
+  "required": [
+    "output_a",
+    "output_b"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "agent_output": {
+      "type": "object",
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": [
+            "PROCEED",
+            "DO_NOT_PROCEED",
+            "INCONCLUSIVE"
+          ],
+          "description": "Primary decision signal (3 values = 2 bits)"
+        },
+        "confidence_bucket": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "description": "Confidence level (3 values = 2 bits)"
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "VALUES",
+            "COMMUNICATION",
+            "LOGISTICS",
+            "INTEREST_UNCLEAR",
+            "TIMING",
+            "LIFESTYLE",
+            "UNKNOWN"
+          ],
+          "description": "Reason classification (7 values = 3 bits)"
+        },
+        "self_adjustment_hint": {
+          "type": "string",
+          "enum": [
+            "BE_MORE_DIRECT",
+            "SLOW_DOWN",
+            "ASK_FEWER_QUESTIONS",
+            "OFFER_REASSURANCE",
+            "STATE_CONSTRAINTS",
+            "KEEP_IT_LIGHT",
+            "NONE"
+          ],
+          "description": "Self-adjustment coaching hint (7 values = 3 bits). For self, not about other party."
+        }
+      },
+      "required": [
+        "decision",
+        "confidence_bucket",
+        "reason_code",
+        "self_adjustment_hint"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-vcav-prompt-instruction": "Analyze both perspectives from a dating interaction and provide personalized guidance for each party.\n\nFor EACH agent, determine:\n1. decision: Should they proceed? (PROCEED, DO_NOT_PROCEED, or INCONCLUSIVE)\n2. confidence_bucket: How confident is this assessment? (LOW, MEDIUM, HIGH)\n3. reason_code: Main factor (VALUES, COMMUNICATION, LOGISTICS, INTEREST_UNCLEAR, TIMING, LIFESTYLE, UNKNOWN)\n4. self_adjustment_hint: What could THIS agent do differently? (BE_MORE_DIRECT, SLOW_DOWN, ASK_FEWER_QUESTIONS, OFFER_REASSURANCE, STATE_CONSTRAINTS, KEEP_IT_LIGHT, NONE)\n\nIMPORTANT: self_adjustment_hint is coaching for THAT agent about their own behavior, NOT about the other party.",
+  "x-vcav-prompt-output-format": "Respond with valid JSON containing output_a (for Agent A) and output_b (for Agent B):",
+  "$comment": "Per-agent: 10 bits (2+2+3+3). Total: 20 bits (2 agents). Budget: 20 bits."
+}

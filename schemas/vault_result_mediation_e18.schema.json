@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/vault_result_mediation_e18.schema.json",
+  "title": "VaultResultMediationE18",
+  "description": "Capability-track constant-shape output for MEDIATION purpose (E18 variant). Max entropy: 18.49 bits (368,640 outputs).",
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "PROGRESS",
+        "STUCK",
+        "ESCALATE"
+      ],
+      "description": "Mediation progress (3 values = ~1.58 bits)"
+    },
+    "a_move": {
+      "type": "string",
+      "enum": [
+        "ACKNOWLEDGE",
+        "RESTATE_NEEDS",
+        "OFFER_REPAIR",
+        "REQUEST_CLARITY",
+        "REQUEST_ACKNOWLEDGMENT",
+        "SET_BOUNDARY",
+        "PROPOSE_COMPROMISE",
+        "NONE"
+      ],
+      "description": "Recommended move for party A (8 values = 3.00 bits)"
+    },
+    "b_move": {
+      "type": "string",
+      "enum": [
+        "ACKNOWLEDGE",
+        "RESTATE_NEEDS",
+        "OFFER_REPAIR",
+        "REQUEST_CLARITY",
+        "REQUEST_ACKNOWLEDGMENT",
+        "SET_BOUNDARY",
+        "PROPOSE_COMPROMISE",
+        "NONE"
+      ],
+      "description": "Recommended move for party B (8 values = 3.00 bits)"
+    },
+    "shared_move": {
+      "type": "string",
+      "enum": [
+        "ENUMERATE_CONTRIBUTIONS",
+        "SET_GROUND_RULES",
+        "TIMEBOX",
+        "PAUSE",
+        "SEEK_EXTERNAL_INPUT",
+        "NONE"
+      ],
+      "description": "Recommended shared action (6 values = ~2.58 bits)"
+    },
+    "conflict_type": {
+      "type": "string",
+      "enum": [
+        "RECOGNITION",
+        "RESOURCE",
+        "PROCESS",
+        "VALUES",
+        "UNKNOWN"
+      ],
+      "description": "Classification of conflict type (5 values = ~2.32 bits)"
+    },
+    "emotional_tone_a": {
+      "type": "string",
+      "enum": [
+        "CALM",
+        "CONCERNED",
+        "FRUSTRATED",
+        "ANXIOUS",
+        "HOSTILE",
+        "DISMISSIVE",
+        "HOPEFUL",
+        "RESIGNED"
+      ],
+      "description": "Observable emotional tone of party A's input (8 values = 3.00 bits)"
+    },
+    "emotional_tone_b": {
+      "type": "string",
+      "enum": [
+        "CALM",
+        "CONCERNED",
+        "FRUSTRATED",
+        "ANXIOUS",
+        "HOSTILE",
+        "DISMISSIVE",
+        "HOPEFUL",
+        "RESIGNED"
+      ],
+      "description": "Observable emotional tone of party B's input (8 values = 3.00 bits)"
+    }
+  },
+  "required": [
+    "outcome",
+    "a_move",
+    "b_move",
+    "shared_move",
+    "conflict_type",
+    "emotional_tone_a",
+    "emotional_tone_b"
+  ],
+  "additionalProperties": false,
+  "x-vcav-prompt-instruction": "Based on this mediation conversation, assess the situation, recommend next moves, and classify the observable emotional tone from each party's input text.",
+  "x-vcav-prompt-context": "Conversation:\n{dialogue}",
+  "x-vcav-prompt-output-format": "Respond with valid JSON using ONLY these values:\n- outcome: \"PROGRESS\" | \"STUCK\" | \"ESCALATE\"\n- a_move: \"ACKNOWLEDGE\" | \"RESTATE_NEEDS\" | \"OFFER_REPAIR\" | \"REQUEST_CLARITY\" | \"REQUEST_ACKNOWLEDGMENT\" | \"SET_BOUNDARY\" | \"PROPOSE_COMPROMISE\" | \"NONE\"\n- b_move: (same options as a_move)\n- shared_move: \"ENUMERATE_CONTRIBUTIONS\" | \"SET_GROUND_RULES\" | \"TIMEBOX\" | \"PAUSE\" | \"SEEK_EXTERNAL_INPUT\" | \"NONE\"\n- conflict_type: \"RECOGNITION\" | \"RESOURCE\" | \"PROCESS\" | \"VALUES\" | \"UNKNOWN\"\n- emotional_tone_a: \"CALM\" | \"CONCERNED\" | \"FRUSTRATED\" | \"ANXIOUS\" | \"HOSTILE\" | \"DISMISSIVE\" | \"HOPEFUL\" | \"RESIGNED\"\n- emotional_tone_b: \"CALM\" | \"CONCERNED\" | \"FRUSTRATED\" | \"ANXIOUS\" | \"HOSTILE\" | \"DISMISSIVE\" | \"HOPEFUL\" | \"RESIGNED\"",
+  "$comment": "Total entropy: ~18.49 bits (3×8×8×6×5×8×8 = 368,640 outputs). E18 extends E12 anchor with two fact-grounded emotional tone fields."
+}

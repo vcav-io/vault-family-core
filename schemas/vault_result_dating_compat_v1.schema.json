@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/vault_result_dating_compat_v1.schema.json",
+  "title": "VaultResultDatingCompatV1",
+  "description": "Capability-track constant-shape output for dating compatibility evaluation.",
+  "type": "object",
+  "properties": {
+    "compatibility_bucket": {
+      "type": "string",
+      "enum": [
+        "NEGATIVE",
+        "MIXED",
+        "POSITIVE"
+      ],
+      "description": "Primary bucketed compatibility class for gate evaluation."
+    },
+    "compatibility_signal": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "Ordinal compatibility class where 0=strong mismatch, 5=strong match."
+    }
+  },
+  "required": [
+    "compatibility_bucket",
+    "compatibility_signal"
+  ],
+  "additionalProperties": false,
+  "x-vcav-prompt-instruction": "Based on this dating compatibility data, evaluate the overall compatibility between the two parties.",
+  "x-vcav-prompt-context": "Compatibility data:\n{dialogue}",
+  "x-vcav-prompt-output-format": "Respond with valid JSON using ONLY these values:\n- compatibility_bucket: \"NEGATIVE\" | \"MIXED\" | \"POSITIVE\"\n- compatibility_signal: integer from 0 (strong mismatch) to 5 (strong match)"
+}
