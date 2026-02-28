@@ -51,6 +51,7 @@ fn main() {
         policy_bundle_hash: None,
         contract_hash: None,
         output_schema_id: None,
+        output_schema_hash: None,
         signal_class: None,
         entropy_budget_bits: None,
         schema_entropy_ceiling_bits: None,

@@ -304,6 +304,10 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_schema_id: Option<String>,
 
+    /// Content-addressed hash of the output schema bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_schema_hash: Option<String>,
+
     /// Low-bandwidth signal label for external notification (optional).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signal_class: Option<SignalClass>,
@@ -401,6 +405,7 @@ impl PartialEq for Receipt {
             && self.policy_bundle_hash == other.policy_bundle_hash
             && self.contract_hash == other.contract_hash
             && self.output_schema_id == other.output_schema_id
+            && self.output_schema_hash == other.output_schema_hash
             && self.signal_class == other.signal_class
             && self.entropy_budget_bits == other.entropy_budget_bits
             && self.schema_entropy_ceiling_bits == other.schema_entropy_ceiling_bits
@@ -562,6 +567,10 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_schema_id: Option<String>,
 
+    /// Content-addressed hash of the output schema bound to this session (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_schema_hash: Option<String>,
+
     /// Low-bandwidth signal label for external notification (optional).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signal_class: Option<SignalClass>,
@@ -656,6 +665,7 @@ impl PartialEq for UnsignedReceipt {
             && self.policy_bundle_hash == other.policy_bundle_hash
             && self.contract_hash == other.contract_hash
             && self.output_schema_id == other.output_schema_id
+            && self.output_schema_hash == other.output_schema_hash
             && self.signal_class == other.signal_class
             && self.entropy_budget_bits == other.entropy_budget_bits
             && self.schema_entropy_ceiling_bits == other.schema_entropy_ceiling_bits
@@ -710,6 +720,7 @@ impl UnsignedReceipt {
             policy_bundle_hash: self.policy_bundle_hash,
             contract_hash: self.contract_hash,
             output_schema_id: self.output_schema_id,
+            output_schema_hash: self.output_schema_hash,
             signal_class: self.signal_class,
             entropy_budget_bits: self.entropy_budget_bits,
             schema_entropy_ceiling_bits: self.schema_entropy_ceiling_bits,
@@ -766,6 +777,7 @@ pub struct ReceiptBuilder {
     policy_bundle_hash: Option<String>,
     contract_hash: Option<String>,
     output_schema_id: Option<String>,
+    output_schema_hash: Option<String>,
     signal_class: Option<SignalClass>,
     entropy_budget_bits: Option<u32>,
     schema_entropy_ceiling_bits: Option<u32>,
@@ -965,6 +977,12 @@ impl ReceiptBuilder {
         self
     }
 
+    /// Set the output schema hash (optional)
+    pub fn output_schema_hash(mut self, hash: Option<String>) -> Self {
+        self.output_schema_hash = hash;
+        self
+    }
+
     /// Set the signal class (optional)
     pub fn signal_class(mut self, class: Option<SignalClass>) -> Self {
         self.signal_class = class;
@@ -1152,6 +1170,7 @@ impl ReceiptBuilder {
             policy_bundle_hash: self.policy_bundle_hash,
             contract_hash: self.contract_hash,
             output_schema_id: self.output_schema_id,
+            output_schema_hash: self.output_schema_hash,
             signal_class: self.signal_class,
             entropy_budget_bits: self.entropy_budget_bits,
             schema_entropy_ceiling_bits: self.schema_entropy_ceiling_bits,
@@ -1234,6 +1253,7 @@ mod tests {
             policy_bundle_hash: None,
             contract_hash: None,
             output_schema_id: None,
+            output_schema_hash: None,
             signal_class: None,
             entropy_budget_bits: None,
             schema_entropy_ceiling_bits: None,
@@ -1692,6 +1712,27 @@ mod tests {
         assert_eq!(unsigned, parsed);
     }
 
+    // ==================== Output Schema Hash Tests ====================
+
+    #[test]
+    fn test_receipt_without_output_schema_hash_omits_field() {
+        let unsigned = sample_unsigned_receipt();
+        assert_eq!(unsigned.output_schema_hash, None);
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(!json.contains("output_schema_hash"));
+    }
+
+    #[test]
+    fn test_receipt_with_output_schema_hash_roundtrip() {
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.output_schema_hash = Some("a".repeat(64));
+
+        let json = serde_json::to_string(&unsigned).unwrap();
+        assert!(json.contains("output_schema_hash"));
+        let parsed: UnsignedReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(unsigned, parsed);
+    }
+
     // ==================== SignalClass Tests ====================
 
     #[test]
@@ -2094,6 +2135,7 @@ mod tests {
             policy_bundle_hash: None,
             contract_hash: Some("a".repeat(64)),
             output_schema_id: Some("vault_result_compatibility".to_string()),
+            output_schema_hash: None,
             signal_class: None,
             entropy_budget_bits: None,
             schema_entropy_ceiling_bits: None,

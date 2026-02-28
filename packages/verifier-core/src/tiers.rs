@@ -1563,6 +1563,7 @@ mod tests {
             policy_bundle_hash: receipt.policy_bundle_hash,
             contract_hash: receipt.contract_hash,
             output_schema_id: receipt.output_schema_id,
+            output_schema_hash: receipt.output_schema_hash,
             signal_class: receipt.signal_class,
             entropy_budget_bits: receipt.entropy_budget_bits,
             schema_entropy_ceiling_bits: receipt.schema_entropy_ceiling_bits,

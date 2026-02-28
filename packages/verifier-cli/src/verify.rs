@@ -148,6 +148,7 @@ pub(crate) fn to_unsigned(receipt: &Receipt) -> UnsignedReceipt {
         policy_bundle_hash: receipt.policy_bundle_hash.clone(),
         contract_hash: receipt.contract_hash.clone(),
         output_schema_id: receipt.output_schema_id.clone(),
+        output_schema_hash: receipt.output_schema_hash.clone(),
         signal_class: receipt.signal_class,
         entropy_budget_bits: receipt.entropy_budget_bits,
         schema_entropy_ceiling_bits: receipt.schema_entropy_ceiling_bits,
@@ -928,6 +929,7 @@ mod tests {
             policy_bundle_hash: None,
             contract_hash: None,
             output_schema_id: None,
+            output_schema_hash: None,
             signal_class: None,
             entropy_budget_bits: None,
             schema_entropy_ceiling_bits: None,
@@ -1631,6 +1633,7 @@ mod tests {
             policy_bundle_hash: None,
             contract_hash: None,
             output_schema_id: None,
+            output_schema_hash: None,
             signal_class: None,
             entropy_budget_bits: None,
             schema_entropy_ceiling_bits: None,
@@ -1975,8 +1978,8 @@ mod tests {
     fn test_verify_d2_output_schema_not_embedded_skips_gracefully() {
         let (receipt_file, pubkey_file, _receipt) = create_d2_test_files();
 
-        // No schema_dir provided — protocol schemas are not embedded, so output
-        // validation should be skipped (output_schema_valid = None) rather than failing.
+        // No schema_dir provided — falls back to embedded registry. The D2 schema
+        // is now embedded, so output validation should succeed.
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
             pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
@@ -1998,9 +2001,8 @@ mod tests {
 
         let details = verify(&args);
         assert!(details.receipt.is_some());
-        // Schema not found in embedded registry → gracefully skipped (not a failure)
         assert_eq!(details.status, VerificationStatus::Ok);
-        assert_eq!(details.output_schema_valid, None);
+        assert_eq!(details.output_schema_valid, Some(true));
         assert_eq!(
             details.output_schema_id,
             Some("vault_result_compatibility_d2".to_string())

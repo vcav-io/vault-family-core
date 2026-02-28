@@ -26,9 +26,9 @@
 
 pub mod ledger;
 pub mod measurement;
-pub mod store;
 #[cfg(feature = "persistence")]
 pub mod sqlite_store;
+pub mod store;
 
 // ---------------------------------------------------------------------------
 // Re-exports: ledger
