@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/vault_result_scheduling_compat_v1.schema.json",
+  "title": "VaultResultSchedulingCompatV1",
+  "description": "Constant-shape output for SCHEDULING_COMPAT_V1 contract including diagnostic intermediates.",
+  "type": "object",
+  "properties": {
+    "scheduling_signal": {
+      "type": "string",
+      "enum": [
+        "CLEAR_MATCH",
+        "PARTIAL_MATCH",
+        "NO_MATCH"
+      ],
+      "description": "Scheduling compatibility signal (3 values = ~2 bits)"
+    },
+    "constraint_type": {
+      "type": "string",
+      "enum": [
+        "TIME_CONFLICT",
+        "LOCATION_CONFLICT",
+        "DURATION_CONFLICT",
+        "MULTI_CONSTRAINT",
+        "NONE"
+      ],
+      "description": "Primary constraint type (5 values = ~2.32 bits)"
+    },
+    "max_overlap_minutes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1440,
+      "description": "Largest same-day UTC overlap observed across all window pairs.",
+      "x-vcav-entropy-bits-upper-bound": 11
+    },
+    "required_duration_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 240,
+      "description": "Required duration computed as max(A.min_duration_minutes, B.min_duration_minutes).",
+      "x-vcav-entropy-bits-upper-bound": 8
+    },
+    "location_compatible": {
+      "type": "boolean",
+      "description": "True when location constraints are jointly satisfiable.",
+      "x-vcav-entropy-bits-upper-bound": 1
+    },
+    "overlaps_by_day": {
+      "type": "object",
+      "properties": {
+        "MON": { "type": "integer", "minimum": 0, "maximum": 1440, "x-vcav-entropy-bits-upper-bound": 11 },
+        "TUE": { "type": "integer", "minimum": 0, "maximum": 1440, "x-vcav-entropy-bits-upper-bound": 11 },
+        "WED": { "type": "integer", "minimum": 0, "maximum": 1440, "x-vcav-entropy-bits-upper-bound": 11 },
+        "THU": { "type": "integer", "minimum": 0, "maximum": 1440, "x-vcav-entropy-bits-upper-bound": 11 },
+        "FRI": { "type": "integer", "minimum": 0, "maximum": 1440, "x-vcav-entropy-bits-upper-bound": 11 }
+      },
+      "required": ["MON", "TUE", "WED", "THU", "FRI"],
+      "additionalProperties": false,
+      "description": "Per-day maximum overlap in UTC minutes across all same-day window pairs."
+    },
+    "max_overlap_check": {
+      "type": "boolean",
+      "description": "Model self-check that max_overlap_minutes equals the maximum listed overlap.",
+      "x-vcav-entropy-bits-upper-bound": 1
+    }
+  },
+  "required": [
+    "scheduling_signal",
+    "constraint_type",
+    "max_overlap_minutes",
+    "required_duration_minutes",
+    "location_compatible",
+    "overlaps_by_day",
+    "max_overlap_check"
+  ],
+  "additionalProperties": false,
+  "x-vcav-prompt-instruction": "Based on the scheduling data from two agents, determine whether their availability schedules are compatible.",
+  "x-vcav-prompt-context": "Scheduling data:\n{dialogue}",
+  "x-vcav-prompt-output-format": "Respond with valid JSON using ONLY these values:\n- scheduling_signal: \"CLEAR_MATCH\" | \"PARTIAL_MATCH\" | \"NO_MATCH\"\n- constraint_type: \"TIME_CONFLICT\" | \"LOCATION_CONFLICT\" | \"DURATION_CONFLICT\" | \"MULTI_CONSTRAINT\" | \"NONE\"\n- max_overlap_minutes: integer from 0 to 1440 (largest same-day UTC overlap in minutes)\n- required_duration_minutes: integer from 1 to 240 (required meeting duration in minutes)\n- location_compatible: true | false (whether location constraints are jointly satisfiable)\n- overlaps_by_day: object with keys MON, TUE, WED, THU, FRI each an integer from 0 to 1440\n- max_overlap_check: true | false (self-check that max_overlap_minutes equals the maximum listed overlap)",
+  "$comment": "Entropy remains bounded by schema ranges and enums."
+}

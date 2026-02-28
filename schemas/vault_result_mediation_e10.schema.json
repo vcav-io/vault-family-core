@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/vault_result_mediation_e10.schema.json",
+  "title": "VaultResultMediationE10",
+  "description": "E10 mediation schema variant: anchor (E12) minus shared_move. 960 outputs ≈ 9.91 bits.",
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "PROGRESS",
+        "STUCK",
+        "ESCALATE"
+      ],
+      "description": "Mediation progress (3 values = ~1.58 bits)"
+    },
+    "a_move": {
+      "type": "string",
+      "enum": [
+        "ACKNOWLEDGE",
+        "RESTATE_NEEDS",
+        "OFFER_REPAIR",
+        "REQUEST_CLARITY",
+        "REQUEST_ACKNOWLEDGMENT",
+        "SET_BOUNDARY",
+        "PROPOSE_COMPROMISE",
+        "NONE"
+      ],
+      "description": "Recommended move for party A (8 values = 3.00 bits)"
+    },
+    "b_move": {
+      "type": "string",
+      "enum": [
+        "ACKNOWLEDGE",
+        "RESTATE_NEEDS",
+        "OFFER_REPAIR",
+        "REQUEST_CLARITY",
+        "REQUEST_ACKNOWLEDGMENT",
+        "SET_BOUNDARY",
+        "PROPOSE_COMPROMISE",
+        "NONE"
+      ],
+      "description": "Recommended move for party B (8 values = 3.00 bits)"
+    },
+    "conflict_type": {
+      "type": "string",
+      "enum": [
+        "RECOGNITION",
+        "RESOURCE",
+        "PROCESS",
+        "VALUES",
+        "UNKNOWN"
+      ],
+      "description": "Classification of conflict type (5 values = ~2.32 bits)"
+    }
+  },
+  "required": [
+    "outcome",
+    "a_move",
+    "b_move",
+    "conflict_type"
+  ],
+  "additionalProperties": false,
+  "x-vcav-prompt-instruction": "Based on this mediation conversation, assess the situation and recommend next moves.",
+  "x-vcav-prompt-context": "Conversation:\n{dialogue}",
+  "x-vcav-prompt-output-format": "Respond with valid JSON using ONLY these values:\n- outcome: \"PROGRESS\" | \"STUCK\" | \"ESCALATE\"\n- a_move: \"ACKNOWLEDGE\" | \"RESTATE_NEEDS\" | \"OFFER_REPAIR\" | \"REQUEST_CLARITY\" | \"REQUEST_ACKNOWLEDGMENT\" | \"SET_BOUNDARY\" | \"PROPOSE_COMPROMISE\" | \"NONE\"\n- b_move: (same options as a_move)\n- conflict_type: \"RECOGNITION\" | \"RESOURCE\" | \"PROCESS\" | \"VALUES\" | \"UNKNOWN\"",
+  "$comment": "Total entropy: ~9.91 bits (960 outputs). E12 anchor minus shared_move field."
+}

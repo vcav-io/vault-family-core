@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/vault_result_mediation_e6.schema.json",
+  "title": "VaultResultMediationE6",
+  "description": "Capability-track constant-shape output for MEDIATION purpose (E6 coarse variant). Max entropy: 6 bits.",
+  "type": "object",
+  "properties": {
+    "stance_a": {
+      "type": "string",
+      "enum": [
+        "CONSTRUCTIVE",
+        "REQUESTING",
+        "DEFENDING",
+        "PASSIVE"
+      ],
+      "description": "Stance classification for party A (4 values = 2.00 bits)"
+    },
+    "stance_b": {
+      "type": "string",
+      "enum": [
+        "CONSTRUCTIVE",
+        "REQUESTING",
+        "DEFENDING",
+        "PASSIVE"
+      ],
+      "description": "Stance classification for party B (4 values = 2.00 bits)"
+    },
+    "situation": {
+      "type": "string",
+      "enum": [
+        "PROGRESS_INTERPERSONAL",
+        "PROGRESS_STRUCTURAL",
+        "STUCK",
+        "ESCALATE"
+      ],
+      "description": "Situational assessment of mediation state (4 values = 2.00 bits)"
+    }
+  },
+  "required": [
+    "stance_a",
+    "stance_b",
+    "situation"
+  ],
+  "additionalProperties": false,
+  "x-vcav-prompt-instruction": "Based on this mediation conversation, classify each party's stance and the overall situation.",
+  "x-vcav-prompt-context": "Conversation:\n{dialogue}",
+  "x-vcav-prompt-output-format": "Respond with valid JSON using ONLY these values:\n- stance_a: \"CONSTRUCTIVE\" | \"REQUESTING\" | \"DEFENDING\" | \"PASSIVE\"\n- stance_b: \"CONSTRUCTIVE\" | \"REQUESTING\" | \"DEFENDING\" | \"PASSIVE\"\n- situation: \"PROGRESS_INTERPERSONAL\" | \"PROGRESS_STRUCTURAL\" | \"STUCK\" | \"ESCALATE\"",
+  "$comment": "Total entropy: 6.00 bits (4 x 4 x 4 = 64 outputs). E6 is the coarsest mediation schema variant."
+}

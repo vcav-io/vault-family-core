@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/vault_result_scheduling.schema.json",
+  "title": "VaultResultScheduling",
+  "description": "Constant-shape output for SCHEDULING purpose. Max entropy: 16 bits.",
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "FOUND",
+        "NONE",
+        "NEEDS_MORE_OPTIONS"
+      ],
+      "description": "Scheduling outcome (3 values = ~1.58 bits)"
+    },
+    "slot_1": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "S01", "S02", "S03", "S04", "S05", "S06",
+        "S07", "S08", "S09", "S10", "S11", "S12"
+      ],
+      "description": "First selected slot or NONE (13 values = ~3.7 bits)"
+    },
+    "slot_2": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "S01", "S02", "S03", "S04", "S05", "S06",
+        "S07", "S08", "S09", "S10", "S11", "S12"
+      ],
+      "description": "Second selected slot or NONE (13 values = ~3.7 bits)"
+    },
+    "slot_3": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "S01", "S02", "S03", "S04", "S05", "S06",
+        "S07", "S08", "S09", "S10", "S11", "S12"
+      ],
+      "description": "Third selected slot or NONE (13 values = ~3.7 bits)"
+    },
+    "confidence_bucket": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "description": "Confidence level (3 values = ~1.58 bits)"
+    }
+  },
+  "required": [
+    "outcome",
+    "slot_1",
+    "slot_2",
+    "slot_3",
+    "confidence_bucket"
+  ],
+  "additionalProperties": false,
+  "x-vcav-prompt-instruction": "Based on this conversation about scheduling, determine the best mutually available time slots.",
+  "x-vcav-prompt-context": "Conversation:\n{dialogue}",
+  "x-vcav-prompt-output-format": "Respond with valid JSON using ONLY these values:\n- outcome: \"FOUND\" | \"NONE\" | \"NEEDS_MORE_OPTIONS\"\n- slot_1: \"NONE\" | \"S01\" | \"S02\" | \"S03\" | \"S04\" | \"S05\" | \"S06\" | \"S07\" | \"S08\" | \"S09\" | \"S10\" | \"S11\" | \"S12\"\n- slot_2: (same options as slot_1)\n- slot_3: (same options as slot_1)\n- confidence_bucket: \"LOW\" | \"MEDIUM\" | \"HIGH\"",
+  "$comment": "Total entropy: ~14.26 bits. Budgeted as 16 bits."
+}

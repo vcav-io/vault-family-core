@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/vault_result_injection_escalation.schema.json",
+  "title": "Injection Escalation Result",
+  "description": "Bounded risk signal for content escalated into a VCAV enclave. All fields are required enums — no free text.",
+  "type": "object",
+  "properties": {
+    "risk_level": {
+      "type": "string",
+      "enum": ["SAFE", "SUSPICIOUS", "MALICIOUS", "ABSTAIN"]
+    },
+    "attack_surface": {
+      "type": "string",
+      "enum": ["PROMPT_OVERRIDE", "TOOL_INJECTION", "DATA_POISONING", "CREDENTIAL_HARVEST", "SOCIAL_ENGINEERING", "UNKNOWN"]
+    },
+    "handling_signal": {
+      "type": "string",
+      "enum": ["PROCEED", "PROCEED_WITH_STRICT_ALLOWLIST", "REQUIRE_HUMAN_CONFIRM", "BLOCK_THIS_INPUT"]
+    }
+  },
+  "required": ["risk_level", "attack_surface", "handling_signal"],
+  "additionalProperties": false
+}
