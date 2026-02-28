@@ -109,6 +109,9 @@ pub enum EntropyLedgerError {
         prev: String,
         timestamp: DateTime<Utc>,
     },
+
+    #[error("store error: {0}")]
+    StoreError(String),
 }
 
 // ============================================================================

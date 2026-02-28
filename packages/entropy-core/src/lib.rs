@@ -27,6 +27,8 @@
 pub mod ledger;
 pub mod measurement;
 pub mod store;
+#[cfg(feature = "persistence")]
+pub mod sqlite_store;
 
 // ---------------------------------------------------------------------------
 // Re-exports: ledger
@@ -52,3 +54,6 @@ pub use measurement::{
 // ---------------------------------------------------------------------------
 
 pub use store::{EntropyLedgerStore, InMemoryEntropyLedgerStore};
+
+#[cfg(feature = "persistence")]
+pub use sqlite_store::SqliteEntropyLedgerStore;
