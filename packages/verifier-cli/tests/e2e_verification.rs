@@ -223,6 +223,7 @@ fn write_receipt_file(
         policy_bundle_hash: unsigned.policy_bundle_hash.clone(),
         contract_hash: unsigned.contract_hash.clone(),
         output_schema_id: unsigned.output_schema_id.clone(),
+        output_schema_hash: unsigned.output_schema_hash.clone(),
         attestation: unsigned.attestation.clone(),
         signal_class: unsigned.signal_class.clone(),
         entropy_budget_bits: unsigned.entropy_budget_bits,
