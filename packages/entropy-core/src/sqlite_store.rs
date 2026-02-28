@@ -168,14 +168,7 @@ impl SqliteEntropyLedgerStore {
                     timestamp: entry.timestamp,
                 }
             }
-            _other => {
-                // Wrap unexpected errors so callers see them as ordering errors.
-                // In practice this should not happen for well-formed entries.
-                EntropyLedgerError::TimestampRegression {
-                    new: entry.timestamp,
-                    prev: entry.timestamp,
-                }
-            }
+            _other => EntropyLedgerError::StoreError(format!("SQLite error: {_other}")),
         })?;
         Ok(())
     }
@@ -187,34 +180,20 @@ impl SqliteEntropyLedgerStore {
 
 impl EntropyLedgerStore for SqliteEntropyLedgerStore {
     fn append(&mut self, entry: EntropyLedgerEntry) -> Result<(), EntropyLedgerError> {
-        // 1. Let the in-memory ledger validate ordering first (cheap, no I/O).
-        //    We clone only if validation passes — but we need to pass the value in.
-        //    Use a clone for the ordering check; if rejected, we never touch SQLite.
-        let entry_clone = entry.clone();
-
-        // Validate ordering via a dry-run probe: peek at the last entry.
-        // EntropyLedger::append takes ownership and pushes on success; we need
-        // to detect a rejection without mutating state.  The cleanest approach
-        // is to let the ledger check, then if ok, persist to SQLite.
-        //
-        // We do this by appending to a scratch copy — but that wastes an alloc
-        // per call.  Instead we replicate the guard logic here manually.
-        // The guard is trivially correct because it mirrors EntropyLedger::append
-        // exactly and is tested against it.
+        // 1. Validate ordering against the last in-memory entry (cheap, no I/O).
+        // Guard mirrors EntropyLedger::append() — keep in sync if ordering rules change.
         if let Some(last) = self.ledger.entries().last() {
-            if entry_clone.timestamp < last.timestamp {
+            if entry.timestamp < last.timestamp {
                 return Err(EntropyLedgerError::TimestampRegression {
-                    new: entry_clone.timestamp,
+                    new: entry.timestamp,
                     prev: last.timestamp,
                 });
             }
-            if entry_clone.timestamp == last.timestamp
-                && entry_clone.session_id <= last.session_id
-            {
+            if entry.timestamp == last.timestamp && entry.session_id <= last.session_id {
                 return Err(EntropyLedgerError::SessionIdNotStrictlyAfter {
-                    new: entry_clone.session_id,
+                    new: entry.session_id,
                     prev: last.session_id.clone(),
-                    timestamp: entry_clone.timestamp,
+                    timestamp: entry.timestamp,
                 });
             }
         }
@@ -426,7 +405,7 @@ mod tests {
             .append(make_entry("same-session", t1))
             .unwrap();
         store
-            .append(make_entry("same-session-2", t2))
+            .append(make_entry("same-session", t2))
             .unwrap();
         assert_eq!(store.entries().len(), 2);
     }
