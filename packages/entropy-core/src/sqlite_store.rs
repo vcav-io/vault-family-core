@@ -109,33 +109,34 @@ impl SqliteEntropyLedgerStore {
              ORDER BY timestamp ASC, session_id ASC",
         )?;
 
-        let entries = stmt.query_map([], |row| {
-            let ts_str: String = row.get(4)?;
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, u64>(3)?,
-                ts_str,
-                row.get::<_, String>(5)?,
-            ))
-        })?
-        .map(|r| {
-            let (session_id, pair_id, contract_key, entropy_millibits, ts_str, receipt_hash) =
-                r.map_err(|e| format!("rusqlite row error: {e}"))?;
-            let timestamp = chrono::DateTime::parse_from_rfc3339(&ts_str)
-                .map_err(|e| format!("invalid timestamp in DB ({ts_str:?}): {e}"))?
-                .with_timezone(&chrono::Utc);
-            Ok(EntropyLedgerEntry {
-                session_id,
-                pair_id,
-                contract_key,
-                entropy_millibits,
-                timestamp,
-                receipt_hash,
+        let entries = stmt
+            .query_map([], |row| {
+                let ts_str: String = row.get(4)?;
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, u64>(3)?,
+                    ts_str,
+                    row.get::<_, String>(5)?,
+                ))
+            })?
+            .map(|r| {
+                let (session_id, pair_id, contract_key, entropy_millibits, ts_str, receipt_hash) =
+                    r.map_err(|e| format!("rusqlite row error: {e}"))?;
+                let timestamp = chrono::DateTime::parse_from_rfc3339(&ts_str)
+                    .map_err(|e| format!("invalid timestamp in DB ({ts_str:?}): {e}"))?
+                    .with_timezone(&chrono::Utc);
+                Ok(EntropyLedgerEntry {
+                    session_id,
+                    pair_id,
+                    contract_key,
+                    entropy_millibits,
+                    timestamp,
+                    receipt_hash,
+                })
             })
-        })
-        .collect::<Result<Vec<_>, String>>()?;
+            .collect::<Result<Vec<_>, String>>()?;
 
         Ok(entries)
     }
@@ -257,8 +258,7 @@ mod tests {
 
         // Write two entries.
         {
-            let mut store =
-                SqliteEntropyLedgerStore::open(&db_path).expect("open store");
+            let mut store = SqliteEntropyLedgerStore::open(&db_path).expect("open store");
             store.append(make_entry("s1", ts_h(2025, 1, 1, 0))).unwrap();
             store.append(make_entry("s2", ts_h(2025, 1, 1, 1))).unwrap();
             assert_eq!(store.entries().len(), 2);
@@ -266,8 +266,7 @@ mod tests {
 
         // Re-open and verify entries survived.
         {
-            let store =
-                SqliteEntropyLedgerStore::open(&db_path).expect("reopen store");
+            let store = SqliteEntropyLedgerStore::open(&db_path).expect("reopen store");
             let entries = store.entries();
             assert_eq!(entries.len(), 2);
             assert_eq!(entries[0].session_id, "s1");
@@ -286,8 +285,7 @@ mod tests {
         let db_path = dir.path().join("ledger.db");
 
         {
-            let mut store =
-                SqliteEntropyLedgerStore::open(&db_path).expect("open store");
+            let mut store = SqliteEntropyLedgerStore::open(&db_path).expect("open store");
             // Insert in ascending (ts, session_id) order — the only valid order.
             let t = ts_h(2025, 6, 1, 10);
             store.append(make_entry("alpha", t)).unwrap();
@@ -297,8 +295,7 @@ mod tests {
         }
 
         {
-            let store =
-                SqliteEntropyLedgerStore::open(&db_path).expect("reopen store");
+            let store = SqliteEntropyLedgerStore::open(&db_path).expect("reopen store");
             let entries = store.entries();
             assert_eq!(entries.len(), 2);
             // Must come back in canonical (timestamp, session_id) order.
@@ -315,8 +312,7 @@ mod tests {
 
     #[test]
     fn test_reject_out_of_order_append() {
-        let mut store =
-            SqliteEntropyLedgerStore::open_in_memory().expect("open in-memory store");
+        let mut store = SqliteEntropyLedgerStore::open_in_memory().expect("open in-memory store");
 
         store.append(make_entry("s2", ts_h(2025, 1, 1, 5))).unwrap();
 
@@ -364,8 +360,7 @@ mod tests {
         let db_path = dir.path().join("nano.db");
 
         {
-            let mut store =
-                SqliteEntropyLedgerStore::open(&db_path).expect("open store");
+            let mut store = SqliteEntropyLedgerStore::open(&db_path).expect("open store");
             store.append(e1.clone()).unwrap();
             store.append(e2.clone()).unwrap();
             assert_eq!(store.entries().len(), 2);
@@ -373,8 +368,7 @@ mod tests {
 
         // Reload and verify order preserved.
         {
-            let store =
-                SqliteEntropyLedgerStore::open(&db_path).expect("reopen store");
+            let store = SqliteEntropyLedgerStore::open(&db_path).expect("reopen store");
             let entries = store.entries();
             assert_eq!(entries.len(), 2);
             assert_eq!(entries[0].session_id, "session-a");
@@ -395,18 +389,13 @@ mod tests {
         let t1 = ts_ns(base_secs, 0);
         let t2 = ts_ns(base_secs, 1); // 1 nanosecond later
 
-        let mut store =
-            SqliteEntropyLedgerStore::open_in_memory().expect("open in-memory store");
+        let mut store = SqliteEntropyLedgerStore::open_in_memory().expect("open in-memory store");
 
         // Note: same session_id is fine here because t2 > t1.
         // The ordering rule requires strictly ascending (timestamp, session_id).
         // t1 < t2 so "same-session-id" at t2 is strictly after t1.
-        store
-            .append(make_entry("same-session", t1))
-            .unwrap();
-        store
-            .append(make_entry("same-session", t2))
-            .unwrap();
+        store.append(make_entry("same-session", t1)).unwrap();
+        store.append(make_entry("same-session", t2)).unwrap();
         assert_eq!(store.entries().len(), 2);
     }
 
@@ -419,8 +408,7 @@ mod tests {
     /// works end-to-end by confirming the store is `Send`.
     #[test]
     fn test_mutex_connection_send() {
-        let mut store =
-            SqliteEntropyLedgerStore::open_in_memory().expect("open in-memory store");
+        let mut store = SqliteEntropyLedgerStore::open_in_memory().expect("open in-memory store");
         store.append(make_entry("s1", ts_h(2025, 1, 1, 0))).unwrap();
 
         // Move store into a thread to confirm it is Send.
@@ -438,8 +426,7 @@ mod tests {
 
     #[test]
     fn test_field_round_trip() {
-        let mut store =
-            SqliteEntropyLedgerStore::open_in_memory().expect("open in-memory store");
+        let mut store = SqliteEntropyLedgerStore::open_in_memory().expect("open in-memory store");
 
         let t = ts_h(2026, 3, 15, 9);
         let entry = EntropyLedgerEntry {

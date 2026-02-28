@@ -20,8 +20,8 @@ pub use budget_tier::{BudgetTier, BudgetTierV2, DEFAULT_BUDGET_BITS, ELEVATED_BU
 pub use contract::Contract;
 pub use inbox::{
     AcceptInviteRequest, AcceptInviteResponse, CreateInviteRequest, CreateInviteResponse,
-    DeclineInviteRequest, DeclineReasonCode, InboxEvent, InboxEventType, InboxQuery,
-    InboxResponse, InviteDetailResponse, InviteStatus, InviteSummary,
+    DeclineInviteRequest, DeclineReasonCode, InboxEvent, InboxEventType, InboxQuery, InboxResponse,
+    InviteDetailResponse, InviteStatus, InviteSummary,
 };
 pub use lane::{ExecutionLane, LaneId};
 pub use purpose::Purpose;
