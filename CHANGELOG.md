@@ -16,3 +16,5 @@ Initial release. Extracted from the vcav monorepo as a standalone repository.
 - `label-registry` 0.1.0
 - `ifc-wasm` 0.1.0
 - `escalation-interface` 0.1.0
+- `afal-core` 0.1.0
+- `entropy-core` 0.1.0

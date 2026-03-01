@@ -206,8 +206,8 @@ pub fn build_policy_digest(bundle: &PolicyBundle) -> PolicyDigestV1 {
 // Contract Enforcement
 // ============================================================================
 
-/// Timing class window lookup (mirrors guardian_core::kernel_limits::TimingClass).
-/// Kept inline to avoid pulling guardian-core (with jsonschema, chrono, etc.)
+/// Timing class window lookup (mirrors the vault runtime's timing class constants).
+/// Kept inline to avoid pulling the full vault runtime (with jsonschema, chrono, etc.)
 /// into the WASM-compatible verifier-core crate.
 fn timing_class_window_seconds(class: &str) -> Option<u64> {
     match class.to_uppercase().as_str() {
@@ -646,7 +646,7 @@ fn is_valid_compartment_hex(s: &str) -> bool {
 
 /// Recompute a compartment ID from pair_id and a JCS-canonicalized confidentiality value.
 ///
-/// This mirrors `guardian_core::budget::generate_compartment_id` but operates on
+/// This mirrors the vault runtime's compartment ID derivation but operates on
 /// a `serde_json::Value` (from the receipt) rather than a `BTreeSet<String>`.
 /// The hash is: `SHA-256("vcav/budget_key/v2" || pair_id || JCS(confidentiality))`.
 ///
@@ -2089,10 +2089,10 @@ mod tests {
     }
 
     // =========================================================================
-    // Timing class golden values (pinned from guardian-core for cross-repo verification)
+    // Timing class golden values (pinned from the vault runtime for cross-repo verification)
     // =========================================================================
 
-    // Golden values pinned from guardian-core. These are verified by cross-language
+    // Golden values pinned from the vault runtime. These are verified by cross-language
     // test vectors and should not change without updating the test vectors.
     #[test]
     fn test_timing_class_windows_golden_values() {
@@ -2467,7 +2467,7 @@ mod tests {
         for vec in vectors {
             let label = vec["label"].as_str().unwrap();
 
-            // Skip guardian-core validation tests (no compartment_id field)
+            // Skip vault-runtime-specific validation tests (no compartment_id field)
             if vec.get("compartment_id").is_none() {
                 continue;
             }

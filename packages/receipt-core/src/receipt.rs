@@ -276,7 +276,7 @@ pub struct Receipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub budget_chain: Option<BudgetChainRecord>,
 
-    /// Identity of the model used for vault execution (optional, Phase 3+)
+    /// Identity of the model used for vault execution (optional, since v0.1)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_identity: Option<ModelIdentity>,
 
@@ -539,7 +539,7 @@ pub struct UnsignedReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub budget_chain: Option<BudgetChainRecord>,
 
-    /// Identity of the model used for vault execution (optional, Phase 3+)
+    /// Identity of the model used for vault execution (optional, since v0.1)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_identity: Option<ModelIdentity>,
 
@@ -935,7 +935,7 @@ impl ReceiptBuilder {
         self
     }
 
-    /// Set the model identity (optional, Phase 3+)
+    /// Set the model identity (optional, since v0.1)
     pub fn model_identity(mut self, identity: Option<ModelIdentity>) -> Self {
         self.model_identity = identity;
         self

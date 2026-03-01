@@ -2,13 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://vcav.io/schemas/receipt.v2.schema.json",
   "title": "Receipt V2",
-  "description": "Cryptographic receipt proving session execution and constraints (Phase 2 with TINY/SMALL/MEDIUM/LARGE budget tiers)",
+  "description": "Cryptographic receipt proving session execution and constraints (v2.0 with TINY/SMALL/MEDIUM/LARGE budget tiers)",
   "type": "object",
   "properties": {
     "schema_version": {
       "type": "string",
       "const": "2.0.0",
-      "description": "Receipt schema version (2.0.0 for Phase 2)"
+      "description": "Receipt schema version (2.0.0)"
     },
     "session_id": {
       "type": "string",
@@ -155,7 +155,7 @@
             "MEDIUM",
             "LARGE"
           ],
-          "description": "Active budget tier (Phase 2: TINY=8, SMALL=16, MEDIUM=24, LARGE=32 bits)"
+          "description": "Active budget tier (v2.0: TINY=8, SMALL=16, MEDIUM=24, LARGE=32 bits)"
         }
       },
       "required": [
@@ -210,7 +210,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "description": "SessionHandoff ID that authorized this session (Phase 2)"
+      "description": "SessionHandoff ID that authorized this session (since v0.1)"
     },
     "contract_hash": {
       "type": "string",
@@ -312,7 +312,7 @@
       },
       "required": ["provider", "model_id"],
       "additionalProperties": false,
-      "description": "Identity of the model used for vault execution (optional, Phase 3+)"
+      "description": "Identity of the model used for vault execution (optional, since v0.1)"
     },
     "signature": {
       "type": "string",

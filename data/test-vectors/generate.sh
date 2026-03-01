@@ -2,8 +2,7 @@
 # Generate deterministic VSSP crypto test vectors.
 #
 # Usage:
-#   ./data/test-vectors/generate.sh              # from workspace root
-#   ./run-dev.sh data/test-vectors/generate.sh   # from workspace root (via container)
+#   ./data/test-vectors/generate.sh   # from workspace root
 #
 # The generator is a Rust binary in receipt-core that uses the same
 # canonicalization and signing code as production, ensuring vectors

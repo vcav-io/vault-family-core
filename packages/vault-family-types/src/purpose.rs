@@ -16,7 +16,7 @@ pub enum Purpose {
     Mediation,
     /// Multi-term negotiation: 24 bits max
     Negotiation,
-    /// Scheduling compatibility (Phase 3 demo): 5 bits max
+    /// Scheduling compatibility (legacy v1): 5 bits max
     SchedulingCompatV1,
 }
 
