@@ -4,6 +4,7 @@ description = "VCAV verification logic (WASM-compatible, no filesystem)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 receipt-core = { path = "../receipt-core" }

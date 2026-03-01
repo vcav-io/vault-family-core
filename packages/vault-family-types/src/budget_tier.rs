@@ -30,7 +30,7 @@ pub const ELEVATED_BUDGET_BITS: u32 = 512;
 // BudgetTierV2
 // ============================================================================
 
-/// Budget tier for Phase 2 (TINY/SMALL/MEDIUM/LARGE).
+/// Budget tier for v2.0 (TINY/SMALL/MEDIUM/LARGE).
 ///
 /// **Wire format — frozen.** Serde strings appear in signed handoffs and AFAL messages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

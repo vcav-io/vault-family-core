@@ -1,7 +1,7 @@
-//! Schema loading and validation (vendored from guardian-core for verifier-cli independence)
+//! Schema loading and validation (inlined for verifier-cli independence)
 //!
 //! Loads JSON Schema definitions from a directory and validates inputs against them.
-//! This is a copy of the loader portion of guardian-core's schema module, without
+//! This is a copy of the loader portion of the schema module, without
 //! the vault-specific Subset v1 conformance validation.
 
 use std::collections::HashMap;

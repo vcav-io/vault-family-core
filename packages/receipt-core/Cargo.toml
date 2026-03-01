@@ -4,6 +4,7 @@ description = "VCAV Receipt: Cryptographic receipt generation and signing"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 vault-family-types = { path = "../vault-family-types" }
@@ -33,6 +34,10 @@ path = "src/bin/vcav-sign-manifest.rs"
 [[bin]]
 name = "vcav-keyring"
 path = "src/bin/vcav-keyring.rs"
+
+[[bin]]
+name = "vcav-receipt-key"
+path = "src/bin/vcav-receipt-key.rs"
 
 [dev-dependencies]
 proptest.workspace = true

@@ -18,6 +18,10 @@ Provides the shared type vocabulary, cryptographic signing, receipt verification
 - **afal-core** -- AFAL wire types and signing
 - **entropy-core** -- Entropy ledger and budget tracking
 
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md) for an overview of the crate structure and design principles.
+
 ## Building
 
 ```bash

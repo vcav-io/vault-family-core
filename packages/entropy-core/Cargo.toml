@@ -4,6 +4,7 @@ description = "Entropy ledger accounting and schema entropy measurement"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 receipt-core = { path = "../receipt-core" }
