@@ -1,15 +1,13 @@
-<svg width="320" height="50" viewBox="0 0 320 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- AV mark (lighter, representing one consumer) -->
+<svg viewBox="-1 -8 500 66" fill="none" xmlns="http://www.w3.org/2000/svg">
   <g opacity="0.4">
     <path d="M0 5H8M0 10H10M0 15H12M0 20H14M0 25H16M0 30H18M0 35H20M2 45H20" stroke="#2F2F2F" stroke-width="2" stroke-linecap="round"/>
     <rect x="23" y="0" width="4" height="50" rx="1" fill="#2F2F2F"/>
     <path d="M50 5H42M50 10H40M50 15H38M50 20H36M50 25H34M50 30H32M50 35H30M48 45H30" stroke="#2F2F2F" stroke-width="2" stroke-linecap="round"/>
   </g>
-  <!-- VCAV mark (lighter, representing the other consumer) -->
   <g opacity="0.4" transform="translate(60, 0)">
     <path d="M0 5H8M0 7H8M0 12H10M0 14H10M0 19H12M0 21H12M0 26H14M0 28H14M0 33H16M0 35H16M2 45H18" stroke="#2F2F2F" stroke-width="2" stroke-linecap="square"/>
     <rect x="21" y="0" width="8" height="50" rx="1" fill="#2F2F2F"/>
     <path d="M50 5H42M50 7H42M50 12H40M50 14H40M50 19H38M50 21H38M50 26H36M50 28H36M50 33H34M50 35H34M48 45H32" stroke="#2F2F2F" stroke-width="2" stroke-linecap="square"/>
   </g>
-  <text x="180" y="25" fill="#2F2F2F" dominant-baseline="central" style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 20px; font-weight: 400;">vault-family-core</text>
+  <text x="130" y="20" fill="#2F2F2F" dominant-baseline="central" style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 54px; font-weight: 400;">vault-family-core</text>
 </svg>
