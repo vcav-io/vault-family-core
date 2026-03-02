@@ -1,4 +1,8 @@
-# vault-family-core
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset=".github/logo-light.svg">
+  <img alt="vault-family-core" src=".github/logo-light.svg" height="48">
+</picture>
 
 Constitutional shared core for the VCAV protocol family. Small, stable, boring.
 
