@@ -17,7 +17,7 @@ use crate::canonicalize::canonicalize_serializable;
 use crate::handoff::UnsignedSessionHandoff;
 use crate::receipt::UnsignedReceipt;
 use crate::receipt_v2::{
-    ReceiptSignature, ReceiptV2, SignatureAlgorithm, UnsignedReceiptV2, DOMAIN_PREFIX_V2,
+    ReceiptV2, SignatureAlgorithm, SignatureV2, UnsignedReceiptV2, DOMAIN_PREFIX_V2,
 };
 
 // ============================================================================
@@ -324,20 +324,55 @@ pub fn create_signing_message_v2(receipt: &UnsignedReceiptV2) -> Result<Vec<u8>,
 
 /// Sign an unsigned v2 receipt with the given Ed25519 signing key.
 ///
-/// Returns a `ReceiptSignature` with `alg = Ed25519` and a base64url-encoded
+/// Returns a `SignatureV2` with `alg = Ed25519` and a base64url-encoded
 /// signature value. The `signed_fields` marker is set to `"ALL_EXCEPT_SIGNATURE"`.
 pub fn sign_receipt_v2(
     receipt: &UnsignedReceiptV2,
     signing_key: &SigningKey,
-) -> Result<ReceiptSignature, SigningError> {
+) -> Result<SignatureV2, SigningError> {
     let message = create_signing_message_v2(receipt)?;
     let hash = hash_message(&message);
     let signature = signing_key.sign(&hash);
-    Ok(ReceiptSignature {
+    Ok(SignatureV2 {
         alg: SignatureAlgorithm::Ed25519,
         value: base64_url_encode(&signature.to_bytes()),
         signed_fields: Some("ALL_EXCEPT_SIGNATURE".to_string()),
     })
+}
+
+/// Verify a v2 receipt's signature.
+///
+/// Canonicalizes `receipt` with JCS using the v2 domain separator and verifies
+/// the provided `SignatureV2`. Only `SignatureAlgorithm::Ed25519` is supported;
+/// other algorithms return `SigningError::VerificationFailed`.
+///
+/// # Arguments
+/// * `receipt` - The unsigned v2 receipt body
+/// * `signature` - The signature object to verify
+/// * `public_key` - The operator's Ed25519 verifying key
+pub fn verify_receipt_v2(
+    receipt: &UnsignedReceiptV2,
+    signature: &SignatureV2,
+    public_key: &VerifyingKey,
+) -> Result<(), SigningError> {
+    if signature.alg != SignatureAlgorithm::Ed25519 {
+        return Err(SigningError::VerificationFailed);
+    }
+
+    // Decode base64url signature value
+    let sig_bytes = base64_url_decode(&signature.value)
+        .map_err(|_| SigningError::InvalidSignatureBytes("invalid base64url".to_string()))?;
+    let byte_array: [u8; 64] = sig_bytes
+        .try_into()
+        .map_err(|_| SigningError::InvalidSignatureBytes("Expected 64 bytes".to_string()))?;
+    let ed_sig = ed25519_dalek::Signature::from_bytes(&byte_array);
+
+    let message = create_signing_message_v2(receipt)?;
+    let hash = hash_message(&message);
+
+    public_key
+        .verify(&hash, &ed_sig)
+        .map_err(|_| SigningError::VerificationFailed)
 }
 
 /// Assemble a complete v2 receipt from its unsigned body and a signing key.
@@ -360,39 +395,6 @@ pub fn sign_and_assemble_receipt_v2(
         tee_attestation: unsigned.tee_attestation,
         signature: sig,
     })
-}
-
-/// Verify a v2 receipt's Ed25519 signature.
-///
-/// Splits off the `signature` object, canonicalizes the remaining fields, and
-/// verifies the Ed25519 signature. Only `SignatureAlgorithm::Ed25519` is
-/// supported by this function; other algorithms return `SigningError::VerificationFailed`.
-///
-/// # Arguments
-/// * `receipt` - The complete v2 receipt (including signature)
-/// * `public_key` - The operator's Ed25519 verifying key
-pub fn verify_receipt_v2(receipt: &ReceiptV2, public_key: &VerifyingKey) -> Result<(), SigningError> {
-    if receipt.signature.alg != SignatureAlgorithm::Ed25519 {
-        return Err(SigningError::VerificationFailed);
-    }
-
-    // Decode base64url signature value
-    let sig_bytes = base64_url_decode(&receipt.signature.value)
-        .map_err(|_| SigningError::InvalidSignatureBytes("invalid base64url".to_string()))?;
-    let byte_array: [u8; 64] = sig_bytes
-        .try_into()
-        .map_err(|_| SigningError::InvalidSignatureBytes("Expected 64 bytes".to_string()))?;
-    let signature = ed25519_dalek::Signature::from_bytes(&byte_array);
-
-    // Reconstruct the unsigned body
-    let (unsigned, _) = receipt.clone().split();
-
-    let message = create_signing_message_v2(&unsigned)?;
-    let hash = hash_message(&message);
-
-    public_key
-        .verify(&hash, &signature)
-        .map_err(|_| SigningError::VerificationFailed)
 }
 
 // ============================================================================

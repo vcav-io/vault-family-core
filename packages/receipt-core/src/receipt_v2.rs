@@ -238,7 +238,7 @@ pub enum SignatureAlgorithm {
 
 /// The receipt signature object.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReceiptSignature {
+pub struct SignatureV2 {
     pub alg: SignatureAlgorithm,
     /// base64url-encoded signature bytes.
     pub value: String,
@@ -246,6 +246,9 @@ pub struct ReceiptSignature {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signed_fields: Option<String>,
 }
+
+/// Alias kept for backwards compatibility within this crate.
+pub type ReceiptSignature = SignatureV2;
 
 // ============================================================================
 // ProviderAttestation
@@ -330,12 +333,12 @@ pub struct ReceiptV2 {
     pub provider_attestation: Option<ProviderAttestation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tee_attestation: Option<TeeAttestation>,
-    pub signature: ReceiptSignature,
+    pub signature: SignatureV2,
 }
 
 impl ReceiptV2 {
     /// Split the receipt into its unsigned body and signature.
-    pub fn split(self) -> (UnsignedReceiptV2, ReceiptSignature) {
+    pub fn split(self) -> (UnsignedReceiptV2, SignatureV2) {
         let sig = self.signature;
         let unsigned = UnsignedReceiptV2 {
             receipt_schema_version: self.receipt_schema_version,
@@ -509,5 +512,193 @@ mod tests {
         assert!(v.get("tee_attestation").is_none());
         // operator_key_discovery is None → omitted
         assert!(v["operator"].get("operator_key_discovery").is_none());
+    }
+
+    #[test]
+    fn test_minimal_receipt_serde_roundtrip() {
+        // Only required commitments, no optional claims
+        let minimal = UnsignedReceiptV2 {
+            receipt_schema_version: SCHEMA_VERSION_V2.to_string(),
+            receipt_canonicalization: CANONICALIZATION_V2.to_string(),
+            receipt_id: "00000000-0000-0000-0000-000000000001".to_string(),
+            session_id: "00000000-0000-0000-0000-000000000002".to_string(),
+            issued_at: chrono::DateTime::parse_from_rfc3339("2026-03-04T00:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            assurance_level: AssuranceLevel::SelfAsserted,
+            operator: Operator {
+                operator_id: "relay.example".to_string(),
+                operator_key_fingerprint: "0".repeat(64),
+                operator_key_discovery: None,
+            },
+            commitments: Commitments {
+                contract_hash: "1".repeat(64),
+                schema_hash: "2".repeat(64),
+                output_hash: "3".repeat(64),
+                input_commitments: vec![],
+                assembled_prompt_hash: "4".repeat(64),
+                prompt_assembly_version: "1.0.0".to_string(),
+                output: None,
+                prompt_template_hash: None,
+                effective_config_hash: None,
+                preflight_bundle: None,
+                output_retrieval_uri: None,
+                output_media_type: None,
+                preflight_bundle_uri: None,
+            },
+            claims: Claims {
+                model_identity_asserted: None,
+                model_identity_attested: None,
+                model_profile_hash_asserted: None,
+                runtime_hash_asserted: None,
+                runtime_hash_attested: None,
+                budget_enforcement_mode: None,
+                provider_latency_ms: None,
+                token_usage: None,
+                relay_software_version: None,
+            },
+            provider_attestation: None,
+            tee_attestation: None,
+        };
+
+        let json = serde_json::to_string(&minimal).unwrap();
+        let parsed: UnsignedReceiptV2 = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.receipt_schema_version, SCHEMA_VERSION_V2);
+        assert_eq!(parsed.commitments.input_commitments.len(), 0);
+        assert!(parsed.claims.model_identity_asserted.is_none());
+    }
+
+    #[test]
+    fn test_sign_and_verify_v2_roundtrip() {
+        use crate::signer::{generate_keypair, sign_receipt_v2, verify_receipt_v2};
+
+        let unsigned = sample_unsigned();
+        let (signing_key, verifying_key) = generate_keypair();
+
+        let signature = sign_receipt_v2(&unsigned, &signing_key).unwrap();
+        let result = verify_receipt_v2(&unsigned, &signature, &verifying_key);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_tamper_commitment_after_signing() {
+        use crate::signer::{generate_keypair, sign_receipt_v2, verify_receipt_v2};
+
+        let unsigned = sample_unsigned();
+        let (signing_key, verifying_key) = generate_keypair();
+
+        let signature = sign_receipt_v2(&unsigned, &signing_key).unwrap();
+
+        // Tamper: change the contract_hash commitment
+        let mut tampered = unsigned.clone();
+        tampered.commitments.contract_hash = "0".repeat(64);
+
+        let result = verify_receipt_v2(&tampered, &signature, &verifying_key);
+        assert!(
+            result.is_err(),
+            "tampered commitment must not verify"
+        );
+    }
+
+    #[test]
+    fn test_domain_separator_v1_v2_isolation() {
+        use crate::receipt::UnsignedReceipt;
+        use crate::signer::{
+            generate_keypair, sign_receipt, sign_receipt_v2, verify_receipt, verify_receipt_v2,
+        };
+
+        // Build a minimal v1 receipt and a v2 receipt using the same key
+        let (signing_key, verifying_key) = generate_keypair();
+
+        // v2 sign + try to verify with the v1 verifier (must fail)
+        let unsigned_v2 = sample_unsigned();
+        let sig_v2 = sign_receipt_v2(&unsigned_v2, &signing_key).unwrap();
+
+        // Encode the v2 signature as the hex string v1 verify expects
+        // (they should be completely different because of domain separation)
+        // We verify that v1 verify_receipt rejects a v2-signed payload with
+        // a different domain prefix — this is tested indirectly via sign+verify v1.
+        // The key assertion: signing with different domain prefixes produces different bytes.
+        let msg_v1 =
+            crate::signer::create_signing_message(&{
+                // Minimal v1 receipt
+                use crate::receipt::{BudgetUsageRecord, ReceiptStatus, SCHEMA_VERSION};
+                use vault_family_types::{BudgetTier, ExecutionLane, Purpose};
+                use chrono::TimeZone;
+                UnsignedReceipt {
+                    schema_version: SCHEMA_VERSION.to_string(),
+                    session_id: "a".repeat(64),
+                    purpose_code: Purpose::Compatibility,
+                    participant_ids: vec![],
+                    runtime_hash: "b".repeat(64),
+                    guardian_policy_hash: "c".repeat(64),
+                    model_weights_hash: "d".repeat(64),
+                    llama_cpp_version: "0.1.0".to_string(),
+                    inference_config_hash: "e".repeat(64),
+                    output_schema_version: "1.0.0".to_string(),
+                    session_start: Utc.with_ymd_and_hms(2026, 3, 4, 0, 0, 0).unwrap(),
+                    session_end: Utc.with_ymd_and_hms(2026, 3, 4, 0, 1, 0).unwrap(),
+                    fixed_window_duration_seconds: 60,
+                    status: ReceiptStatus::Completed,
+                    execution_lane: ExecutionLane::SoftwareLocal,
+                    output: None,
+                    output_entropy_bits: 0,
+                    receipt_payload_type: None,
+                    receipt_payload_version: None,
+                    payload: None,
+                    mitigations_applied: vec![],
+                    budget_usage: BudgetUsageRecord {
+                        pair_id: "f".repeat(64),
+                        window_start: Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+                        bits_used_before: 0,
+                        bits_used_after: 0,
+                        budget_limit: 128,
+                        budget_tier: BudgetTier::Default,
+                        budget_enforcement: None,
+                        compartment_id: None,
+                    },
+                    budget_chain: None,
+                    model_identity: None,
+                    agreement_hash: None,
+                    model_profile_hash: None,
+                    policy_bundle_hash: None,
+                    contract_hash: None,
+                    output_schema_id: None,
+                    output_schema_hash: None,
+                    signal_class: None,
+                    entropy_budget_bits: None,
+                    schema_entropy_ceiling_bits: None,
+                    prompt_template_hash: None,
+                    contract_timing_class: None,
+                    ifc_output_label: None,
+                    ifc_policy_hash: None,
+                    ifc_label_receipt: None,
+                    ifc_joined_confidentiality: None,
+                    entropy_status_commitment: None,
+                    ledger_head_hash: None,
+                    delta_commitment_counterparty: None,
+                    delta_commitment_contract: None,
+                    policy_declaration: None,
+                    receipt_key_id: None,
+                    attestation: None,
+                }
+            })
+            .unwrap();
+        let msg_v2 = crate::signer::create_signing_message_v2(&unsigned_v2).unwrap();
+
+        // Domain prefix bytes differ → signing messages differ → signatures differ
+        assert_ne!(
+            &msg_v1[..16],
+            &msg_v2[..16],
+            "v1 and v2 domain prefixes must be distinct"
+        );
+        assert!(
+            msg_v1.starts_with(b"VCAV-RECEIPT-V1:"),
+            "v1 must use V1 prefix"
+        );
+        assert!(
+            msg_v2.starts_with(b"VCAV-RECEIPT-V2:"),
+            "v2 must use V2 prefix"
+        );
     }
 }
