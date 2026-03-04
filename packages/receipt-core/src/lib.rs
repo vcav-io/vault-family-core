@@ -28,6 +28,7 @@ pub mod handoff;
 pub mod ledger;
 pub mod manifest;
 pub mod receipt;
+pub mod receipt_v2;
 pub mod signer;
 #[cfg(test)]
 mod tamper_tests;
@@ -58,10 +59,17 @@ pub use manifest::{
 };
 pub use signer::{
     compute_budget_chain_id, compute_receipt_hash, compute_receipt_key_id,
-    create_handoff_signing_message, create_signing_message, generate_keypair, hash_message,
-    parse_public_key_hex, parse_signature_hex, public_key_to_hex, sign_handoff, sign_receipt,
-    verify_handoff, verify_receipt, SigningError, BUDGET_CHAIN_DOMAIN_PREFIX, DOMAIN_PREFIX,
+    create_handoff_signing_message, create_signing_message, create_signing_message_v2,
+    generate_keypair, hash_message, parse_public_key_hex, parse_signature_hex, public_key_to_hex,
+    sign_and_assemble_receipt_v2, sign_handoff, sign_receipt, sign_receipt_v2, verify_handoff,
+    verify_receipt, verify_receipt_v2, SigningError, BUDGET_CHAIN_DOMAIN_PREFIX, DOMAIN_PREFIX,
     RECEIPT_HASH_DOMAIN_PREFIX, RECEIPT_HASH_PLACEHOLDER, SESSION_HANDOFF_DOMAIN_PREFIX,
+};
+pub use receipt_v2::{
+    AssuranceLevel, BudgetEnforcementMode, Commitments, Claims, HashAlgorithm, InputCommitment,
+    Operator, ProviderAttestation, PreflightBundle, ReceiptSignature, ReceiptV2, SignatureAlgorithm,
+    TeeAttestation, TeeType, TokenUsage, UnsignedReceiptV2, CANONICALIZATION_V2, DOMAIN_PREFIX_V2,
+    SCHEMA_VERSION_V2,
 };
 pub use vault_family_types::{ExecutionLane, LaneId};
 
