@@ -14,7 +14,14 @@ use serde::{Deserialize, Serialize};
 // ============================================================================
 
 /// v2 receipt schema version
-pub const SCHEMA_VERSION_V2: &str = "2.0.0";
+pub const SCHEMA_VERSION_V2: &str = "2.1.0";
+
+/// Channel capacity measurement algorithm identifier.
+///
+/// The current algorithm sums `ceil(log2(cardinality))` for each string-enum
+/// field in the output JSON Schema. This measures the schema's structural
+/// capacity — the log2 of the number of distinct outputs the schema permits.
+pub const CHANNEL_CAPACITY_MEASUREMENT_VERSION: &str = "enum_cardinality_v1";
 
 /// v2 domain separator for signing
 pub const DOMAIN_PREFIX_V2: &str = "VCAV-RECEIPT-V2:";
@@ -184,6 +191,65 @@ pub struct TokenUsage {
 }
 
 // ============================================================================
+// SessionStatus
+// ============================================================================
+
+/// Outcome status of a session. Claims field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SessionStatus {
+    /// Session completed successfully with output.
+    #[serde(rename = "success")]
+    Success,
+    /// Output was produced but rejected by schema validation or guardian policy.
+    #[serde(rename = "rejected")]
+    Rejected,
+    /// Session was aborted before output was produced (e.g. provider error, timeout).
+    #[serde(rename = "aborted")]
+    Aborted,
+    /// Relay encountered an internal error.
+    #[serde(rename = "error")]
+    Error,
+}
+
+// ============================================================================
+// ExecutionLaneV2
+// ============================================================================
+
+/// Execution environment for this session. Claims field.
+///
+/// The relay asserts its own execution environment. In `Standard` mode, this is
+/// a self-assertion with no independent verification. In `Tee` mode, it would be
+/// backed by hardware attestation (and `assurance_level` would change accordingly).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ExecutionLaneV2 {
+    /// Standard software execution — no hardware isolation.
+    #[serde(rename = "standard")]
+    Standard,
+    /// Trusted execution environment with hardware attestation.
+    #[serde(rename = "tee")]
+    Tee,
+}
+
+// ============================================================================
+// BudgetUsageV2
+// ============================================================================
+
+/// Channel capacity budget accounting for a session. Claims field.
+///
+/// Tracks cumulative schema capacity usage across sessions for a participant pair.
+/// Currently `bits_used_before` is always 0 (cross-session ledger not yet wired),
+/// but the structure is present for forward compatibility.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BudgetUsageV2 {
+    /// Bits used by this participant pair before this session.
+    pub bits_used_before: u32,
+    /// Bits used by this participant pair after this session.
+    pub bits_used_after: u32,
+    /// Configured budget limit in bits (128 default).
+    pub budget_limit: u32,
+}
+
+// ============================================================================
 // Claims
 // ============================================================================
 
@@ -218,6 +284,42 @@ pub struct Claims {
     /// Semver of the relay software that issued this receipt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relay_software_version: Option<String>,
+
+    // --- Session outcome (issue #189) ---
+
+    /// Session outcome status.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<SessionStatus>,
+    /// Coarse classification of the output signal (e.g. "SESSION_COMPLETED",
+    /// "SCHEMA_VALIDATION_FAILED"). Absent for aborted sessions with no output.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signal_class: Option<String>,
+
+    // --- Execution lane (issue #190) ---
+
+    /// Execution environment: `standard` or `tee`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_lane: Option<ExecutionLaneV2>,
+
+    // --- Channel capacity (issue #188) ---
+
+    /// Schema's structural channel capacity in bits — log2 of the number of
+    /// distinct outputs the schema permits. Deterministically derivable from
+    /// the committed schema hash.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel_capacity_bits_upper_bound: Option<u32>,
+    /// Identifies the measurement algorithm (e.g. "enum_cardinality_v1").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel_capacity_measurement_version: Option<String>,
+    /// Configured entropy budget from the contract, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_budget_bits: Option<u32>,
+    /// Schema entropy ceiling used for budget comparison.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema_entropy_ceiling_bits: Option<u32>,
+    /// Budget usage accounting for this session.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_usage: Option<BudgetUsageV2>,
 }
 
 // ============================================================================
@@ -411,6 +513,20 @@ mod tests {
                     total_tokens: 1550,
                 }),
                 relay_software_version: Some("0.8.0".to_string()),
+                status: Some(SessionStatus::Success),
+                signal_class: Some("SESSION_COMPLETED".to_string()),
+                execution_lane: Some(ExecutionLaneV2::Standard),
+                channel_capacity_bits_upper_bound: Some(12),
+                channel_capacity_measurement_version: Some(
+                    CHANNEL_CAPACITY_MEASUREMENT_VERSION.to_string(),
+                ),
+                entropy_budget_bits: Some(128),
+                schema_entropy_ceiling_bits: Some(12),
+                budget_usage: Some(BudgetUsageV2 {
+                    bits_used_before: 0,
+                    bits_used_after: 12,
+                    budget_limit: 128,
+                }),
             },
             provider_attestation: None,
             tee_attestation: None,
@@ -495,6 +611,109 @@ mod tests {
     }
 
     #[test]
+    fn test_session_status_serialization() {
+        assert_eq!(
+            serde_json::to_string(&SessionStatus::Success).unwrap(),
+            "\"success\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SessionStatus::Rejected).unwrap(),
+            "\"rejected\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SessionStatus::Aborted).unwrap(),
+            "\"aborted\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SessionStatus::Error).unwrap(),
+            "\"error\""
+        );
+    }
+
+    #[test]
+    fn test_execution_lane_v2_serialization() {
+        assert_eq!(
+            serde_json::to_string(&ExecutionLaneV2::Standard).unwrap(),
+            "\"standard\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ExecutionLaneV2::Tee).unwrap(),
+            "\"tee\""
+        );
+    }
+
+    #[test]
+    fn test_budget_usage_v2_serde_roundtrip() {
+        let usage = BudgetUsageV2 {
+            bits_used_before: 0,
+            bits_used_after: 12,
+            budget_limit: 128,
+        };
+        let json = serde_json::to_string(&usage).unwrap();
+        let parsed: BudgetUsageV2 = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.bits_used_before, 0);
+        assert_eq!(parsed.bits_used_after, 12);
+        assert_eq!(parsed.budget_limit, 128);
+    }
+
+    #[test]
+    fn test_new_claims_fields_present_in_sample() {
+        let receipt = sample_unsigned();
+        let json = serde_json::to_string(&receipt).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let claims = &v["claims"];
+        assert_eq!(claims["status"], "success");
+        assert_eq!(claims["signal_class"], "SESSION_COMPLETED");
+        assert_eq!(claims["execution_lane"], "standard");
+        assert_eq!(claims["channel_capacity_bits_upper_bound"], 12);
+        assert_eq!(
+            claims["channel_capacity_measurement_version"],
+            CHANNEL_CAPACITY_MEASUREMENT_VERSION
+        );
+        assert_eq!(claims["entropy_budget_bits"], 128);
+        assert_eq!(claims["schema_entropy_ceiling_bits"], 12);
+        assert_eq!(claims["budget_usage"]["bits_used_before"], 0);
+        assert_eq!(claims["budget_usage"]["bits_used_after"], 12);
+        assert_eq!(claims["budget_usage"]["budget_limit"], 128);
+    }
+
+    #[test]
+    fn test_new_claims_fields_omitted_when_none() {
+        // The minimal receipt has all new fields as None
+        let minimal_claims = Claims {
+            model_identity_asserted: None,
+            model_identity_attested: None,
+            model_profile_hash_asserted: None,
+            runtime_hash_asserted: None,
+            runtime_hash_attested: None,
+            budget_enforcement_mode: None,
+            provider_latency_ms: None,
+            token_usage: None,
+            relay_software_version: None,
+            status: None,
+            signal_class: None,
+            execution_lane: None,
+            channel_capacity_bits_upper_bound: None,
+            channel_capacity_measurement_version: None,
+            entropy_budget_bits: None,
+            schema_entropy_ceiling_bits: None,
+            budget_usage: None,
+        };
+        let json = serde_json::to_string(&minimal_claims).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(v.get("status").is_none());
+        assert!(v.get("signal_class").is_none());
+        assert!(v.get("execution_lane").is_none());
+        assert!(v.get("channel_capacity_bits_upper_bound").is_none());
+        assert!(v.get("budget_usage").is_none());
+    }
+
+    #[test]
+    fn test_schema_version_bumped() {
+        assert_eq!(SCHEMA_VERSION_V2, "2.1.0");
+    }
+
+    #[test]
     fn test_tee_type_serialization() {
         assert_eq!(
             serde_json::to_string(&TeeType::SevSnp).unwrap(),
@@ -556,6 +775,14 @@ mod tests {
                 provider_latency_ms: None,
                 token_usage: None,
                 relay_software_version: None,
+                status: None,
+                signal_class: None,
+                execution_lane: None,
+                channel_capacity_bits_upper_bound: None,
+                channel_capacity_measurement_version: None,
+                entropy_budget_bits: None,
+                schema_entropy_ceiling_bits: None,
+                budget_usage: None,
             },
             provider_attestation: None,
             tee_attestation: None,

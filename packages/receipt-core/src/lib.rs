@@ -66,10 +66,11 @@ pub use signer::{
     RECEIPT_HASH_DOMAIN_PREFIX, RECEIPT_HASH_PLACEHOLDER, SESSION_HANDOFF_DOMAIN_PREFIX,
 };
 pub use receipt_v2::{
-    AssuranceLevel, BudgetEnforcementMode, Claims, Commitments, HashAlgorithm, InputCommitment,
-    Operator, PreflightBundle, ProviderAttestation, ReceiptSignature, ReceiptV2, SignatureAlgorithm,
-    SignatureV2, TeeAttestation, TeeType, TokenUsage, UnsignedReceiptV2, CANONICALIZATION_V2,
-    DOMAIN_PREFIX_V2, SCHEMA_VERSION_V2,
+    AssuranceLevel, BudgetEnforcementMode, BudgetUsageV2, Claims, Commitments, ExecutionLaneV2,
+    HashAlgorithm, InputCommitment, Operator, PreflightBundle, ProviderAttestation,
+    ReceiptSignature, ReceiptV2, SessionStatus, SignatureAlgorithm, SignatureV2, TeeAttestation,
+    TeeType, TokenUsage, UnsignedReceiptV2, CANONICALIZATION_V2,
+    CHANNEL_CAPACITY_MEASUREMENT_VERSION, DOMAIN_PREFIX_V2, SCHEMA_VERSION_V2,
 };
 pub use vault_family_types::{ExecutionLane, LaneId};
 
