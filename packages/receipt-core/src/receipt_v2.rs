@@ -161,6 +161,14 @@ pub struct Commitments {
     /// URI from which the preflight bundle can be fetched.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preflight_bundle_uri: Option<String>,
+
+    /// SHA-256(JCS(rejected_output)) for failure receipts where inference
+    /// produced output that was subsequently rejected (schema validation,
+    /// policy gate). `None` for success receipts and pre-inference failures.
+    /// Separate from `output_hash` to preserve the invariant that `output_hash`
+    /// is always the hash of a valid, accepted output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rejected_output_hash: Option<String>,
 }
 
 // ============================================================================
@@ -495,6 +503,7 @@ mod tests {
                 output_retrieval_uri: None,
                 output_media_type: None,
                 preflight_bundle_uri: None,
+                rejected_output_hash: None,
             },
             claims: Claims {
                 model_identity_asserted: Some("gpt-4o-2024-11-20".to_string()),
@@ -761,6 +770,7 @@ mod tests {
                 output_retrieval_uri: None,
                 output_media_type: None,
                 preflight_bundle_uri: None,
+                rejected_output_hash: None,
             },
             claims: Claims {
                 model_identity_asserted: None,
