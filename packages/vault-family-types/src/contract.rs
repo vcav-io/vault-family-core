@@ -97,6 +97,15 @@ pub struct Contract {
     /// Entropy enforcement mode (#151 gap 6).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entropy_enforcement: Option<EntropyEnforcementMode>,
+
+    /// Ed25519 verifying key (lowercase hex, 64 chars) of the relay that should
+    /// execute this session. If present, the relay MUST verify its own key matches
+    /// before proceeding. Key rotation invalidates contracts that pin the old key.
+    ///
+    /// Future direction: may evolve to `required_signers: Vec<SignerIdentity>` to
+    /// support TEE dual-signing (enclave key + operator key).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_verifying_key_hex: Option<String>,
 }
 
 #[cfg(test)]
@@ -122,6 +131,7 @@ mod tests {
             session_ttl_secs: None,
             invite_ttl_secs: None,
             entropy_enforcement: None,
+            relay_verifying_key_hex: None,
         };
         let json = serde_json::to_string(&contract).unwrap();
         let parsed: Contract = serde_json::from_str(&json).unwrap();
