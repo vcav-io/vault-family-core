@@ -424,6 +424,11 @@ pub struct TeeAttestation {
     /// this field without independent verification.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript_hash_hex: Option<String>,
+    /// Platform user_data field from the attestation report (hex).
+    /// For SEV-SNP this is the 64 bytes bound to the quote via REPORT_DATA.
+    /// Verifiers recompute the transcript hash and check it matches this field.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_data_hex: Option<String>,
 }
 
 // ============================================================================
@@ -696,6 +701,7 @@ mod tests {
             attestation_hash: Some("b".repeat(64)),
             receipt_signing_pubkey_hex: Some("c".repeat(64)),
             transcript_hash_hex: Some("d".repeat(128)),
+            user_data_hex: Some("e".repeat(128)),
         };
         let json = serde_json::to_string(&att).unwrap();
         let parsed: TeeAttestation = serde_json::from_str(&json).unwrap();
@@ -711,6 +717,7 @@ mod tests {
             attestation_hash: None,
             receipt_signing_pubkey_hex: None,
             transcript_hash_hex: None,
+            user_data_hex: None,
         };
         let json = serde_json::to_string(&att).unwrap();
         assert!(!json.contains("attestation_hash"));
