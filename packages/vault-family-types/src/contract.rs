@@ -67,7 +67,6 @@ pub struct Contract {
     pub model_profile_id: Option<String>,
 
     // --- NEW v2 fields ---
-
     /// Content hash of the enforcement policy governing this session (#147).
     /// If present, the receipt's guardian_policy_hash MUST match.
     #[serde(default, skip_serializing_if = "Option::is_none")]
