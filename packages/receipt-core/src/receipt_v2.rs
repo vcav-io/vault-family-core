@@ -169,6 +169,16 @@ pub struct Commitments {
     /// is always the hash of a valid, accepted output.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rejected_output_hash: Option<String>,
+
+    // --- TEE encrypted ingress commitments ---
+    /// SHA-256 of the initiator's encrypted submission (ciphertext bytes).
+    /// Present only when `execution_lane` is `tee`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initiator_submission_hash: Option<String>,
+    /// SHA-256 of the responder's encrypted submission (ciphertext bytes).
+    /// Present only when `execution_lane` is `tee`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub responder_submission_hash: Option<String>,
 }
 
 // ============================================================================
@@ -384,6 +394,9 @@ pub enum TeeType {
     #[serde(rename = "SEV-SNP")]
     SevSnp,
     TrustZone,
+    /// Simulated TEE for local development and testing.
+    /// Receipts with this type MUST use `AssuranceLevel::SelfAsserted`.
+    Simulated,
 }
 
 /// Hardware TEE attestation binding the receipt to an enclave measurement.
@@ -397,6 +410,20 @@ pub struct TeeAttestation {
     /// Raw attestation quote (base64).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quote: Option<String>,
+    /// `sha256(quote_bytes)` where `quote_bytes` is the exact byte array
+    /// stored in `quote` with no re-encoding. Hex-encoded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attestation_hash: Option<String>,
+    /// Ed25519 verifying key (hex) of the enclave's sealed receipt signing key.
+    /// Named explicitly to distinguish from session ECDH keys.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_signing_pubkey_hex: Option<String>,
+    /// Hex of the 64-byte SHA-512 transcript hash (128 hex chars).
+    /// Stored for verifier convenience. Verifiers MUST recompute this value
+    /// from the canonical transcript inputs and compare — they MUST NOT trust
+    /// this field without independent verification.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transcript_hash_hex: Option<String>,
 }
 
 // ============================================================================
@@ -504,6 +531,8 @@ mod tests {
                 output_media_type: None,
                 preflight_bundle_uri: None,
                 rejected_output_hash: None,
+                initiator_submission_hash: None,
+                responder_submission_hash: None,
             },
             claims: Claims {
                 model_identity_asserted: Some("gpt-4o-2024-11-20".to_string()),
@@ -649,6 +678,56 @@ mod tests {
     }
 
     #[test]
+    fn test_tee_type_simulated_serialization() {
+        assert_eq!(
+            serde_json::to_string(&TeeType::Simulated).unwrap(),
+            "\"Simulated\""
+        );
+        let parsed: TeeType = serde_json::from_str("\"Simulated\"").unwrap();
+        assert_eq!(parsed, TeeType::Simulated);
+    }
+
+    #[test]
+    fn test_tee_attestation_extended_fields_roundtrip() {
+        let att = TeeAttestation {
+            tee_type: Some(TeeType::SevSnp),
+            measurement: Some("a".repeat(64)),
+            quote: Some("base64quote".to_string()),
+            attestation_hash: Some("b".repeat(64)),
+            receipt_signing_pubkey_hex: Some("c".repeat(64)),
+            transcript_hash_hex: Some("d".repeat(128)),
+        };
+        let json = serde_json::to_string(&att).unwrap();
+        let parsed: TeeAttestation = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, att);
+    }
+
+    #[test]
+    fn test_tee_attestation_extended_fields_omitted_when_none() {
+        let att = TeeAttestation {
+            tee_type: Some(TeeType::SevSnp),
+            measurement: Some("a".repeat(64)),
+            quote: None,
+            attestation_hash: None,
+            receipt_signing_pubkey_hex: None,
+            transcript_hash_hex: None,
+        };
+        let json = serde_json::to_string(&att).unwrap();
+        assert!(!json.contains("attestation_hash"));
+        assert!(!json.contains("receipt_signing_pubkey_hex"));
+        assert!(!json.contains("transcript_hash_hex"));
+    }
+
+    #[test]
+    fn test_commitments_submission_hashes_roundtrip() {
+        let receipt = sample_unsigned();
+        let json = serde_json::to_string(&receipt).unwrap();
+        // Default sample has None — should not appear in JSON
+        assert!(!json.contains("initiator_submission_hash"));
+        assert!(!json.contains("responder_submission_hash"));
+    }
+
+    #[test]
     fn test_budget_usage_v2_serde_roundtrip() {
         let usage = BudgetUsageV2 {
             bits_used_before: 0,
@@ -771,6 +850,8 @@ mod tests {
                 output_media_type: None,
                 preflight_bundle_uri: None,
                 rejected_output_hash: None,
+                initiator_submission_hash: None,
+                responder_submission_hash: None,
             },
             claims: Claims {
                 model_identity_asserted: None,
