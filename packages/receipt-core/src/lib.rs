@@ -57,6 +57,13 @@ pub use manifest::{
     ArtefactEntry, ManifestArtefacts, PublicationManifest, RuntimeHashes, UnsignedManifest,
     MANIFEST_DOMAIN_PREFIX,
 };
+pub use receipt_v2::{
+    AssuranceLevel, BudgetEnforcementMode, BudgetUsageV2, Claims, Commitments, ExecutionLaneV2,
+    HashAlgorithm, InputCommitment, Operator, PreflightBundle, ProviderAttestation,
+    ReceiptSignature, ReceiptV2, SessionStatus, SignatureAlgorithm, SignatureV2, TeeAttestation,
+    TeeType, TokenUsage, UnsignedReceiptV2, CANONICALIZATION_V2,
+    CHANNEL_CAPACITY_MEASUREMENT_VERSION, DOMAIN_PREFIX_V2, SCHEMA_VERSION_V2,
+};
 pub use signer::{
     compute_budget_chain_id, compute_receipt_hash, compute_receipt_key_id,
     create_handoff_signing_message, create_signing_message, create_signing_message_v2,
@@ -64,12 +71,6 @@ pub use signer::{
     sign_and_assemble_receipt_v2, sign_handoff, sign_receipt, sign_receipt_v2, verify_handoff,
     verify_receipt, verify_receipt_v2, SigningError, BUDGET_CHAIN_DOMAIN_PREFIX, DOMAIN_PREFIX,
     RECEIPT_HASH_DOMAIN_PREFIX, RECEIPT_HASH_PLACEHOLDER, SESSION_HANDOFF_DOMAIN_PREFIX,
-};
-pub use receipt_v2::{
-    AssuranceLevel, BudgetEnforcementMode, Claims, Commitments, HashAlgorithm, InputCommitment,
-    Operator, PreflightBundle, ProviderAttestation, ReceiptSignature, ReceiptV2, SignatureAlgorithm,
-    SignatureV2, TeeAttestation, TeeType, TokenUsage, UnsignedReceiptV2, CANONICALIZATION_V2,
-    DOMAIN_PREFIX_V2, SCHEMA_VERSION_V2,
 };
 pub use vault_family_types::{ExecutionLane, LaneId};
 
