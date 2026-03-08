@@ -8,6 +8,8 @@
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::{BTreeMap, HashMap};
 
 use vault_family_types::LaneId;
 
@@ -28,7 +30,7 @@ pub struct IdentityKey {
 /// X25519 envelope key for encrypted input envelopes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvelopeKey {
-    pub algorithm: String,      // always "x25519"
+    pub algorithm: String,      // "x25519" or "ed25519"
     pub public_key_hex: String, // 64 hex chars (32 bytes)
 }
 
@@ -52,24 +54,37 @@ pub struct ModelProfileRef {
 }
 
 /// Agent capabilities declared in the descriptor.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Capabilities {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub supported_purpose_codes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub supported_output_schemas: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub supported_lanes: Vec<LaneId>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_entropy_bits_by_schema: Option<std::collections::HashMap<String, u32>>,
+    pub max_entropy_bits_by_schema: Option<HashMap<String, u32>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub supported_model_profiles: Vec<ModelProfileRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supported_body_formats: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub supports_commit: bool,
+    #[serde(flatten, default)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Policy commitment hashes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct PolicyCommitments {
-    pub policy_bundle_hash: String, // 64 hex chars
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_bundle_hash: Option<String>, // 64 hex chars
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schema_bundle_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub admission_policy_hash: Option<String>,
+    #[serde(flatten, default)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// IFC label requirements (optional).
@@ -82,7 +97,7 @@ pub struct LabelRequirements {
 }
 
 /// Agent descriptor as per AFAL Binding Spec §2.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AgentDescriptor {
     pub descriptor_version: String, // always "1"
     pub agent_id: String,
@@ -191,8 +206,8 @@ pub fn validate_descriptor(
     }
 
     // envelope_key
-    if desc.envelope_key.algorithm != "x25519" {
-        errors.push("envelope_key.algorithm: must be \"x25519\"".to_string());
+    if desc.envelope_key.algorithm != "x25519" && desc.envelope_key.algorithm != "ed25519" {
+        errors.push("envelope_key.algorithm: must be \"x25519\" or \"ed25519\"".to_string());
     }
     if !is_hex64(&desc.envelope_key.public_key_hex) {
         errors
@@ -208,17 +223,17 @@ pub fn validate_descriptor(
     }
 
     // capabilities
-    if desc.capabilities.supported_purpose_codes.is_empty() {
-        errors.push("capabilities.supported_purpose_codes: must have at least 1 item".to_string());
-    }
-    if desc.capabilities.supported_output_schemas.is_empty() {
-        errors.push("capabilities.supported_output_schemas: must have at least 1 item".to_string());
-    }
-    if desc.capabilities.supported_lanes.is_empty() {
-        errors.push("capabilities.supported_lanes: must have at least 1 item".to_string());
-    }
-    if desc.capabilities.supported_model_profiles.is_empty() {
-        errors.push("capabilities.supported_model_profiles: must have at least 1 item".to_string());
+    let has_structured_capabilities = !desc.capabilities.supported_purpose_codes.is_empty()
+        || !desc.capabilities.supported_output_schemas.is_empty()
+        || !desc.capabilities.supported_lanes.is_empty()
+        || !desc.capabilities.supported_model_profiles.is_empty();
+    let has_wrapped_capabilities = !desc.capabilities.supported_body_formats.is_empty()
+        || desc.capabilities.supports_commit;
+    if !has_structured_capabilities && !has_wrapped_capabilities {
+        errors.push(
+            "capabilities: must declare either structured AFAL capabilities or wrapped_v1 support"
+                .to_string(),
+        );
     }
     for (i, mp) in desc
         .capabilities
@@ -234,9 +249,27 @@ pub fn validate_descriptor(
     }
 
     // policy_commitments
-    if !is_hex64(&desc.policy_commitments.policy_bundle_hash) {
-        errors
-            .push("policy_commitments.policy_bundle_hash: expected 64-char hex string".to_string());
+    if let Some(policy_bundle_hash) = &desc.policy_commitments.policy_bundle_hash {
+        if !is_hex64(policy_bundle_hash) {
+            errors.push(
+                "policy_commitments.policy_bundle_hash: expected 64-char hex string".to_string(),
+            );
+        }
+    }
+    if let Some(schema_bundle_hash) = &desc.policy_commitments.schema_bundle_hash {
+        if !is_hex64(schema_bundle_hash) {
+            errors.push(
+                "policy_commitments.schema_bundle_hash: expected 64-char hex string".to_string(),
+            );
+        }
+    }
+    if let Some(admission_policy_hash) = &desc.policy_commitments.admission_policy_hash {
+        if !is_hex64(admission_policy_hash) {
+            errors.push(
+                "policy_commitments.admission_policy_hash: expected 64-char hex string"
+                    .to_string(),
+            );
+        }
     }
 
     // label_requirements (optional)
@@ -350,8 +383,8 @@ mod tests {
                 public_key_hex: pubkey_hex.clone(),
             },
             envelope_key: EnvelopeKey {
-                algorithm: "x25519".to_string(),
-                public_key_hex: "a".repeat(64),
+                algorithm: "ed25519".to_string(),
+                public_key_hex: pubkey_hex.clone(),
             },
             endpoints: Endpoints {
                 propose: "https://example.com/propose".to_string(),
@@ -360,20 +393,20 @@ mod tests {
                 receipts: None,
             },
             capabilities: Capabilities {
-                supported_purpose_codes: vec!["COMPATIBILITY".to_string()],
-                supported_output_schemas: vec!["urn:test:schema".to_string()],
-                supported_lanes: vec![LaneId::SealedLocal],
+                supported_purpose_codes: vec![],
+                supported_output_schemas: vec![],
+                supported_lanes: vec![],
                 max_entropy_bits_by_schema: None,
-                supported_model_profiles: vec![ModelProfileRef {
-                    id: "test-model".to_string(),
-                    version: "1.0".to_string(),
-                    hash: "b".repeat(64),
-                }],
+                supported_model_profiles: vec![],
+                supported_body_formats: vec!["wrapped_v1".to_string()],
+                supports_commit: true,
+                extra: BTreeMap::new(),
             },
             policy_commitments: PolicyCommitments {
-                policy_bundle_hash: "c".repeat(64),
+                policy_bundle_hash: None,
                 schema_bundle_hash: None,
                 admission_policy_hash: None,
+                extra: BTreeMap::new(),
             },
             label_requirements: None,
             signature: None,

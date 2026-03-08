@@ -12,18 +12,20 @@
   },
   "description": "AFAL COMMIT: signing and AAD construction",
   "expected": {
-    "signature_hex": "2a1418d0170d3a160e6bae768778390ae566e6ccf9704b5055a03a4ccf504f418781cccb630261b3f7a7f6799a98f8819458752bae13ad8452298839ee372600",
+    "signature_hex": "b6f120c248b0d14e03abc561d8731d7fdc7a78d8142468aedb28ebee8276d17111c768ccdd06ec6bd3e6746b2b0a69e1631c356fd206517dc3ac0274ab93520e",
     "verification_result": "PASS"
   },
   "input": {
-    "canonical_json": "{\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"agent_descriptor_hash\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"commit_version\":\"1\",\"encrypted_input_hash\":\"1111111111111111111111111111111111111111111111111111111111111111\"}",
+    "canonical_json": "{\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"agent_descriptor_hash\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"commit_version\":\"1\",\"encrypted_input_hash\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"from\":\"alice-test-agent\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
     "domain_prefix": "VCAV-COMMIT-V1:",
     "seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
     "unsigned_commit": {
       "admit_token_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "agent_descriptor_hash": "2222222222222222222222222222222222222222222222222222222222222222",
       "commit_version": "1",
-      "encrypted_input_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+      "encrypted_input_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "from": "alice-test-agent",
+      "proposal_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
   },

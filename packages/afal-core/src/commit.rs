@@ -16,6 +16,8 @@ use crate::signing::{content_hash, SigningError};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommitMessage {
     pub commit_version: String,        // "1"
+    pub proposal_id: String,           // echoed proposal_id
+    pub from: String,                  // committer agent_id
     pub admit_token_id: String,        // 64 hex, from ADMIT.admit_token_id
     pub encrypted_input_hash: String,  // 64 hex, SHA-256 of encrypted envelope bytes
     pub agent_descriptor_hash: String, // 64 hex, SHA-256 of committer's unsigned descriptor
@@ -28,6 +30,8 @@ pub struct CommitMessage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnsignedCommit {
     pub commit_version: String,
+    pub proposal_id: String,
+    pub from: String,
     pub admit_token_id: String,
     pub encrypted_input_hash: String,
     pub agent_descriptor_hash: String,
@@ -39,6 +43,8 @@ impl CommitMessage {
     pub fn to_unsigned(&self) -> UnsignedCommit {
         UnsignedCommit {
             commit_version: self.commit_version.clone(),
+            proposal_id: self.proposal_id.clone(),
+            from: self.from.clone(),
             admit_token_id: self.admit_token_id.clone(),
             encrypted_input_hash: self.encrypted_input_hash.clone(),
             agent_descriptor_hash: self.agent_descriptor_hash.clone(),
@@ -90,6 +96,8 @@ mod tests {
     fn commit_serde_roundtrip() {
         let msg = CommitMessage {
             commit_version: "1".to_string(),
+            proposal_id: "0".repeat(64),
+            from: "alice".to_string(),
             admit_token_id: "a".repeat(64),
             encrypted_input_hash: "b".repeat(64),
             agent_descriptor_hash: "c".repeat(64),
@@ -106,6 +114,8 @@ mod tests {
     fn commit_with_envelopes_roundtrip() {
         let msg = CommitMessage {
             commit_version: "1".to_string(),
+            proposal_id: "0".repeat(64),
+            from: "alice".to_string(),
             admit_token_id: "a".repeat(64),
             encrypted_input_hash: "b".repeat(64),
             agent_descriptor_hash: "c".repeat(64),
@@ -142,6 +152,8 @@ mod tests {
     fn unsigned_commit_excludes_envelopes() {
         let msg = CommitMessage {
             commit_version: "1".to_string(),
+            proposal_id: "0".repeat(64),
+            from: "alice".to_string(),
             admit_token_id: "a".repeat(64),
             encrypted_input_hash: "b".repeat(64),
             agent_descriptor_hash: "c".repeat(64),
