@@ -230,8 +230,8 @@ pub fn validate_descriptor(
         || !desc.capabilities.supported_output_schemas.is_empty()
         || !desc.capabilities.supported_lanes.is_empty()
         || !desc.capabilities.supported_model_profiles.is_empty();
-    let has_wrapped_capabilities = !desc.capabilities.supported_body_formats.is_empty()
-        || desc.capabilities.supports_commit;
+    let has_wrapped_capabilities =
+        !desc.capabilities.supported_body_formats.is_empty() || desc.capabilities.supports_commit;
     if !has_structured_capabilities && !has_wrapped_capabilities {
         errors.push(
             "capabilities: must declare either structured AFAL capabilities or wrapped_v1 support"
@@ -269,8 +269,7 @@ pub fn validate_descriptor(
     if let Some(admission_policy_hash) = &desc.policy_commitments.admission_policy_hash {
         if !is_hex64(admission_policy_hash) {
             errors.push(
-                "policy_commitments.admission_policy_hash: expected 64-char hex string"
-                    .to_string(),
+                "policy_commitments.admission_policy_hash: expected 64-char hex string".to_string(),
             );
         }
     }

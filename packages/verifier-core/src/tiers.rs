@@ -237,9 +237,11 @@ pub fn receipt_top_or_commitments<'a>(
     receipt: &'a serde_json::Value,
     key: &str,
 ) -> Option<&'a serde_json::Value> {
-    receipt
-        .get(key)
-        .or_else(|| receipt.get("commitments").and_then(|commitments| commitments.get(key)))
+    receipt.get(key).or_else(|| {
+        receipt
+            .get("commitments")
+            .and_then(|commitments| commitments.get(key))
+    })
 }
 
 pub fn receipt_preflight<'a>(
@@ -309,7 +311,9 @@ pub fn verify_contract_enforcement(
     let mut result = ContractEnforcementResult::default();
 
     // 1. Entropy budget: receipt.entropy_budget_bits == contract.entropy_budget_bits
-    if let Some(receipt_entropy) = receipt_u64(&receipt, &[("top_or_claims", "entropy_budget_bits")]) {
+    if let Some(receipt_entropy) =
+        receipt_u64(&receipt, &[("top_or_claims", "entropy_budget_bits")])
+    {
         if let Some(contract_entropy) = contract.get("entropy_budget_bits").and_then(|v| v.as_u64())
         {
             let matches = receipt_entropy == contract_entropy;
@@ -346,9 +350,10 @@ pub fn verify_contract_enforcement(
     if let Some(c_tc) = contract_timing {
         match timing_class_window_seconds(c_tc) {
             Some(expected_window) => {
-                if let Some(receipt_window) =
-                    receipt_u64(&receipt, &[("top_or_claims", "fixed_window_duration_seconds")])
-                {
+                if let Some(receipt_window) = receipt_u64(
+                    &receipt,
+                    &[("top_or_claims", "fixed_window_duration_seconds")],
+                ) {
                     let consistent = receipt_window == 0 || receipt_window == expected_window;
                     result.timing_window_consistent = Some(consistent);
                     if !consistent {
@@ -660,8 +665,8 @@ pub fn verify_manifest_from_str(
         if let Some(ref manifest_rt) = manifest.runtime_hashes {
             let rt_match = receipt_runtime_hash.map(|rh| rh == manifest_rt.runtime_hash);
 
-            let gp_match =
-                receipt_guardian_hash.map(|guardian_hash| guardian_hash == manifest_rt.guardian_policy_hash);
+            let gp_match = receipt_guardian_hash
+                .map(|guardian_hash| guardian_hash == manifest_rt.guardian_policy_hash);
 
             // In strict mode, mismatches are hard failures
             if strict_runtime {
@@ -872,7 +877,8 @@ pub fn verify_attestation(
             .and_then(|v| v.as_str())
             .map(str::to_string);
 
-        if let (Some(allowlist), Some(measurement)) = (&config.measurement_allowlist, &measurement) {
+        if let (Some(allowlist), Some(measurement)) = (&config.measurement_allowlist, &measurement)
+        {
             if !allowlist.contains(measurement) {
                 return AttestationVerificationResult {
                     status: Some("invalid".to_string()),
@@ -1930,8 +1936,7 @@ mod tests {
         let json = serde_json::to_string(&manifest).unwrap();
         let guardian_hash = "x".repeat(64);
         let result =
-            verify_manifest_from_str(&json, None, None, Some(&guardian_hash), None, false)
-                .unwrap();
+            verify_manifest_from_str(&json, None, None, Some(&guardian_hash), None, false).unwrap();
         // Signature should be invalid because runtime_hashes were tampered
         assert_eq!(result.signature_valid, Some(false));
     }
@@ -2887,8 +2892,10 @@ mod tests {
                 "receipt_signing_pubkey_hex": "a".repeat(64)
             }
         });
-        let result =
-            verify_attestation(&serde_json::to_string(&receipt).unwrap(), &AttestationVerifyConfig::default());
+        let result = verify_attestation(
+            &serde_json::to_string(&receipt).unwrap(),
+            &AttestationVerifyConfig::default(),
+        );
         assert_eq!(result.status.as_deref(), Some("present_unverified"));
         assert_eq!(result.environment.as_deref(), Some("TDX"));
         assert_eq!(result.challenge_bound, None);

@@ -19,13 +19,13 @@ use crate::types::AdmissionTier;
 /// Signed ADMIT message as per AFAL Binding Spec §3.2.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdmitMessage {
-    pub admission_version: String,  // "1"
-    pub proposal_id: String,        // echoed from PROPOSE
-    pub outcome: String,            // "ADMIT"
-    pub admit_token_id: String,     // unique bearer token identifier
+    pub admission_version: String, // "1"
+    pub proposal_id: String,       // echoed from PROPOSE
+    pub outcome: String,           // "ADMIT"
+    pub admit_token_id: String,    // unique bearer token identifier
     pub admission_tier: AdmissionTier,
-    pub expires_at: String,         // ISO 8601, ≤10 min from now
-    pub signature: String, // 128 hex
+    pub expires_at: String, // ISO 8601, ≤10 min from now
+    pub signature: String,  // 128 hex
 }
 
 /// Unsigned ADMIT (for signing).
@@ -68,8 +68,8 @@ pub struct DenyMessage {
     pub proposal_id: String,       // echoed from PROPOSE
     pub outcome: String,           // "DENY"
     pub deny_code: String,
-    pub expires_at: String,        // timing obfuscation
-    pub signature: String,         // 128 hex
+    pub expires_at: String, // timing obfuscation
+    pub signature: String,  // 128 hex
 }
 
 /// Unsigned DENY (for signing).
