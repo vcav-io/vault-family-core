@@ -65,6 +65,8 @@ pub struct Contract {
     pub metadata: serde_json::Value,
     #[serde(default)]
     pub model_profile_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_profile_hash: Option<String>,
 
     // --- NEW v2 fields ---
     /// Content hash of the enforcement policy governing this session (#147).
@@ -132,6 +134,7 @@ mod tests {
             timing_class: Some("standard".to_string()),
             metadata: serde_json::json!({}),
             model_profile_id: None,
+            model_profile_hash: None,
             enforcement_policy_hash: None,
             output_schema_hash: None,
             model_constraints: None,
@@ -161,6 +164,7 @@ mod tests {
         assert!(contract.entropy_budget_bits.is_none());
         assert!(contract.timing_class.is_none());
         assert!(contract.model_profile_id.is_none());
+        assert!(contract.model_profile_hash.is_none());
     }
 
     #[test]
@@ -179,6 +183,7 @@ mod tests {
                 "flow": "bilateral"
             },
             "model_profile_id": "sealed-demo-v2",
+            "model_profile_hash": "bc5593f8efd4b85d785cf871c4539daea1fc5af6c6f69055f5f166c4ff8c8e07",
             "enforcement_policy_hash": "6d6c6cc26d91708d7fd8f12cf5d7f7f86d5b59f60f9748f2d2730a4ac89d56be",
             "output_schema_hash": "8278e0910d750195b448797616e091ad6dd17d43db59e148f8d7b9727e1e48d0",
             "model_constraints": {

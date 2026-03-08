@@ -51,6 +51,10 @@
       "type": "string",
       "minLength": 1
     },
+    "model_profile_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
     "enforcement_policy_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"

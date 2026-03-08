@@ -20,6 +20,7 @@
         "flow": "direct-afal"
       },
       "model_profile_id": "sealed-demo-v2",
+      "model_profile_hash": "bc5593f8efd4b85d785cf871c4539daea1fc5af6c6f69055f5f166c4ff8c8e07",
       "enforcement_policy_hash": "6d6c6cc26d91708d7fd8f12cf5d7f7f86d5b59f60f9748f2d2730a4ac89d56be",
       "output_schema_hash": "8278e0910d750195b448797616e091ad6dd17d43db59e148f8d7b9727e1e48d0",
       "model_constraints": {
