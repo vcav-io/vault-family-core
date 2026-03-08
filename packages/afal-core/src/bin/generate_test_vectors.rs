@@ -7,6 +7,7 @@ use afal_core::*;
 use ed25519_dalek::SigningKey;
 use receipt_core::canonicalize_serializable;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 
 fn main() {
     let descriptor_vectors = generate_descriptor_vectors();
@@ -67,8 +68,8 @@ fn generate_descriptor_vectors() -> serde_json::Value {
             public_key_hex: alice_pub.clone(),
         },
         envelope_key: EnvelopeKey {
-            algorithm: "x25519".to_string(),
-            public_key_hex: "a".repeat(64),
+            algorithm: "ed25519".to_string(),
+            public_key_hex: alice_pub.clone(),
         },
         endpoints: Endpoints {
             propose: "https://alice.example.com/afal/propose".to_string(),
@@ -77,20 +78,20 @@ fn generate_descriptor_vectors() -> serde_json::Value {
             receipts: None,
         },
         capabilities: Capabilities {
-            supported_purpose_codes: vec!["COMPATIBILITY".to_string()],
-            supported_output_schemas: vec!["urn:vcav:schema:dating.d2.v1".to_string()],
-            supported_lanes: vec![vault_family_types::LaneId::SealedLocal],
+            supported_purpose_codes: vec![],
+            supported_output_schemas: vec![],
+            supported_lanes: vec![],
             max_entropy_bits_by_schema: None,
-            supported_model_profiles: vec![ModelProfileRef {
-                id: "test-model".to_string(),
-                version: "1.0".to_string(),
-                hash: "b".repeat(64),
-            }],
+            supported_model_profiles: vec![],
+            supported_body_formats: vec!["wrapped_v1".to_string()],
+            supports_commit: true,
+            extra: BTreeMap::new(),
         },
         policy_commitments: PolicyCommitments {
-            policy_bundle_hash: "c".repeat(64),
+            policy_bundle_hash: None,
             schema_bundle_hash: None,
             admission_policy_hash: None,
+            extra: BTreeMap::new(),
         },
         label_requirements: None,
         signature: None,
@@ -131,21 +132,23 @@ fn generate_propose_vectors() -> serde_json::Value {
     let unsigned = UnsignedPropose {
         proposal_version: "1".to_string(),
         proposal_id: "a".repeat(64),
+        nonce: "9".repeat(64),
         timestamp: "2026-01-01T00:05:00Z".to_string(),
         from: "alice-test-agent".to_string(),
         to: "bob-test-agent".to_string(),
-        descriptor_hash: "d".repeat(64),
+        descriptor_hash: Some("d".repeat(64)),
         purpose_code: "COMPATIBILITY".to_string(),
         lane_id: vault_family_types::LaneId::SealedLocal,
         output_schema_id: "urn:vcav:schema:dating.d2.v1".to_string(),
         output_schema_version: "1.0".to_string(),
         model_profile_id: "test-model".to_string(),
         model_profile_version: "1.0".to_string(),
-        model_profile_hash: "b".repeat(64),
+        model_profile_hash: Some("b".repeat(64)),
         requested_entropy_bits: 8,
         requested_budget_tier: vault_family_types::BudgetTierV2::Small,
         admission_tier_requested: AdmissionTier::Default,
         prev_receipt_hash: None,
+        relay_binding_hash: Some("e".repeat(64)),
     };
 
     let sig = sign_afal_message(DomainPrefix::Propose, &unsigned, &alice).unwrap();
@@ -181,18 +184,9 @@ fn generate_admit_deny_vectors() -> serde_json::Value {
         admission_version: "1".to_string(),
         proposal_id: "a".repeat(64),
         outcome: "ADMIT".to_string(),
-        expires_at: "2026-01-01T00:15:00Z".to_string(),
-        contract_hash: "e".repeat(64),
-        model_profile_hash: "b".repeat(64),
-        output_schema_id: "urn:vcav:schema:dating.d2.v1".to_string(),
-        output_schema_version: "1.0".to_string(),
-        lane_id: vault_family_types::LaneId::SealedLocal,
-        entropy_cap: 8,
-        budget_tier: vault_family_types::BudgetTierV2::Small,
-        admission_tier_granted: AdmissionTier::Default,
         admit_token_id: "f".repeat(64),
-        prev_receipt_hash: None,
-        policy_hash: None,
+        admission_tier: AdmissionTier::Default,
+        expires_at: "2026-01-01T00:15:00Z".to_string(),
     };
 
     let admit_sig = sign_afal_message(DomainPrefix::Admit, &unsigned_admit, &bob).unwrap();
@@ -203,6 +197,7 @@ fn generate_admit_deny_vectors() -> serde_json::Value {
         admission_version: "1".to_string(),
         proposal_id: "a".repeat(64),
         outcome: "DENY".to_string(),
+        deny_code: "POLICY".to_string(),
         expires_at: "2026-01-01T00:15:00Z".to_string(),
     };
 
@@ -214,6 +209,7 @@ fn generate_admit_deny_vectors() -> serde_json::Value {
         "admission_version": "1",
         "proposal_id": "a".repeat(64),
         "outcome": "DENY",
+        "deny_code": "POLICY",
         "expires_at": "2026-01-01T00:15:00Z",
         "signature": deny_sig,
     });
@@ -253,6 +249,8 @@ fn generate_commit_vectors() -> serde_json::Value {
 
     let unsigned_commit = UnsignedCommit {
         commit_version: "1".to_string(),
+        proposal_id: "a".repeat(64),
+        from: "alice-test-agent".to_string(),
         admit_token_id: "f".repeat(64),
         encrypted_input_hash: "1".repeat(64),
         agent_descriptor_hash: "2".repeat(64),

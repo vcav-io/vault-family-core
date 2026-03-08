@@ -400,7 +400,10 @@ pub fn verify_bundle(
     // --- Agreement hash (Tier 1 sub-check) ---
     if let (Some(agreement_fields), Some(declared_hash)) = (
         bundle.get("agreement_fields"),
-        receipt_string(&receipt_val, &[(RECEIPT_SCOPE_TOP_OR_CLAIMS, "agreement_hash")]),
+        receipt_string(
+            &receipt_val,
+            &[(RECEIPT_SCOPE_TOP_OR_CLAIMS, "agreement_hash")],
+        ),
     ) {
         let fields_str = to_json_safe(agreement_fields);
         match verify_agreement_hash_from_str(&fields_str, declared_hash) {
@@ -590,9 +593,9 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use receipt_core::{
         compute_operator_key_id, public_key_to_hex, sign_and_assemble_receipt_v2, sign_manifest,
-        AssuranceLevel, BudgetEnforcementMode, CANONICALIZATION_V2, Claims, Commitments,
-        ExecutionLaneV2, HashAlgorithm, InputCommitment, ManifestArtefacts, Operator, ReceiptV2,
-        SCHEMA_VERSION_V2, SessionStatus, TokenUsage, UnsignedManifest, UnsignedReceiptV2,
+        AssuranceLevel, BudgetEnforcementMode, Claims, Commitments, ExecutionLaneV2, HashAlgorithm,
+        InputCommitment, ManifestArtefacts, Operator, ReceiptV2, SessionStatus, TokenUsage,
+        UnsignedManifest, UnsignedReceiptV2, CANONICALIZATION_V2, SCHEMA_VERSION_V2,
     };
     use serde_json::json;
     use sha2::{Digest, Sha256};
@@ -673,7 +676,8 @@ mod tests {
 
     fn sample_signed_receipt_v2() -> (ReceiptV2, String) {
         let (signing_key, verifying_key) = receipt_core::generate_keypair();
-        let receipt = sign_and_assemble_receipt_v2(sample_unsigned_receipt_v2(), &signing_key).unwrap();
+        let receipt =
+            sign_and_assemble_receipt_v2(sample_unsigned_receipt_v2(), &signing_key).unwrap();
         (receipt, public_key_to_hex(&verifying_key))
     }
 
@@ -716,7 +720,10 @@ mod tests {
             false,
         );
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert_eq!(parsed["contract_hash_valid"], true, "expected contract check to pass, got {parsed}");
+        assert_eq!(
+            parsed["contract_hash_valid"], true,
+            "expected contract check to pass, got {parsed}"
+        );
     }
 
     #[test]
@@ -763,9 +770,18 @@ mod tests {
             false,
         );
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert_eq!(parsed["signature_valid"], true, "expected signed manifest, got {parsed}");
-        assert_eq!(parsed["profile_covered"], true, "expected nested profile hash lookup, got {parsed}");
-        assert_eq!(parsed["policy_covered"], true, "expected nested policy hash lookup, got {parsed}");
+        assert_eq!(
+            parsed["signature_valid"], true,
+            "expected signed manifest, got {parsed}"
+        );
+        assert_eq!(
+            parsed["profile_covered"], true,
+            "expected nested profile hash lookup, got {parsed}"
+        );
+        assert_eq!(
+            parsed["policy_covered"], true,
+            "expected nested policy hash lookup, got {parsed}"
+        );
     }
 
     #[test]

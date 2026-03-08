@@ -10,8 +10,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use vault_family_types::{BudgetTierV2, LaneId};
-
 use crate::types::AdmissionTier;
 
 // ---------------------------------------------------------------------------
@@ -21,24 +19,13 @@ use crate::types::AdmissionTier;
 /// Signed ADMIT message as per AFAL Binding Spec §3.2.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdmitMessage {
-    pub admission_version: String,  // "1"
-    pub proposal_id: String,        // echoed from PROPOSE
-    pub outcome: String,            // "ADMIT"
-    pub expires_at: String,         // ISO 8601, ≤10 min from now
-    pub contract_hash: String,      // 64 hex
-    pub model_profile_hash: String, // 64 hex
-    pub output_schema_id: String,
-    pub output_schema_version: String,
-    pub lane_id: LaneId,
-    pub entropy_cap: u32, // 0-256
-    pub budget_tier: BudgetTierV2,
-    pub admission_tier_granted: AdmissionTier,
-    pub admit_token_id: String, // 64 hex, unique, one-time use
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prev_receipt_hash: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub policy_hash: Option<String>,
-    pub signature: String, // 128 hex
+    pub admission_version: String, // "1"
+    pub proposal_id: String,       // echoed from PROPOSE
+    pub outcome: String,           // "ADMIT"
+    pub admit_token_id: String,    // unique bearer token identifier
+    pub admission_tier: AdmissionTier,
+    pub expires_at: String, // ISO 8601, ≤10 min from now
+    pub signature: String,  // 128 hex
 }
 
 /// Unsigned ADMIT (for signing).
@@ -47,20 +34,9 @@ pub struct UnsignedAdmit {
     pub admission_version: String,
     pub proposal_id: String,
     pub outcome: String,
-    pub expires_at: String,
-    pub contract_hash: String,
-    pub model_profile_hash: String,
-    pub output_schema_id: String,
-    pub output_schema_version: String,
-    pub lane_id: LaneId,
-    pub entropy_cap: u32,
-    pub budget_tier: BudgetTierV2,
-    pub admission_tier_granted: AdmissionTier,
     pub admit_token_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prev_receipt_hash: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub policy_hash: Option<String>,
+    pub admission_tier: AdmissionTier,
+    pub expires_at: String,
 }
 
 impl AdmitMessage {
@@ -70,18 +46,9 @@ impl AdmitMessage {
             admission_version: self.admission_version.clone(),
             proposal_id: self.proposal_id.clone(),
             outcome: self.outcome.clone(),
-            expires_at: self.expires_at.clone(),
-            contract_hash: self.contract_hash.clone(),
-            model_profile_hash: self.model_profile_hash.clone(),
-            output_schema_id: self.output_schema_id.clone(),
-            output_schema_version: self.output_schema_version.clone(),
-            lane_id: self.lane_id,
-            entropy_cap: self.entropy_cap,
-            budget_tier: self.budget_tier,
-            admission_tier_granted: self.admission_tier_granted,
             admit_token_id: self.admit_token_id.clone(),
-            prev_receipt_hash: self.prev_receipt_hash.clone(),
-            policy_hash: self.policy_hash.clone(),
+            admission_tier: self.admission_tier,
+            expires_at: self.expires_at.clone(),
         }
     }
 }
@@ -100,8 +67,9 @@ pub struct DenyMessage {
     pub admission_version: String, // "1"
     pub proposal_id: String,       // echoed from PROPOSE
     pub outcome: String,           // "DENY"
-    pub expires_at: String,        // timing obfuscation
-    pub signature: String,         // 128 hex
+    pub deny_code: String,
+    pub expires_at: String, // timing obfuscation
+    pub signature: String,  // 128 hex
 }
 
 /// Unsigned DENY (for signing).
@@ -110,6 +78,7 @@ pub struct UnsignedDeny {
     pub admission_version: String,
     pub proposal_id: String,
     pub outcome: String,
+    pub deny_code: String,
     pub expires_at: String,
 }
 
@@ -120,6 +89,7 @@ impl DenyMessage {
             admission_version: self.admission_version.clone(),
             proposal_id: self.proposal_id.clone(),
             outcome: self.outcome.clone(),
+            deny_code: self.deny_code.clone(),
             expires_at: self.expires_at.clone(),
         }
     }
@@ -128,6 +98,7 @@ impl DenyMessage {
 /// Expected fields for sealed-mode DENY constant-shape validation.
 pub const SEALED_MODE_DENY_FIELDS: &[&str] = &[
     "admission_version",
+    "deny_code",
     "expires_at",
     "outcome",
     "proposal_id",
@@ -169,6 +140,9 @@ pub fn validate_deny_canonical_form(
     if obj.get("outcome").and_then(|v| v.as_str()) != Some("DENY") {
         return Err("outcome must be \"DENY\"".to_string());
     }
+    if obj.get("deny_code").and_then(|v| v.as_str()).is_none() {
+        return Err("deny_code must be a string".to_string());
+    }
     if obj.get("proposal_id").and_then(|v| v.as_str()).is_none() {
         return Err("proposal_id must be a string".to_string());
     }
@@ -192,18 +166,9 @@ mod tests {
             admission_version: "1".to_string(),
             proposal_id: "a".repeat(64),
             outcome: "ADMIT".to_string(),
-            expires_at: "2026-01-01T00:10:00Z".to_string(),
-            contract_hash: "b".repeat(64),
-            model_profile_hash: "c".repeat(64),
-            output_schema_id: "urn:test:schema".to_string(),
-            output_schema_version: "1.0".to_string(),
-            lane_id: LaneId::SealedLocal,
-            entropy_cap: 8,
-            budget_tier: BudgetTierV2::Small,
-            admission_tier_granted: AdmissionTier::Default,
             admit_token_id: "d".repeat(64),
-            prev_receipt_hash: None,
-            policy_hash: None,
+            admission_tier: AdmissionTier::Default,
+            expires_at: "2026-01-01T00:10:00Z".to_string(),
             signature: "e".repeat(128),
         };
 
@@ -218,6 +183,7 @@ mod tests {
             admission_version: "1".to_string(),
             proposal_id: "a".repeat(64),
             outcome: "DENY".to_string(),
+            deny_code: "POLICY".to_string(),
             expires_at: "2026-01-01T00:10:00Z".to_string(),
             signature: "b".repeat(128),
         };
@@ -231,6 +197,7 @@ mod tests {
     fn deny_constant_shape_valid() {
         let deny = serde_json::json!({
             "admission_version": "1",
+            "deny_code": "POLICY",
             "proposal_id": "a".repeat(64),
             "outcome": "DENY",
             "expires_at": "2026-01-01T00:10:00Z",

@@ -115,10 +115,8 @@ mod tests {
     use serde_json::json;
 
     fn compile_contract_schema() -> JSONSchema {
-        let schema: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../schemas/contract.schema.json"
-        ))
-        .unwrap();
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../../../schemas/contract.schema.json")).unwrap();
         JSONSchema::compile(&schema).unwrap()
     }
 

@@ -29,7 +29,7 @@
       "required": ["algorithm", "public_key_hex"],
       "additionalProperties": false,
       "properties": {
-        "algorithm": { "type": "string", "const": "x25519" },
+        "algorithm": { "type": "string", "enum": ["x25519", "ed25519"] },
         "public_key_hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
@@ -46,11 +46,7 @@
     },
     "capabilities": {
       "type": "object",
-      "required": [
-        "supported_purpose_codes", "supported_output_schemas",
-        "supported_lanes", "supported_model_profiles"
-      ],
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "supported_purpose_codes": {
           "type": "array",
@@ -87,13 +83,20 @@
             }
           },
           "minItems": 1
+        },
+        "supported_body_formats": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "supports_commit": {
+          "type": "boolean"
         }
       }
     },
     "policy_commitments": {
       "type": "object",
-      "required": ["policy_bundle_hash"],
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "policy_bundle_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "schema_bundle_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },

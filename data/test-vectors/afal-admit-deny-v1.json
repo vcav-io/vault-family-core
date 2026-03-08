@@ -1,28 +1,22 @@
 {
   "admit": {
-    "canonical_json": "{\"admission_tier_granted\":\"DEFAULT\",\"admission_version\":\"1\",\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"budget_tier\":\"SMALL\",\"contract_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"entropy_cap\":8,\"expires_at\":\"2026-01-01T00:15:00Z\",\"lane_id\":\"SEALED_LOCAL\",\"model_profile_hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"outcome\":\"ADMIT\",\"output_schema_id\":\"urn:vcav:schema:dating.d2.v1\",\"output_schema_version\":\"1.0\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+    "canonical_json": "{\"admission_tier\":\"DEFAULT\",\"admission_version\":\"1\",\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"expires_at\":\"2026-01-01T00:15:00Z\",\"outcome\":\"ADMIT\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
     "domain_prefix": "VCAV-ADMIT-V1:",
-    "expected_signature_hex": "06c54f809db0082bddb88cb0db1d987e395a968d1e2e384cf67f1b5a9ee2181ca34fcb9eeaced16e7db1d968966b4e333f322f4010c90bedb745d36b114f0001",
+    "expected_signature_hex": "56d1075fae9612c0580c9b7f6f7b44e038f8c8a6798d5797a5ca94b1398d1e9d9a37dce114705e1a30667e0183e4ac2da98967ed70a01fb5f1a4d9767e5c0a0e",
     "unsigned_admit": {
-      "admission_tier_granted": "DEFAULT",
+      "admission_tier": "DEFAULT",
       "admission_version": "1",
       "admit_token_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "budget_tier": "SMALL",
-      "contract_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "entropy_cap": 8,
       "expires_at": "2026-01-01T00:15:00Z",
-      "lane_id": "SEALED_LOCAL",
-      "model_profile_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "outcome": "ADMIT",
-      "output_schema_id": "urn:vcav:schema:dating.d2.v1",
-      "output_schema_version": "1.0",
       "proposal_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     }
   },
   "deny": {
-    "canonical_json": "{\"admission_version\":\"1\",\"expires_at\":\"2026-01-01T00:15:00Z\",\"outcome\":\"DENY\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+    "canonical_json": "{\"admission_version\":\"1\",\"deny_code\":\"POLICY\",\"expires_at\":\"2026-01-01T00:15:00Z\",\"outcome\":\"DENY\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
     "constant_shape_fields": [
       "admission_version",
+      "deny_code",
       "expires_at",
       "outcome",
       "proposal_id",
@@ -30,16 +24,18 @@
     ],
     "constant_shape_valid": true,
     "domain_prefix": "VCAV-DENY-V1:",
-    "expected_signature_hex": "db2ecc4e2795f2396a4fac637138e9cd38509d33ad5464f2740b0c796989ba8f2a634d36294377392c1604c23b9701af66e8f04b52de860600eeb053c7522a02",
+    "expected_signature_hex": "efceacfb6a02778dae0ac97e5f1b1f7a8d1cd911ceb3cb24fc8713e719198275fce2b9c7701ce9b801a8622bea81de2a9c4ce07146f9c76490d2b737b8477f03",
     "signed_deny": {
       "admission_version": "1",
+      "deny_code": "POLICY",
       "expires_at": "2026-01-01T00:15:00Z",
       "outcome": "DENY",
       "proposal_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "signature": "db2ecc4e2795f2396a4fac637138e9cd38509d33ad5464f2740b0c796989ba8f2a634d36294377392c1604c23b9701af66e8f04b52de860600eeb053c7522a02"
+      "signature": "efceacfb6a02778dae0ac97e5f1b1f7a8d1cd911ceb3cb24fc8713e719198275fce2b9c7701ce9b801a8622bea81de2a9c4ce07146f9c76490d2b737b8477f03"
     },
     "unsigned_deny": {
       "admission_version": "1",
+      "deny_code": "POLICY",
       "expires_at": "2026-01-01T00:15:00Z",
       "outcome": "DENY",
       "proposal_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

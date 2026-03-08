@@ -5,12 +5,14 @@
   "description": "COMMIT message for AFAL protocol (Binding Spec v1, Section 3.4)",
   "type": "object",
   "required": [
-    "commit_version", "admit_token_id", "encrypted_input_hash",
+    "commit_version", "proposal_id", "from", "admit_token_id", "encrypted_input_hash",
     "agent_descriptor_hash", "signature"
   ],
   "additionalProperties": false,
   "properties": {
     "commit_version": { "type": "string", "const": "1" },
+    "proposal_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "from": { "type": "string", "minLength": 1, "maxLength": 128 },
     "admit_token_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "encrypted_input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "agent_descriptor_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
