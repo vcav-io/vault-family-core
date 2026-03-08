@@ -22,6 +22,8 @@ pub struct CommitMessage {
     pub encrypted_input_hash: String,  // 64 hex, SHA-256 of encrypted envelope bytes
     pub agent_descriptor_hash: String, // 64 hex, SHA-256 of committer's unsigned descriptor
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub relay_session: Option<RelaySessionBinding>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub encrypted_input_envelopes: Option<Vec<EncryptedInputEnvelope>>,
     pub signature: String, // 128 hex
 }
@@ -35,6 +37,8 @@ pub struct UnsignedCommit {
     pub admit_token_id: String,
     pub encrypted_input_hash: String,
     pub agent_descriptor_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relay_session: Option<RelaySessionBinding>,
 }
 
 impl CommitMessage {
@@ -48,8 +52,19 @@ impl CommitMessage {
             admit_token_id: self.admit_token_id.clone(),
             encrypted_input_hash: self.encrypted_input_hash.clone(),
             agent_descriptor_hash: self.agent_descriptor_hash.clone(),
+            relay_session: self.relay_session.clone(),
         }
     }
+}
+
+/// Signed relay session details handed off after ADMIT.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RelaySessionBinding {
+    pub session_id: String,
+    pub responder_submit_token: String,
+    pub responder_read_token: String,
+    pub relay_url: String,
+    pub contract_hash: String,
 }
 
 /// Encrypted input envelope (spec §3.4).
@@ -101,6 +116,13 @@ mod tests {
             admit_token_id: "a".repeat(64),
             encrypted_input_hash: "b".repeat(64),
             agent_descriptor_hash: "c".repeat(64),
+            relay_session: Some(RelaySessionBinding {
+                session_id: "sess-123".to_string(),
+                responder_submit_token: "tok-sub".to_string(),
+                responder_read_token: "tok-read".to_string(),
+                relay_url: "http://relay.test".to_string(),
+                contract_hash: "e".repeat(64),
+            }),
             encrypted_input_envelopes: None,
             signature: "d".repeat(128),
         };
@@ -119,6 +141,7 @@ mod tests {
             admit_token_id: "a".repeat(64),
             encrypted_input_hash: "b".repeat(64),
             agent_descriptor_hash: "c".repeat(64),
+            relay_session: None,
             encrypted_input_envelopes: Some(vec![EncryptedInputEnvelope {
                 ephemeral_public_key_hex: "e".repeat(64),
                 nonce_hex: "f".repeat(48),
@@ -157,6 +180,7 @@ mod tests {
             admit_token_id: "a".repeat(64),
             encrypted_input_hash: "b".repeat(64),
             agent_descriptor_hash: "c".repeat(64),
+            relay_session: None,
             encrypted_input_envelopes: Some(vec![]),
             signature: "d".repeat(128),
         };

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use vault_family_types::{BudgetTierV2, LaneId};
 
+use crate::descriptor::ModelProfileRef;
 use crate::types::AdmissionTier;
 
 /// PROPOSE message as per AFAL Binding Spec §3.1.
@@ -27,6 +28,8 @@ pub struct ProposeMessage {
     pub model_profile_version: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_profile_hash: Option<String>, // 64 hex chars
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub acceptable_model_profiles: Vec<ModelProfileRef>,
     pub requested_entropy_bits: u32,
     pub requested_budget_tier: BudgetTierV2,
     pub admission_tier_requested: AdmissionTier,
@@ -56,6 +59,8 @@ pub struct UnsignedPropose {
     pub model_profile_version: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_profile_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub acceptable_model_profiles: Vec<ModelProfileRef>,
     pub requested_entropy_bits: u32,
     pub requested_budget_tier: BudgetTierV2,
     pub admission_tier_requested: AdmissionTier,
@@ -83,6 +88,7 @@ impl ProposeMessage {
             model_profile_id: self.model_profile_id.clone(),
             model_profile_version: self.model_profile_version.clone(),
             model_profile_hash: self.model_profile_hash.clone(),
+            acceptable_model_profiles: self.acceptable_model_profiles.clone(),
             requested_entropy_bits: self.requested_entropy_bits,
             requested_budget_tier: self.requested_budget_tier,
             admission_tier_requested: self.admission_tier_requested,
@@ -135,6 +141,36 @@ pub fn validate_propose(msg: &ProposeMessage) -> Result<(), Vec<String>> {
             errors.push("model_profile_hash must be 64-char hex".to_string());
         }
     }
+    for (i, profile) in msg.acceptable_model_profiles.iter().enumerate() {
+        if profile.id.is_empty() {
+            errors.push(format!(
+                "acceptable_model_profiles[{i}].id must be non-empty"
+            ));
+        }
+        if profile.version.is_empty() {
+            errors.push(format!(
+                "acceptable_model_profiles[{i}].version must be non-empty"
+            ));
+        }
+        if !is_hex64(&profile.hash) {
+            errors.push(format!(
+                "acceptable_model_profiles[{i}].hash must be 64-char hex"
+            ));
+        }
+    }
+    if !msg.acceptable_model_profiles.is_empty() {
+        let preferred_in_set = msg.acceptable_model_profiles.iter().any(|profile| {
+            profile.id == msg.model_profile_id
+                && profile.version == msg.model_profile_version
+                && msg.model_profile_hash.as_deref() == Some(profile.hash.as_str())
+        });
+        if !preferred_in_set {
+            errors.push(
+                "model_profile_id/model_profile_version/model_profile_hash must match one acceptable_model_profiles entry"
+                    .to_string(),
+            );
+        }
+    }
     if let Some(relay_binding_hash) = &msg.relay_binding_hash {
         if !is_hex64(relay_binding_hash) {
             errors.push("relay_binding_hash must be 64-char hex".to_string());
@@ -174,6 +210,11 @@ mod tests {
             model_profile_id: "test-model".to_string(),
             model_profile_version: "1.0".to_string(),
             model_profile_hash: Some("c".repeat(64)),
+            acceptable_model_profiles: vec![ModelProfileRef {
+                id: "test-model".to_string(),
+                version: "1.0".to_string(),
+                hash: "c".repeat(64),
+            }],
             requested_entropy_bits: 8,
             requested_budget_tier: BudgetTierV2::Small,
             admission_tier_requested: AdmissionTier::Default,
@@ -201,6 +242,17 @@ mod tests {
         let json = serde_json::to_string(&msg).unwrap();
         let parsed: ProposeMessage = serde_json::from_str(&json).unwrap();
         assert_eq!(msg, parsed);
+    }
+
+    #[test]
+    fn validate_rejects_preferred_profile_not_in_acceptable_set() {
+        let mut msg = sample_propose();
+        msg.acceptable_model_profiles = vec![ModelProfileRef {
+            id: "other-model".to_string(),
+            version: "1.0".to_string(),
+            hash: "f".repeat(64),
+        }];
+        assert!(validate_propose(&msg).is_err());
     }
 
     #[test]

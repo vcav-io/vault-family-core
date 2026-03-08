@@ -1,15 +1,22 @@
 {
   "description": "AFAL PROPOSE message: sign and verify",
   "expected": {
-    "signature_hex": "2d79e0f111d067f3cce9a3e8f07aa3638aaacb7c2d7944a4d04e9b81494b3393c9040cd7e160069875a6900ae5d9623f26e94906fbdc0ec1c82e7e9172f47a07",
+    "signature_hex": "4b5f630dae75aca01ac39383f4e2651ed4b40f57c683f3bf63049d9eaac60c7c72324214ac6b3c2c6614126295be39e3c9ca3daee2daea5cf3df383d7fdbc50e",
     "verification_result": "PASS"
   },
   "input": {
-    "canonical_json": "{\"admission_tier_requested\":\"DEFAULT\",\"descriptor_hash\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"from\":\"alice-test-agent\",\"lane_id\":\"SEALED_LOCAL\",\"model_profile_hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"model_profile_id\":\"test-model\",\"model_profile_version\":\"1.0\",\"nonce\":\"9999999999999999999999999999999999999999999999999999999999999999\",\"output_schema_id\":\"urn:vcav:schema:dating.d2.v1\",\"output_schema_version\":\"1.0\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"proposal_version\":\"1\",\"purpose_code\":\"COMPATIBILITY\",\"relay_binding_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"requested_budget_tier\":\"SMALL\",\"requested_entropy_bits\":8,\"timestamp\":\"2026-01-01T00:05:00Z\",\"to\":\"bob-test-agent\"}",
+    "canonical_json": "{\"acceptable_model_profiles\":[{\"hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"id\":\"test-model\",\"version\":\"1.0\"}],\"admission_tier_requested\":\"DEFAULT\",\"descriptor_hash\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"from\":\"alice-test-agent\",\"lane_id\":\"SEALED_LOCAL\",\"model_profile_hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"model_profile_id\":\"test-model\",\"model_profile_version\":\"1.0\",\"nonce\":\"9999999999999999999999999999999999999999999999999999999999999999\",\"output_schema_id\":\"urn:vcav:schema:dating.d2.v1\",\"output_schema_version\":\"1.0\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"proposal_version\":\"1\",\"purpose_code\":\"COMPATIBILITY\",\"relay_binding_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"requested_budget_tier\":\"SMALL\",\"requested_entropy_bits\":8,\"timestamp\":\"2026-01-01T00:05:00Z\",\"to\":\"bob-test-agent\"}",
     "domain_prefix": "VCAV-PROPOSE-V1:",
     "seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
-    "sha256_digest_hex": "9926acc595c828a880408d11d0771e3ee6624facc987edf7eca140e702e08acc",
+    "sha256_digest_hex": "b3f4ff2d08067198c567bbec41f5446f795d9c989ab6d775d9ea13ee19aab474",
     "unsigned_propose": {
+      "acceptable_model_profiles": [
+        {
+          "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "id": "test-model",
+          "version": "1.0"
+        }
+      ],
       "admission_tier_requested": "DEFAULT",
       "descriptor_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "from": "alice-test-agent",

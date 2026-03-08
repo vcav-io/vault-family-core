@@ -36,7 +36,8 @@ pub use admit::{
     SEALED_MODE_DENY_FIELDS,
 };
 pub use commit::{
-    compute_aad_hex, AadBinding, CommitMessage, EncryptedInputEnvelope, UnsignedCommit,
+    compute_aad_hex, AadBinding, CommitMessage, EncryptedInputEnvelope, RelaySessionBinding,
+    UnsignedCommit,
 };
 pub use descriptor::{
     compute_descriptor_hash, is_descriptor_expired, is_descriptor_expired_at, sign_descriptor,
