@@ -27,7 +27,10 @@ pub struct IdentityKey {
     pub public_key_hex: String, // 64 hex chars (32 bytes)
 }
 
-/// X25519 envelope key for encrypted input envelopes.
+/// Envelope key advertised for AFAL input wrapping.
+///
+/// Deployed AgentVault currently reuses the Ed25519 identity key here, while
+/// richer AFAL peers may advertise a distinct X25519 envelope key.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvelopeKey {
     pub algorithm: String,      // "x25519" or "ed25519"

@@ -13,7 +13,10 @@
     "admission_version": { "type": "string", "const": "1" },
     "proposal_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "outcome": { "type": "string", "const": "ADMIT" },
-    "admit_token_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "admit_token_id": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+    },
     "admission_tier": {
       "type": "string",
       "enum": ["TRUSTED", "DEFAULT", "LOW_TRUST"]
