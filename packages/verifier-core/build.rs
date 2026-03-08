@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 /// Simplified build script for verifier-core.
 ///
-/// Copies the 16 vault-family-core schemas to OUT_DIR/family/ for embedding
+/// Copies the vault-family-core schemas to OUT_DIR/family/ for embedding
 /// via include_str!. No cross-workspace paths — schemas are resolved relative
 /// to CARGO_MANIFEST_DIR (../../schemas/).
 fn main() {
@@ -16,6 +16,7 @@ fn main() {
     fs::create_dir_all(&family_out).expect("failed to create family/ in OUT_DIR");
 
     let schemas = [
+        "contract.schema.json",
         "receipt.schema.json",
         "receipt.v2.schema.json",
         "encrypted_input.schema.json",

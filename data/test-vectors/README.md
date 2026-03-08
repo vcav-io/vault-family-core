@@ -15,6 +15,7 @@ Positive vectors represent valid protocol operations that MUST succeed:
 - Agreement hash computation (`agreement_hash_positive_01.json`, `agreement_hash_positive_02.json`)
 - `pair_id` derivation (`pair_id_positive_01.json`, `pair_id_positive_02.json`)
 - Canonicalization (`canonicalization_positive_01.json`)
+- Contract schema validation (`contract_positive_01.json`)
 
 ### Negative Vectors
 
@@ -25,6 +26,7 @@ Negative vectors represent invalid operations that MUST be rejected:
 - Unsorted participants produce different hash (`agreement_hash_negative_01.json`)
 - Non-ASCII `agent_id` edge case (`pair_id_negative_01.json`)
 - Non-canonical JSON forms (`canonicalization_negative_01.json`)
+- Malformed contract hash fields (`contract_negative_01.json`)
 
 ### Standalone Files
 
