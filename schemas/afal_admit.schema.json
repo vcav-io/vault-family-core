@@ -22,6 +22,16 @@
       "enum": ["TRUSTED", "DEFAULT", "LOW_TRUST"]
     },
     "expires_at": { "type": "string", "format": "date-time" },
+    "selected_model_profile": {
+      "type": "object",
+      "required": ["id", "version", "hash"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
     "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
   }
 }

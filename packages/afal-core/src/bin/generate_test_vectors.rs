@@ -144,6 +144,11 @@ fn generate_propose_vectors() -> serde_json::Value {
         model_profile_id: "test-model".to_string(),
         model_profile_version: "1.0".to_string(),
         model_profile_hash: Some("b".repeat(64)),
+        acceptable_model_profiles: vec![ModelProfileRef {
+            id: "test-model".to_string(),
+            version: "1.0".to_string(),
+            hash: "b".repeat(64),
+        }],
         requested_entropy_bits: 8,
         requested_budget_tier: vault_family_types::BudgetTierV2::Small,
         admission_tier_requested: AdmissionTier::Default,
@@ -187,6 +192,11 @@ fn generate_admit_deny_vectors() -> serde_json::Value {
         admit_token_id: "f".repeat(64),
         admission_tier: AdmissionTier::Default,
         expires_at: "2026-01-01T00:15:00Z".to_string(),
+        selected_model_profile: Some(ModelProfileRef {
+            id: "test-model".to_string(),
+            version: "1.0".to_string(),
+            hash: "b".repeat(64),
+        }),
     };
 
     let admit_sig = sign_afal_message(DomainPrefix::Admit, &unsigned_admit, &bob).unwrap();
@@ -254,6 +264,13 @@ fn generate_commit_vectors() -> serde_json::Value {
         admit_token_id: "f".repeat(64),
         encrypted_input_hash: "1".repeat(64),
         agent_descriptor_hash: "2".repeat(64),
+        relay_session: Some(RelaySessionBinding {
+            session_id: "sess-123".to_string(),
+            responder_submit_token: "submit-token".to_string(),
+            responder_read_token: "read-token".to_string(),
+            relay_url: "http://relay.test".to_string(),
+            contract_hash: "e".repeat(64),
+        }),
     };
 
     let commit_sig = sign_afal_message(DomainPrefix::Commit, &unsigned_commit, &alice).unwrap();

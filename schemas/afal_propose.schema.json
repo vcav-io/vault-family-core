@@ -30,6 +30,19 @@
     "model_profile_id": { "type": "string" },
     "model_profile_version": { "type": "string" },
     "model_profile_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "acceptable_model_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "hash"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "version": { "type": "string", "minLength": 1 },
+          "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
     "requested_entropy_bits": { "type": "integer", "minimum": 0, "maximum": 256 },
     "requested_budget_tier": {
       "type": "string",

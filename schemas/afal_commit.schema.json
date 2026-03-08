@@ -16,6 +16,24 @@
     "admit_token_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "encrypted_input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "agent_descriptor_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "relay_session": {
+      "type": "object",
+      "required": [
+        "session_id",
+        "responder_submit_token",
+        "responder_read_token",
+        "relay_url",
+        "contract_hash"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "session_id": { "type": "string", "minLength": 1 },
+        "responder_submit_token": { "type": "string", "minLength": 1 },
+        "responder_read_token": { "type": "string", "minLength": 1 },
+        "relay_url": { "type": "string", "minLength": 1 },
+        "contract_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
     "encrypted_input_envelopes": {
       "type": "array",
       "items": {

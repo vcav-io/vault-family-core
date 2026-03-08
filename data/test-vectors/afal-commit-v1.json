@@ -12,11 +12,11 @@
   },
   "description": "AFAL COMMIT: signing and AAD construction",
   "expected": {
-    "signature_hex": "b6f120c248b0d14e03abc561d8731d7fdc7a78d8142468aedb28ebee8276d17111c768ccdd06ec6bd3e6746b2b0a69e1631c356fd206517dc3ac0274ab93520e",
+    "signature_hex": "aae9410af4cb8b035a212a4449a03b51a4e4b11cccddca450341b1b73547d84bb2b7f0750507172d4683bf30e175261ff11a488dd75312610c9f8d302cf5b50c",
     "verification_result": "PASS"
   },
   "input": {
-    "canonical_json": "{\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"agent_descriptor_hash\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"commit_version\":\"1\",\"encrypted_input_hash\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"from\":\"alice-test-agent\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+    "canonical_json": "{\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"agent_descriptor_hash\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"commit_version\":\"1\",\"encrypted_input_hash\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"from\":\"alice-test-agent\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"relay_session\":{\"contract_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"relay_url\":\"http://relay.test\",\"responder_read_token\":\"read-token\",\"responder_submit_token\":\"submit-token\",\"session_id\":\"sess-123\"}}",
     "domain_prefix": "VCAV-COMMIT-V1:",
     "seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
     "unsigned_commit": {
@@ -25,7 +25,14 @@
       "commit_version": "1",
       "encrypted_input_hash": "1111111111111111111111111111111111111111111111111111111111111111",
       "from": "alice-test-agent",
-      "proposal_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "proposal_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "relay_session": {
+        "contract_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "relay_url": "http://relay.test",
+        "responder_read_token": "read-token",
+        "responder_submit_token": "submit-token",
+        "session_id": "sess-123"
+      }
     },
     "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
   },

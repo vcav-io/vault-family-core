@@ -1,15 +1,20 @@
 {
   "admit": {
-    "canonical_json": "{\"admission_tier\":\"DEFAULT\",\"admission_version\":\"1\",\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"expires_at\":\"2026-01-01T00:15:00Z\",\"outcome\":\"ADMIT\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+    "canonical_json": "{\"admission_tier\":\"DEFAULT\",\"admission_version\":\"1\",\"admit_token_id\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"expires_at\":\"2026-01-01T00:15:00Z\",\"outcome\":\"ADMIT\",\"proposal_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"selected_model_profile\":{\"hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"id\":\"test-model\",\"version\":\"1.0\"}}",
     "domain_prefix": "VCAV-ADMIT-V1:",
-    "expected_signature_hex": "56d1075fae9612c0580c9b7f6f7b44e038f8c8a6798d5797a5ca94b1398d1e9d9a37dce114705e1a30667e0183e4ac2da98967ed70a01fb5f1a4d9767e5c0a0e",
+    "expected_signature_hex": "f2413e4a01783980f9b383cf3973409025088b295501491ed902884b942ca2c4b0e3d023ba95eff212bc5fe6b53a614c0e506dd966e018975543a6b8c8c8d100",
     "unsigned_admit": {
       "admission_tier": "DEFAULT",
       "admission_version": "1",
       "admit_token_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "expires_at": "2026-01-01T00:15:00Z",
       "outcome": "ADMIT",
-      "proposal_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "proposal_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "selected_model_profile": {
+        "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "id": "test-model",
+        "version": "1.0"
+      }
     }
   },
   "deny": {

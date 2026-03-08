@@ -10,6 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::descriptor::ModelProfileRef;
 use crate::types::AdmissionTier;
 
 // ---------------------------------------------------------------------------
@@ -25,7 +26,9 @@ pub struct AdmitMessage {
     pub admit_token_id: String,    // unique bearer token identifier
     pub admission_tier: AdmissionTier,
     pub expires_at: String, // ISO 8601, ≤10 min from now
-    pub signature: String,  // 128 hex
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_model_profile: Option<ModelProfileRef>,
+    pub signature: String, // 128 hex
 }
 
 /// Unsigned ADMIT (for signing).
@@ -37,6 +40,8 @@ pub struct UnsignedAdmit {
     pub admit_token_id: String,
     pub admission_tier: AdmissionTier,
     pub expires_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_model_profile: Option<ModelProfileRef>,
 }
 
 impl AdmitMessage {
@@ -49,6 +54,7 @@ impl AdmitMessage {
             admit_token_id: self.admit_token_id.clone(),
             admission_tier: self.admission_tier,
             expires_at: self.expires_at.clone(),
+            selected_model_profile: self.selected_model_profile.clone(),
         }
     }
 }
@@ -169,6 +175,11 @@ mod tests {
             admit_token_id: "d".repeat(64),
             admission_tier: AdmissionTier::Default,
             expires_at: "2026-01-01T00:10:00Z".to_string(),
+            selected_model_profile: Some(ModelProfileRef {
+                id: "api-claude-sonnet-v1".to_string(),
+                version: "1".to_string(),
+                hash: "a".repeat(64),
+            }),
             signature: "e".repeat(128),
         };
 
