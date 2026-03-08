@@ -1776,13 +1776,16 @@ dependencies = [
 name = "verifier-wasm"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "console_error_panic_hook",
  "ed25519-dalek",
  "getrandom 0.2.17",
  "getrandom 0.3.4",
+ "hex",
  "receipt-core",
  "serde",
  "serde_json",
+ "sha2",
  "verifier-core",
  "wasm-bindgen",
  "wasm-bindgen-test",

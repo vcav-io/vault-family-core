@@ -2,344 +2,406 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://vcav.io/schemas/receipt.v2.schema.json",
   "title": "Receipt V2",
-  "description": "Cryptographic receipt proving session execution and constraints (v2.0 with TINY/SMALL/MEDIUM/LARGE budget tiers)",
+  "description": "Current VCAV receipt schema matching receipt-core ReceiptV2 (v2.1.0).",
   "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_schema_version",
+    "receipt_canonicalization",
+    "receipt_id",
+    "session_id",
+    "issued_at",
+    "assurance_level",
+    "operator",
+    "commitments",
+    "claims",
+    "signature"
+  ],
   "properties": {
-    "schema_version": {
+    "receipt_schema_version": {
       "type": "string",
-      "const": "2.0.0",
-      "description": "Receipt schema version (2.0.0)"
+      "const": "2.1.0"
+    },
+    "receipt_canonicalization": {
+      "type": "string",
+      "const": "JCS_V1"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
     },
     "session_id": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$",
-      "description": "32-byte hex-encoded session identifier"
+      "minLength": 1
     },
-    "purpose_code": {
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "assurance_level": {
       "type": "string",
       "enum": [
-        "COMPATIBILITY",
-        "SCHEDULING",
-        "MEDIATION",
-        "NEGOTIATION",
-        "SCHEDULING_COMPAT_V1"
-      ],
-      "description": "Purpose code for this session"
+        "SELF_ASSERTED",
+        "OPERATOR_AUDITED",
+        "PROVIDER_ATTESTED",
+        "TEE_ATTESTED"
+      ]
     },
-    "participant_ids": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 128
-      },
-      "minItems": 2,
-      "maxItems": 5,
-      "description": "Agent IDs of participants (sorted lexicographically)"
-    },
-    "runtime_hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$",
-      "description": "SHA-256 hash of vault runtime image"
-    },
-    "guardian_policy_hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$",
-      "description": "SHA-256 hash of guardian policy configuration"
-    },
-    "model_weights_hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$",
-      "description": "SHA-256 hash of GGUF model weights file"
-    },
-    "llama_cpp_version": {
-      "type": "string",
-      "pattern": "^([0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9.]+)?|[a-f0-9]{7,40})$",
-      "description": "Semver (e.g., 0.1.0) or git SHA (7-40 hex chars)"
-    },
-    "inference_config_hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$",
-      "description": "SHA-256 hash of inference configuration"
-    },
-    "output_schema_version": {
-      "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
-      "description": "Version of the output schema used"
-    },
-    "session_start": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO 8601 timestamp of session start"
-    },
-    "session_end": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO 8601 timestamp of session end"
-    },
-    "fixed_window_duration_seconds": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 600,
-      "description": "Fixed window duration enforced (e.g., 120)"
-    },
-    "status": {
-      "type": "string",
-      "enum": [
-        "COMPLETED",
-        "ABORTED"
-      ],
-      "description": "Session completion status"
-    },
-    "output": {
-      "oneOf": [
-        { "type": "null" },
-        { "type": "object" }
-      ],
-      "description": "Vault result (null if ABORTED)"
-    },
-    "output_entropy_bits": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 32,
-      "description": "Calculated entropy of this output"
-    },
-    "receipt_payload_type": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128,
-      "description": "Typed payload type identifier (optional)"
-    },
-    "receipt_payload_version": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 64,
-      "description": "Typed payload version string (optional)"
-    },
-    "payload": {
-      "description": "Typed payload blob. Opaque to vault-family-core; exact JSON bytes are preserved through signing round-trips."
-    },
-    "budget_usage": {
+    "operator": {
       "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operator_id",
+        "operator_key_fingerprint"
+      ],
       "properties": {
-        "pair_id": {
+        "operator_id": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$",
-          "description": "Hash of sorted participant IDs"
+          "minLength": 1
         },
-        "window_start": {
+        "operator_key_fingerprint": {
           "type": "string",
-          "format": "date-time",
-          "description": "Start of current 30-day budget window"
+          "pattern": "^[a-f0-9]{64}$"
         },
-        "bits_used_before": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Bits used by this pair before this session"
+        "operator_key_discovery": {
+          "type": "string"
+        }
+      }
+    },
+    "commitments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_hash",
+        "schema_hash",
+        "output_hash",
+        "input_commitments",
+        "assembled_prompt_hash",
+        "prompt_assembly_version"
+      ],
+      "properties": {
+        "contract_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         },
-        "bits_used_after": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Bits used by this pair after this session"
+        "schema_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         },
-        "budget_limit": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Budget limit for this pair based on tier"
+        "output_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         },
-        "budget_tier": {
+        "input_commitments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "participant_id",
+              "input_hash",
+              "hash_alg",
+              "canonicalization"
+            ],
+            "properties": {
+              "participant_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "input_hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "hash_alg": {
+                "type": "string",
+                "enum": [
+                  "SHA-256",
+                  "SHA-384",
+                  "SHA-512"
+                ]
+              },
+              "canonicalization": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "assembled_prompt_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "prompt_assembly_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output": {},
+        "prompt_template_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "effective_config_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "preflight_bundle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_hash",
+            "prompt_template_hash",
+            "model_profile_hash",
+            "schema_hash",
+            "enforcement_parameters"
+          ],
+          "properties": {
+            "policy_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "prompt_template_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "model_profile_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "schema_hash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "enforcement_parameters": {}
+          }
+        },
+        "output_retrieval_uri": {
+          "type": "string"
+        },
+        "output_media_type": {
+          "type": "string"
+        },
+        "preflight_bundle_uri": {
+          "type": "string"
+        },
+        "rejected_output_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "initiator_submission_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "responder_submission_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model_identity_asserted": {
+          "type": "string"
+        },
+        "model_identity_attested": {
+          "type": "string"
+        },
+        "model_profile_hash_asserted": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "runtime_hash_asserted": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "runtime_hash_attested": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "budget_enforcement_mode": {
           "type": "string",
           "enum": [
-            "TINY",
-            "SMALL",
-            "MEDIUM",
-            "LARGE"
-          ],
-          "description": "Active budget tier (v2.0: TINY=8, SMALL=16, MEDIUM=24, LARGE=32 bits)"
-        }
-      },
-      "required": [
-        "pair_id",
-        "window_start",
-        "bits_used_before",
-        "bits_used_after",
-        "budget_limit",
-        "budget_tier"
-      ],
-      "additionalProperties": false,
-      "description": "Privacy budget accounting"
-    },
-    "budget_chain": {
-      "oneOf": [
-        { "type": "null" },
-        {
+            "enforced",
+            "advisory",
+            "disabled"
+          ]
+        },
+        "provider_latency_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "token_usage": {
           "type": "object",
-          "properties": {
-            "chain_id": {
-              "type": "string",
-              "pattern": "^chain-[a-f0-9]{64}$",
-              "description": "Stable budget chain identifier"
-            },
-            "prev_receipt_hash": {
-              "oneOf": [
-                { "type": "null" },
-                {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                }
-              ],
-              "description": "Previous receipt hash in chain (null for first link)"
-            },
-            "receipt_hash": {
-              "type": "string",
-              "pattern": "^[a-f0-9]{64}$",
-              "description": "Canonical hash of this unsigned receipt"
-            }
-          },
+          "additionalProperties": false,
           "required": [
-            "chain_id",
-            "prev_receipt_hash",
-            "receipt_hash"
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens"
           ],
-          "additionalProperties": false
-        }
-      ],
-      "description": "Receipt hash-chain linkage for budget continuity verification"
-    },
-    "handoff_id": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128,
-      "description": "SessionHandoff ID that authorized this session (since v0.1)"
-    },
-    "contract_hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$",
-      "description": "Content-addressed SHA-256 hash of the contract bound to this session"
-    },
-    "output_schema_id": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128,
-      "description": "Identifier of the output schema used for this session"
-    },
-    "model_profile_hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$",
-      "description": "Content-addressed SHA-256 hash of the model profile bound to this session"
-    },
-    "policy_bundle_hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$",
-      "description": "Content-addressed SHA-256 hash of the policy bundle bound to this session"
-    },
-    "mitigations_applied": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "pattern": "^[A-Z0-9._:-]{1,64}$"
-      },
-      "description": "Mitigation IDs applied during this session"
-    },
-    "attestation": {
-      "oneOf": [
-        { "type": "null" },
-        {
+          "properties": {
+            "prompt_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "completion_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_tokens": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "relay_software_version": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "rejected",
+            "aborted",
+            "error"
+          ]
+        },
+        "signal_class": {
+          "type": "string"
+        },
+        "execution_lane": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "tee"
+          ]
+        },
+        "channel_capacity_bits_upper_bound": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "channel_capacity_measurement_version": {
+          "type": "string"
+        },
+        "entropy_budget_bits": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "schema_entropy_ceiling_bits": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "budget_usage": {
           "type": "object",
-          "properties": {
-            "enclave_measurement": {
-              "type": "string",
-              "pattern": "^[a-f0-9]{64,96}$",
-              "description": "Enclave measurement hash"
-            },
-            "attestation_document": {
-              "type": "string",
-              "description": "Base64-encoded attestation document"
-            },
-            "attestation_timestamp": {
-              "type": "string",
-              "format": "date-time",
-              "description": "When attestation was generated"
-            }
-          },
+          "additionalProperties": false,
           "required": [
-            "enclave_measurement",
-            "attestation_document",
-            "attestation_timestamp"
+            "bits_used_before",
+            "bits_used_after",
+            "budget_limit"
           ],
-          "additionalProperties": false
+          "properties": {
+            "bits_used_before": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bits_used_after": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "budget_limit": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         }
-      ],
-      "description": "Enclave attestation (null in dev mode)"
+      }
     },
-    "agreement_hash": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$",
-      "description": "SHA-256 agreement hash binding session to negotiated contract terms"
-    },
-    "execution_lane": {
-      "type": "string",
-      "enum": [
-        "SEALED_LOCAL",
-        "SOFTWARE_LOCAL",
-        "API_MEDIATED"
-      ],
-      "description": "Execution lane used for this session"
-    },
-    "receipt_key_id": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9._:-]{1,128}$",
-      "description": "Stable identifier for verifying key used to validate this receipt signature"
-    },
-    "model_identity": {
+    "provider_attestation": {
       "type": "object",
-      "properties": {
-        "provider": {
-          "type": "string",
-          "enum": ["LOCAL", "OPENAI"],
-          "description": "Model provider"
-        },
-        "model_id": {
-          "type": "string",
-          "maxLength": 64,
-          "description": "Model identifier"
-        },
-        "model_version": {
-          "type": "string",
-          "maxLength": 64,
-          "description": "Model version"
-        }
-      },
-      "required": ["provider", "model_id"],
       "additionalProperties": false,
-      "description": "Identity of the model used for vault execution (optional, since v0.1)"
+      "required": [
+        "provider_attestation_blob",
+        "provider_attestation_type",
+        "provider_key_id"
+      ],
+      "properties": {
+        "provider_attestation_blob": {
+          "type": "string"
+        },
+        "provider_attestation_type": {
+          "type": "string"
+        },
+        "provider_key_id": {
+          "type": "string"
+        },
+        "provider_key_discovery_uri": {
+          "type": "string"
+        }
+      }
+    },
+    "tee_attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tee_type": {
+          "type": "string",
+          "enum": [
+            "SGX",
+            "TDX",
+            "SEV-SNP",
+            "TrustZone",
+            "Simulated"
+          ]
+        },
+        "measurement": {
+          "type": "string"
+        },
+        "quote": {
+          "type": "string"
+        },
+        "attestation_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "receipt_signing_pubkey_hex": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "transcript_hash_hex": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{128}$"
+        },
+        "user_data_hex": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{128}$"
+        }
+      }
     },
     "signature": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{128}$",
-      "description": "64-byte hex-encoded Ed25519 signature over canonical receipt"
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alg",
+        "value"
+      ],
+      "properties": {
+        "alg": {
+          "type": "string",
+          "enum": [
+            "Ed25519",
+            "ES256",
+            "ES384"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signed_fields": {
+          "type": "string"
+        }
+      }
     }
-  },
-  "required": [
-    "schema_version",
-    "session_id",
-    "purpose_code",
-    "participant_ids",
-    "runtime_hash",
-    "guardian_policy_hash",
-    "model_weights_hash",
-    "llama_cpp_version",
-    "inference_config_hash",
-    "output_schema_version",
-    "session_start",
-    "session_end",
-    "fixed_window_duration_seconds",
-    "status",
-    "execution_lane",
-    "output",
-    "output_entropy_bits",
-    "budget_usage",
-    "signature"
-  ],
-  "additionalProperties": false
+  }
 }

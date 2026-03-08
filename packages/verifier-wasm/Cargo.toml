@@ -25,6 +25,9 @@ getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] 
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+chrono.workspace = true
+sha2.workspace = true
+hex.workspace = true
 
 # wasm-pack runs wasm-opt by default for release builds. Some wasm-opt builds
 # (notably older Binaryen distributions) fail validation unless bulk-memory is

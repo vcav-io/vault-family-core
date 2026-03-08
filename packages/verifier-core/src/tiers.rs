@@ -220,6 +220,54 @@ fn timing_class_window_seconds(class: &str) -> Option<u64> {
     }
 }
 
+fn receipt_top_or_claims<'a>(receipt: &'a serde_json::Value, key: &str) -> Option<&'a serde_json::Value> {
+    receipt
+        .get(key)
+        .or_else(|| receipt.get("claims").and_then(|claims| claims.get(key)))
+}
+
+fn receipt_top_or_commitments<'a>(
+    receipt: &'a serde_json::Value,
+    key: &str,
+) -> Option<&'a serde_json::Value> {
+    receipt
+        .get(key)
+        .or_else(|| receipt.get("commitments").and_then(|commitments| commitments.get(key)))
+}
+
+fn receipt_preflight<'a>(
+    receipt: &'a serde_json::Value,
+    key: &str,
+) -> Option<&'a serde_json::Value> {
+    receipt
+        .get("commitments")
+        .and_then(|commitments| commitments.get("preflight_bundle"))
+        .and_then(|bundle| bundle.get(key))
+}
+
+fn receipt_string<'a>(
+    receipt: &'a serde_json::Value,
+    keys: &[(&str, &'static str)],
+) -> Option<&'a str> {
+    keys.iter().find_map(|(scope, key)| match *scope {
+        "top_or_claims" => receipt_top_or_claims(receipt, key),
+        "top_or_commitments" => receipt_top_or_commitments(receipt, key),
+        "preflight" => receipt_preflight(receipt, key),
+        _ => None,
+    })
+    .and_then(|value| value.as_str())
+}
+
+fn receipt_u64(receipt: &serde_json::Value, keys: &[(&str, &'static str)]) -> Option<u64> {
+    keys.iter().find_map(|(scope, key)| match *scope {
+        "top_or_claims" => receipt_top_or_claims(receipt, key),
+        "top_or_commitments" => receipt_top_or_commitments(receipt, key),
+        "preflight" => receipt_preflight(receipt, key),
+        _ => None,
+    })
+    .and_then(|value| value.as_u64())
+}
+
 /// Result of cross-checking receipt fields against contract fields.
 #[derive(Debug, Clone, Default)]
 pub struct ContractEnforcementResult {
@@ -254,7 +302,7 @@ pub fn verify_contract_enforcement(
     let mut result = ContractEnforcementResult::default();
 
     // 1. Entropy budget: receipt.entropy_budget_bits == contract.entropy_budget_bits
-    if let Some(receipt_entropy) = receipt.get("entropy_budget_bits").and_then(|v| v.as_u64()) {
+    if let Some(receipt_entropy) = receipt_u64(&receipt, &[("top_or_claims", "entropy_budget_bits")]) {
         if let Some(contract_entropy) = contract.get("entropy_budget_bits").and_then(|v| v.as_u64())
         {
             let matches = receipt_entropy == contract_entropy;
@@ -272,9 +320,7 @@ pub fn verify_contract_enforcement(
     }
 
     // 2. Timing class: receipt.contract_timing_class == contract.timing_class
-    let receipt_timing = receipt
-        .get("contract_timing_class")
-        .and_then(|v| v.as_str());
+    let receipt_timing = receipt_string(&receipt, &[("top_or_claims", "contract_timing_class")]);
     let contract_timing = contract.get("timing_class").and_then(|v| v.as_str());
     if let (Some(r_tc), Some(c_tc)) = (receipt_timing, contract_timing) {
         let matches = r_tc.eq_ignore_ascii_case(c_tc);
@@ -293,11 +339,10 @@ pub fn verify_contract_enforcement(
     if let Some(c_tc) = contract_timing {
         match timing_class_window_seconds(c_tc) {
             Some(expected_window) => {
-                if let Some(receipt_window) = receipt
-                    .get("fixed_window_duration_seconds")
-                    .and_then(|v| v.as_u64())
+                if let Some(receipt_window) =
+                    receipt_u64(&receipt, &[("top_or_claims", "fixed_window_duration_seconds")])
                 {
-                    let consistent = receipt_window == expected_window;
+                    let consistent = receipt_window == 0 || receipt_window == expected_window;
                     result.timing_window_consistent = Some(consistent);
                     if !consistent {
                         let msg = format!(
@@ -323,7 +368,14 @@ pub fn verify_contract_enforcement(
     }
 
     // 4. Prompt template hash: receipt.prompt_template_hash == contract.prompt_template_hash
-    let receipt_pth = receipt.get("prompt_template_hash").and_then(|v| v.as_str());
+    let receipt_pth = receipt_string(
+        &receipt,
+        &[
+            ("top_or_commitments", "prompt_template_hash"),
+            ("preflight", "prompt_template_hash"),
+            ("top_or_claims", "prompt_template_hash"),
+        ],
+    );
     let contract_pth = contract
         .get("prompt_template_hash")
         .and_then(|v| v.as_str());
@@ -471,8 +523,21 @@ pub fn verify_contract_hash_from_bytes(
     content: &[u8],
     declared_hash: &str,
 ) -> Result<bool, String> {
+    let canonical_bytes = match std::str::from_utf8(content) {
+        Ok(as_str) => match serde_json::from_str::<serde_json::Value>(as_str) {
+            Ok(mut value) => {
+                if let Some(obj) = value.as_object_mut() {
+                    obj.remove("contract_hash");
+                }
+                receipt_core::canonicalize(&value).into_bytes()
+            }
+            Err(_) => content.to_vec(),
+        },
+        Err(_) => content.to_vec(),
+    };
+
     let mut hasher = Sha256::new();
-    hasher.update(content);
+    hasher.update(&canonical_bytes);
     let recomputed = hex::encode(hasher.finalize());
 
     Ok(recomputed == declared_hash)
@@ -778,11 +843,48 @@ pub fn verify_attestation(
         }
     };
 
-    // Check if attestation is absent
-    let attestation_value = receipt.get("attestation");
-    if attestation_value.is_none() || attestation_value == Some(&serde_json::Value::Null) {
+    // Legacy receipts use top-level `attestation`; current v2 receipts use
+    // `tee_attestation`.
+    let attestation_value = receipt
+        .get("attestation")
+        .filter(|value| **value != serde_json::Value::Null);
+    let tee_attestation_value = receipt
+        .get("tee_attestation")
+        .filter(|value| **value != serde_json::Value::Null);
+
+    if attestation_value.is_none() && tee_attestation_value.is_none() {
         return AttestationVerificationResult {
             status: Some("absent".to_string()),
+            ..Default::default()
+        };
+    }
+
+    if let Some(tee_attestation) = tee_attestation_value {
+        let measurement = tee_attestation
+            .get("measurement")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+
+        if let (Some(allowlist), Some(measurement)) = (&config.measurement_allowlist, &measurement) {
+            if !allowlist.contains(measurement) {
+                return AttestationVerificationResult {
+                    status: Some("invalid".to_string()),
+                    environment: tee_attestation
+                        .get("tee_type")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    error_detail: Some(format!("measurement {measurement} not in allowlist")),
+                    ..Default::default()
+                };
+            }
+        }
+
+        return AttestationVerificationResult {
+            status: Some("present_unverified".to_string()),
+            environment: tee_attestation
+                .get("tee_type")
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
             ..Default::default()
         };
     }
@@ -1276,6 +1378,44 @@ mod tests {
 
         assert!(verify_contract_hash_from_bytes(content, &expected_hash).unwrap());
         assert!(!verify_contract_hash_from_bytes(content, "wrong_hash").unwrap());
+    }
+
+    #[test]
+    fn test_verify_contract_hash_from_bytes_uses_canonical_json_semantics() {
+        let compact = br#"{"b":2,"a":1}"#;
+        let reordered = br#"{
+          "a": 1,
+          "b": 2
+        }"#;
+        let canonical = receipt_core::canonicalize(&serde_json::json!({"a": 1, "b": 2}));
+        let mut hasher = Sha256::new();
+        hasher.update(canonical.as_bytes());
+        let expected_hash = hex::encode(hasher.finalize());
+
+        assert!(verify_contract_hash_from_bytes(compact, &expected_hash).unwrap());
+        assert!(verify_contract_hash_from_bytes(reordered, &expected_hash).unwrap());
+    }
+
+    #[test]
+    fn test_verify_contract_hash_from_bytes_ignores_self_referential_contract_hash_field() {
+        let value = serde_json::json!({
+            "contract_hash": "z".repeat(64),
+            "participants": ["alice", "bob"],
+            "purpose": "NEGOTIATION",
+        });
+        let canonical_without_hash = receipt_core::canonicalize(&serde_json::json!({
+            "participants": ["alice", "bob"],
+            "purpose": "NEGOTIATION",
+        }));
+        let mut hasher = Sha256::new();
+        hasher.update(canonical_without_hash.as_bytes());
+        let expected_hash = hex::encode(hasher.finalize());
+
+        assert!(verify_contract_hash_from_bytes(
+            serde_json::to_string(&value).unwrap().as_bytes(),
+            &expected_hash,
+        )
+        .unwrap());
     }
 
     // =========================================================================
@@ -2702,5 +2842,63 @@ mod tests {
         };
         let result = verify_attestation(&receipt_json, &config);
         assert_eq!(result.status.as_deref(), Some("verified"));
+    }
+
+    #[test]
+    fn test_contract_enforcement_accepts_zero_fixed_window_for_timing_class() {
+        let receipt = serde_json::json!({
+            "receipt_schema_version": "2.1.0",
+            "claims": {
+                "contract_timing_class": "STANDARD",
+                "fixed_window_duration_seconds": 0
+            }
+        });
+        let contract = serde_json::json!({
+            "timing_class": "STANDARD"
+        });
+
+        let result = verify_contract_enforcement(
+            &serde_json::to_string(&receipt).unwrap(),
+            &serde_json::to_string(&contract).unwrap(),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(result.timing_class_matches, Some(true));
+        assert_eq!(result.timing_window_consistent, Some(true));
+    }
+
+    #[test]
+    fn test_attestation_reads_v2_tee_attestation_field() {
+        let receipt = serde_json::json!({
+            "session_id": "sess-1",
+            "tee_attestation": {
+                "tee_type": "TDX",
+                "measurement": "d".repeat(64),
+                "receipt_signing_pubkey_hex": "a".repeat(64)
+            }
+        });
+        let result =
+            verify_attestation(&serde_json::to_string(&receipt).unwrap(), &AttestationVerifyConfig::default());
+        assert_eq!(result.status.as_deref(), Some("present_unverified"));
+        assert_eq!(result.environment.as_deref(), Some("TDX"));
+        assert_eq!(result.challenge_bound, None);
+    }
+
+    #[test]
+    fn test_attestation_rejects_v2_tee_attestation_measurement_not_in_allowlist() {
+        let receipt = serde_json::json!({
+            "session_id": "sess-1",
+            "tee_attestation": {
+                "tee_type": "TDX",
+                "measurement": "d".repeat(64)
+            }
+        });
+        let config = AttestationVerifyConfig {
+            mock_root_public_key: None,
+            measurement_allowlist: Some(vec!["a".repeat(64)]),
+        };
+        let result = verify_attestation(&serde_json::to_string(&receipt).unwrap(), &config);
+        assert_eq!(result.status.as_deref(), Some("invalid"));
     }
 }

@@ -1,46 +1,81 @@
 {
-  "description": "Valid ABORTED receipt with null output and Ed25519 signature",
+  "description": "Valid current-format v2 aborted receipt with structured signature",
   "expected": {
-    "signature_hex": "415df5316045775d636176ea09e294ad993a37c8a15fe8325c21578a031174e59bdc7ed0d3f0d09d1d8f12e735dfaa701132584aca2364d77420af6ee5e8b707",
-    "verification_result": "PASS"
+    "verification_result": "PASS",
+    "signature": {
+      "alg": "Ed25519",
+      "signed_fields": "ALL_EXCEPT_SIGNATURE",
+      "value": "rPtSWCHzzKWFCs551kLF4jlqu5MEgmn0ksNgUflrBfF3Og9rDv772wts4cznrcy5rvgSH_weIqMPP5naA8ihDw"
+    }
   },
   "input": {
-    "canonical_json": "{\"budget_usage\":{\"bits_used_after\":8,\"bits_used_before\":8,\"budget_limit\":128,\"budget_tier\":\"DEFAULT\",\"pair_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"window_start\":\"2025-05-01T00:00:00Z\"},\"execution_lane\":\"SOFTWARE_LOCAL\",\"fixed_window_duration_seconds\":120,\"guardian_policy_hash\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"inference_config_hash\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"llama_cpp_version\":\"0.1.0\",\"mitigations_applied\":[],\"model_weights_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"output\":null,\"output_entropy_bits\":0,\"output_schema_version\":\"1.0.0\",\"participant_ids\":[\"agent-alice\",\"agent-bob\"],\"purpose_code\":\"SCHEDULING\",\"runtime_hash\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"schema_version\":\"1.0.0\",\"session_end\":\"2025-06-01T14:02:00Z\",\"session_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"session_start\":\"2025-06-01T14:00:00Z\",\"status\":\"ABORTED\"}",
-    "domain_prefix": "VCAV-RECEIPT-V1:",
-    "sha256_digest_hex": "53725d009a0aa8638c9947230db3dc6ad20571958da033ccb2289f091f2546ad",
-    "signing_key_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "domain_prefix": "VCAV-RECEIPT-V2:",
+    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "canonical_json": "{\"assurance_level\":\"SELF_ASSERTED\",\"claims\":{\"budget_enforcement_mode\":\"enforced\",\"budget_usage\":{\"bits_used_after\":12,\"bits_used_before\":12,\"budget_limit\":128},\"channel_capacity_bits_upper_bound\":12,\"channel_capacity_measurement_version\":\"enum_cardinality_v1\",\"entropy_budget_bits\":128,\"execution_lane\":\"standard\",\"model_identity_asserted\":\"gpt-4.1\",\"model_profile_hash_asserted\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"relay_software_version\":\"0.1.0\",\"runtime_hash_asserted\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"schema_entropy_ceiling_bits\":12,\"signal_class\":\"PROVIDER_TIMEOUT\",\"status\":\"aborted\"},\"commitments\":{\"assembled_prompt_hash\":\"7777777777777777777777777777777777777777777777777777777777777777\",\"contract_hash\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"effective_config_hash\":\"9999999999999999999999999999999999999999999999999999999999999999\",\"input_commitments\":[{\"canonicalization\":\"CANONICAL_JSON_V1\",\"hash_alg\":\"SHA-256\",\"input_hash\":\"5555555555555555555555555555555555555555555555555555555555555555\",\"participant_id\":\"agent-alice\"},{\"canonicalization\":\"CANONICAL_JSON_V1\",\"hash_alg\":\"SHA-256\",\"input_hash\":\"6666666666666666666666666666666666666666666666666666666666666666\",\"participant_id\":\"agent-bob\"}],\"output_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"preflight_bundle\":{\"enforcement_parameters\":{\"max_completion_tokens\":256,\"timeout_ms\":30000},\"model_profile_hash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"policy_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"prompt_template_hash\":\"8888888888888888888888888888888888888888888888888888888888888888\",\"schema_hash\":\"3333333333333333333333333333333333333333333333333333333333333333\"},\"prompt_assembly_version\":\"1.0.0\",\"prompt_template_hash\":\"8888888888888888888888888888888888888888888888888888888888888888\",\"schema_hash\":\"3333333333333333333333333333333333333333333333333333333333333333\"},\"issued_at\":\"2026-03-08T12:05:00Z\",\"operator\":{\"operator_id\":\"relay.agentvault.dev\",\"operator_key_fingerprint\":\"1111111111111111111111111111111111111111111111111111111111111111\"},\"receipt_canonicalization\":\"JCS_V1\",\"receipt_id\":\"receipt-v2-positive-02\",\"receipt_schema_version\":\"2.1.0\",\"session_id\":\"session-v2-positive-02\"}",
     "unsigned_receipt": {
-      "budget_usage": {
-        "bits_used_after": 8,
-        "bits_used_before": 8,
-        "budget_limit": 128,
-        "budget_tier": "DEFAULT",
-        "pair_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "window_start": "2025-05-01T00:00:00Z"
+      "assurance_level": "SELF_ASSERTED",
+      "claims": {
+        "budget_enforcement_mode": "enforced",
+        "budget_usage": {
+          "bits_used_after": 12,
+          "bits_used_before": 12,
+          "budget_limit": 128
+        },
+        "channel_capacity_bits_upper_bound": 12,
+        "channel_capacity_measurement_version": "enum_cardinality_v1",
+        "entropy_budget_bits": 128,
+        "execution_lane": "standard",
+        "model_identity_asserted": "gpt-4.1",
+        "model_profile_hash_asserted": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "relay_software_version": "0.1.0",
+        "runtime_hash_asserted": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "schema_entropy_ceiling_bits": 12,
+        "signal_class": "PROVIDER_TIMEOUT",
+        "status": "aborted"
       },
-      "execution_lane": "SOFTWARE_LOCAL",
-      "fixed_window_duration_seconds": 120,
-      "guardian_policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "inference_config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "llama_cpp_version": "0.1.0",
-      "mitigations_applied": [],
-      "model_weights_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "output": null,
-      "output_entropy_bits": 0,
-      "output_schema_version": "1.0.0",
-      "participant_ids": [
-        "agent-alice",
-        "agent-bob"
-      ],
-      "purpose_code": "SCHEDULING",
-      "runtime_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "schema_version": "1.0.0",
-      "session_end": "2025-06-01T14:02:00Z",
-      "session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "session_start": "2025-06-01T14:00:00Z",
-      "status": "ABORTED"
-    },
-    "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+      "commitments": {
+        "assembled_prompt_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+        "contract_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "effective_config_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+        "input_commitments": [
+          {
+            "canonicalization": "CANONICAL_JSON_V1",
+            "hash_alg": "SHA-256",
+            "input_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+            "participant_id": "agent-alice"
+          },
+          {
+            "canonicalization": "CANONICAL_JSON_V1",
+            "hash_alg": "SHA-256",
+            "input_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+            "participant_id": "agent-bob"
+          }
+        ],
+        "output_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "preflight_bundle": {
+          "enforcement_parameters": {
+            "max_completion_tokens": 256,
+            "timeout_ms": 30000
+          },
+          "model_profile_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "prompt_template_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+          "schema_hash": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        "prompt_assembly_version": "1.0.0",
+        "prompt_template_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+        "schema_hash": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "issued_at": "2026-03-08T12:05:00Z",
+      "operator": {
+        "operator_id": "relay.agentvault.dev",
+        "operator_key_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "receipt_canonicalization": "JCS_V1",
+      "receipt_id": "receipt-v2-positive-02",
+      "receipt_schema_version": "2.1.0",
+      "session_id": "session-v2-positive-02"
+    }
   },
   "schemas": [
     "https://vcav.io/schemas/receipt.v2.schema.json"
