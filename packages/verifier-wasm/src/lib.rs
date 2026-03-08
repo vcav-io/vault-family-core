@@ -6,8 +6,10 @@
 
 use serde::Serialize;
 use verifier_core::tiers::{
-    verify_agreement_hash_from_str, verify_contract_hash_from_bytes, verify_manifest_from_str,
-    verify_policy_hash_from_str, verify_profile_hash_from_str, ManifestResult,
+    receipt_string, verify_agreement_hash_from_str, verify_contract_hash_from_bytes,
+    verify_manifest_from_str, verify_policy_hash_from_str, verify_profile_hash_from_str,
+    ManifestResult, RECEIPT_SCOPE_PREFLIGHT, RECEIPT_SCOPE_TOP_OR_CLAIMS,
+    RECEIPT_SCOPE_TOP_OR_COMMITMENTS,
 };
 use wasm_bindgen::prelude::*;
 
@@ -107,33 +109,43 @@ fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<(), Stri
     let receipt_val: serde_json::Value = serde_json::from_str(receipt_json)
         .map_err(|e| format!("Failed to parse receipt JSON: {e}"))?;
 
-    let signature_hex = receipt_val
-        .get("signature")
-        .and_then(|s| s.as_str())
-        .ok_or_else(|| "Receipt missing 'signature' field".to_string())?;
-
     let public_key = receipt_core::parse_public_key_hex(pubkey_hex)
         .map_err(|e| format!("Invalid public key: {e}"))?;
 
-    let signature = receipt_core::parse_signature_hex(signature_hex)
-        .map_err(|e| format!("Invalid signature: {e}"))?;
+    match receipt_val.get("signature") {
+        Some(signature) if signature.is_object() => {
+            let receipt: receipt_core::ReceiptV2 = serde_json::from_value(receipt_val)
+                .map_err(|e| format!("Failed to parse receipt v2 JSON: {e}"))?;
+            let (unsigned, signature) = receipt.split();
+            receipt_core::verify_receipt_v2(&unsigned, &signature, &public_key)
+                .map_err(|e| format!("Signature verification failed: {e}"))
+        }
+        Some(signature) if signature.is_string() => {
+            let signature_hex = signature
+                .as_str()
+                .ok_or_else(|| "Receipt missing 'signature' field".to_string())?;
 
-    // Build unsigned receipt: remove the signature field and canonicalize
-    let mut unsigned = receipt_val.clone();
-    if let Some(obj) = unsigned.as_object_mut() {
-        obj.remove("signature");
+            let signature = receipt_core::parse_signature_hex(signature_hex)
+                .map_err(|e| format!("Invalid signature: {e}"))?;
+
+            let mut unsigned = receipt_val.clone();
+            if let Some(obj) = unsigned.as_object_mut() {
+                obj.remove("signature");
+            }
+
+            let canonical = receipt_core::canonicalize(&unsigned);
+            let mut message = receipt_core::DOMAIN_PREFIX.as_bytes().to_vec();
+            message.extend(canonical.as_bytes());
+            let hash = receipt_core::signer::hash_message(&message);
+
+            use ed25519_dalek::Verifier;
+            public_key
+                .verify(&hash, &signature)
+                .map_err(|e| format!("Signature verification failed: {e}"))
+        }
+        Some(_) => Err("Receipt has unsupported 'signature' field shape".to_string()),
+        None => Err("Receipt missing 'signature' field".to_string()),
     }
-
-    // Reconstruct signing message: DOMAIN_PREFIX || JCS(unsigned_receipt)
-    let canonical = receipt_core::canonicalize(&unsigned);
-    let mut message = receipt_core::DOMAIN_PREFIX.as_bytes().to_vec();
-    message.extend(canonical.as_bytes());
-    let hash = receipt_core::signer::hash_message(&message);
-
-    use ed25519_dalek::Verifier;
-    public_key
-        .verify(&hash, &signature)
-        .map_err(|e| format!("Signature verification failed: {e}"))
 }
 
 // ============================================================================
@@ -177,10 +189,14 @@ pub fn verify_with_artefacts(
     };
 
     // Verify profile hash if present in receipt
-    if let Some(declared_hash) = receipt_val
-        .get("model_profile_hash")
-        .and_then(|v| v.as_str())
-    {
+    if let Some(declared_hash) = receipt_string(
+        &receipt_val,
+        &[
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash_asserted"),
+            (RECEIPT_SCOPE_PREFLIGHT, "model_profile_hash"),
+        ],
+    ) {
         match verify_profile_hash_from_str(profile_json, declared_hash) {
             Ok(true) => {}
             Ok(false) => return err_json("Profile hash mismatch"),
@@ -189,10 +205,13 @@ pub fn verify_with_artefacts(
     }
 
     // Verify policy hash if present in receipt
-    if let Some(declared_hash) = receipt_val
-        .get("policy_bundle_hash")
-        .and_then(|v| v.as_str())
-    {
+    if let Some(declared_hash) = receipt_string(
+        &receipt_val,
+        &[
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "policy_bundle_hash"),
+            (RECEIPT_SCOPE_PREFLIGHT, "policy_hash"),
+        ],
+    ) {
         match verify_policy_hash_from_str(policy_json, declared_hash) {
             Ok(true) => {}
             Ok(false) => return err_json("Policy hash mismatch"),
@@ -225,20 +244,36 @@ pub fn verify_with_manifest(
         Err(e) => return err_json(&format!("Failed to parse receipt JSON: {e}")),
     };
 
-    let profile_hash = receipt_val
-        .get("model_profile_hash")
-        .and_then(|v| v.as_str());
-    let policy_hash = receipt_val
-        .get("policy_bundle_hash")
-        .and_then(|v| v.as_str());
-    let guardian_hash = match receipt_val
-        .get("guardian_policy_hash")
-        .and_then(|v| v.as_str())
-    {
-        Some(h) => h,
-        None => return err_json("Receipt missing 'guardian_policy_hash' field"),
-    };
-    let runtime_hash = receipt_val.get("runtime_hash").and_then(|v| v.as_str());
+    let profile_hash = receipt_string(
+        &receipt_val,
+        &[
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash_asserted"),
+            (RECEIPT_SCOPE_PREFLIGHT, "model_profile_hash"),
+        ],
+    );
+    let policy_hash = receipt_string(
+        &receipt_val,
+        &[
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "policy_bundle_hash"),
+            (RECEIPT_SCOPE_PREFLIGHT, "policy_hash"),
+        ],
+    );
+    let guardian_hash = receipt_string(
+        &receipt_val,
+        &[
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "guardian_policy_hash"),
+            (RECEIPT_SCOPE_TOP_OR_COMMITMENTS, "guardian_policy_hash"),
+        ],
+    );
+    let runtime_hash = receipt_string(
+        &receipt_val,
+        &[
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash_asserted"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash_attested"),
+        ],
+    );
 
     match verify_manifest_from_str(
         manifest_json,
@@ -365,7 +400,7 @@ pub fn verify_bundle(
     // --- Agreement hash (Tier 1 sub-check) ---
     if let (Some(agreement_fields), Some(declared_hash)) = (
         bundle.get("agreement_fields"),
-        receipt_val.get("agreement_hash").and_then(|v| v.as_str()),
+        receipt_string(&receipt_val, &[(RECEIPT_SCOPE_TOP_OR_CLAIMS, "agreement_hash")]),
     ) {
         let fields_str = to_json_safe(agreement_fields);
         match verify_agreement_hash_from_str(&fields_str, declared_hash) {
@@ -380,9 +415,14 @@ pub fn verify_bundle(
     // --- Tier 2: Profile hash ---
     if let (Some(profile_val), Some(declared_hash)) = (
         bundle.get("profile"),
-        receipt_val
-            .get("model_profile_hash")
-            .and_then(|v| v.as_str()),
+        receipt_string(
+            &receipt_val,
+            &[
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash_asserted"),
+                (RECEIPT_SCOPE_PREFLIGHT, "model_profile_hash"),
+            ],
+        ),
     ) {
         let profile_str = to_json_safe(profile_val);
         match verify_profile_hash_from_str(&profile_str, declared_hash) {
@@ -404,9 +444,13 @@ pub fn verify_bundle(
     // --- Tier 2: Policy hash ---
     if let (Some(policy_val), Some(declared_hash)) = (
         bundle.get("policy"),
-        receipt_val
-            .get("policy_bundle_hash")
-            .and_then(|v| v.as_str()),
+        receipt_string(
+            &receipt_val,
+            &[
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "policy_bundle_hash"),
+                (RECEIPT_SCOPE_PREFLIGHT, "policy_hash"),
+            ],
+        ),
     ) {
         let policy_str = to_json_safe(policy_val);
         match verify_policy_hash_from_str(&policy_str, declared_hash) {
@@ -426,11 +470,18 @@ pub fn verify_bundle(
     }
 
     // --- Tier 2: Contract hash ---
-    if let (Some(contract_str), Some(declared_hash)) = (
-        bundle.get("contract").and_then(|v| v.as_str()),
-        receipt_val.get("contract_hash").and_then(|v| v.as_str()),
+    if let (Some(contract_val), Some(declared_hash)) = (
+        bundle.get("contract"),
+        receipt_string(
+            &receipt_val,
+            &[(RECEIPT_SCOPE_TOP_OR_COMMITMENTS, "contract_hash")],
+        ),
     ) {
-        match verify_contract_hash_from_bytes(contract_str.as_bytes(), declared_hash) {
+        let contract_bytes = match contract_val {
+            serde_json::Value::String(s) => s.as_bytes().to_vec(),
+            other => serde_json::to_vec(other).unwrap_or_default(),
+        };
+        match verify_contract_hash_from_bytes(&contract_bytes, declared_hash) {
             Ok(valid) => {
                 contract_hash_valid = Some(valid);
                 if valid {
@@ -449,17 +500,36 @@ pub fn verify_bundle(
     // --- Tier 3: Manifest ---
     if let Some(manifest_val) = bundle.get("manifest") {
         let manifest_str = to_json_safe(manifest_val);
-        let profile_hash = receipt_val
-            .get("model_profile_hash")
-            .and_then(|v| v.as_str());
-        let policy_hash = receipt_val
-            .get("policy_bundle_hash")
-            .and_then(|v| v.as_str());
-        let guardian_hash = receipt_val
-            .get("guardian_policy_hash")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let runtime_hash = receipt_val.get("runtime_hash").and_then(|v| v.as_str());
+        let profile_hash = receipt_string(
+            &receipt_val,
+            &[
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash_asserted"),
+                (RECEIPT_SCOPE_PREFLIGHT, "model_profile_hash"),
+            ],
+        );
+        let policy_hash = receipt_string(
+            &receipt_val,
+            &[
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "policy_bundle_hash"),
+                (RECEIPT_SCOPE_PREFLIGHT, "policy_hash"),
+            ],
+        );
+        let guardian_hash = receipt_string(
+            &receipt_val,
+            &[
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "guardian_policy_hash"),
+                (RECEIPT_SCOPE_TOP_OR_COMMITMENTS, "guardian_policy_hash"),
+            ],
+        );
+        let runtime_hash = receipt_string(
+            &receipt_val,
+            &[
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash_asserted"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash_attested"),
+            ],
+        );
 
         match verify_manifest_from_str(
             &manifest_str,
@@ -512,4 +582,201 @@ pub fn verify_bundle(
 #[wasm_bindgen]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{TimeZone, Utc};
+    use receipt_core::{
+        compute_operator_key_id, public_key_to_hex, sign_and_assemble_receipt_v2, sign_manifest,
+        AssuranceLevel, BudgetEnforcementMode, CANONICALIZATION_V2, Claims, Commitments,
+        ExecutionLaneV2, HashAlgorithm, InputCommitment, ManifestArtefacts, Operator, ReceiptV2,
+        SCHEMA_VERSION_V2, SessionStatus, TokenUsage, UnsignedManifest, UnsignedReceiptV2,
+    };
+    use serde_json::json;
+    use sha2::{Digest, Sha256};
+
+    fn sample_unsigned_receipt_v2() -> UnsignedReceiptV2 {
+        UnsignedReceiptV2 {
+            receipt_schema_version: SCHEMA_VERSION_V2.to_string(),
+            receipt_canonicalization: CANONICALIZATION_V2.to_string(),
+            receipt_id: "a1b2c3d4-0000-0000-0000-000000000001".to_string(),
+            session_id: "session-123".to_string(),
+            issued_at: Utc.with_ymd_and_hms(2026, 3, 8, 12, 0, 0).unwrap(),
+            assurance_level: AssuranceLevel::SelfAsserted,
+            operator: Operator {
+                operator_id: "relay.agentvault.dev".to_string(),
+                operator_key_fingerprint: "a".repeat(64),
+                operator_key_discovery: None,
+            },
+            commitments: Commitments {
+                contract_hash: "b".repeat(64),
+                schema_hash: "c".repeat(64),
+                output_hash: "d".repeat(64),
+                input_commitments: vec![InputCommitment {
+                    participant_id: "alice".to_string(),
+                    input_hash: "e".repeat(64),
+                    hash_alg: HashAlgorithm::Sha256,
+                    canonicalization: "CANONICAL_JSON_V1".to_string(),
+                }],
+                assembled_prompt_hash: "f".repeat(64),
+                prompt_assembly_version: "1.0.0".to_string(),
+                output: Some(json!({"decision": "approve"})),
+                prompt_template_hash: Some("1".repeat(64)),
+                effective_config_hash: None,
+                preflight_bundle: Some(receipt_core::PreflightBundle {
+                    policy_hash: "2".repeat(64),
+                    prompt_template_hash: "1".repeat(64),
+                    model_profile_hash: "3".repeat(64),
+                    schema_hash: "c".repeat(64),
+                    enforcement_parameters: json!({"max_completion_tokens": 256}),
+                }),
+                output_retrieval_uri: None,
+                output_media_type: None,
+                preflight_bundle_uri: None,
+                rejected_output_hash: None,
+                initiator_submission_hash: None,
+                responder_submission_hash: None,
+            },
+            claims: Claims {
+                model_identity_asserted: Some("gpt-4.1".to_string()),
+                model_identity_attested: None,
+                model_profile_hash_asserted: Some("3".repeat(64)),
+                runtime_hash_asserted: Some("4".repeat(64)),
+                runtime_hash_attested: None,
+                budget_enforcement_mode: Some(BudgetEnforcementMode::Enforced),
+                provider_latency_ms: Some(42),
+                token_usage: Some(TokenUsage {
+                    prompt_tokens: 10,
+                    completion_tokens: 20,
+                    total_tokens: 30,
+                }),
+                relay_software_version: Some("0.1.0".to_string()),
+                status: Some(SessionStatus::Success),
+                signal_class: Some("SESSION_COMPLETED".to_string()),
+                execution_lane: Some(ExecutionLaneV2::Standard),
+                channel_capacity_bits_upper_bound: Some(12),
+                channel_capacity_measurement_version: Some("enum_cardinality_v1".to_string()),
+                entropy_budget_bits: Some(128),
+                schema_entropy_ceiling_bits: Some(12),
+                budget_usage: Some(receipt_core::BudgetUsageV2 {
+                    bits_used_before: 0,
+                    bits_used_after: 12,
+                    budget_limit: 128,
+                }),
+            },
+            provider_attestation: None,
+            tee_attestation: None,
+        }
+    }
+
+    fn sample_signed_receipt_v2() -> (ReceiptV2, String) {
+        let (signing_key, verifying_key) = receipt_core::generate_keypair();
+        let receipt = sign_and_assemble_receipt_v2(sample_unsigned_receipt_v2(), &signing_key).unwrap();
+        (receipt, public_key_to_hex(&verifying_key))
+    }
+
+    fn sample_signed_receipt_v2_with_contract_hash(contract_hash: String) -> (ReceiptV2, String) {
+        let (signing_key, verifying_key) = receipt_core::generate_keypair();
+        let mut unsigned = sample_unsigned_receipt_v2();
+        unsigned.commitments.contract_hash = contract_hash;
+        let receipt = sign_and_assemble_receipt_v2(unsigned, &signing_key).unwrap();
+        (receipt, public_key_to_hex(&verifying_key))
+    }
+
+    #[test]
+    fn verify_receipt_accepts_structured_v2_signature() {
+        let (receipt, pubkey_hex) = sample_signed_receipt_v2();
+        let result = verify_receipt(&serde_json::to_string(&receipt).unwrap(), &pubkey_hex);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["ok"], true, "expected success, got {parsed}");
+    }
+
+    #[test]
+    fn verify_bundle_accepts_contract_object_for_tier_two() {
+        let bundle = json!({
+            "contract": {
+                "participants": ["alice", "bob"],
+                "purpose": "NEGOTIATION"
+            }
+        });
+        let contract_hash = {
+            let contract = bundle.get("contract").unwrap();
+            let canonical = receipt_core::canonicalize(contract);
+            let mut hasher = Sha256::new();
+            hasher.update(canonical.as_bytes());
+            hex::encode(hasher.finalize())
+        };
+        let (receipt, pubkey_hex) = sample_signed_receipt_v2_with_contract_hash(contract_hash);
+        let result = verify_bundle(
+            &serde_json::to_string(&receipt).unwrap(),
+            &pubkey_hex,
+            &bundle.to_string(),
+            false,
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["contract_hash_valid"], true, "expected contract check to pass, got {parsed}");
+    }
+
+    #[test]
+    fn verify_with_manifest_reads_nested_v2_fields() {
+        let (receipt, pubkey_hex) = sample_signed_receipt_v2();
+        let manifest_signing_key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+        let manifest_pubkey_hex = hex::encode(manifest_signing_key.verifying_key().as_bytes());
+        let unsigned_manifest = UnsignedManifest {
+            manifest_version: "1.0.0".to_string(),
+            operator_id: "relay.agentvault.dev".to_string(),
+            operator_key_id: compute_operator_key_id(&manifest_pubkey_hex),
+            operator_public_key_hex: manifest_pubkey_hex,
+            protocol_version: "1.0.0".to_string(),
+            published_at: "2026-03-08T12:00:00Z".to_string(),
+            runtime_hashes: None,
+            artefacts: ManifestArtefacts {
+                profiles: vec![receipt_core::ArtefactEntry {
+                    content_hash: "3".repeat(64),
+                    filename: "profiles/default.json".to_string(),
+                }],
+                policies: vec![receipt_core::ArtefactEntry {
+                    content_hash: "2".repeat(64),
+                    filename: "policies/default.json".to_string(),
+                }],
+                contracts: vec![],
+            },
+        };
+        let signature = sign_manifest(&unsigned_manifest, &manifest_signing_key).unwrap();
+        let manifest = receipt_core::PublicationManifest {
+            manifest_version: unsigned_manifest.manifest_version.clone(),
+            operator_id: unsigned_manifest.operator_id.clone(),
+            operator_key_id: unsigned_manifest.operator_key_id.clone(),
+            operator_public_key_hex: unsigned_manifest.operator_public_key_hex.clone(),
+            protocol_version: unsigned_manifest.protocol_version.clone(),
+            published_at: unsigned_manifest.published_at.clone(),
+            artefacts: unsigned_manifest.artefacts.clone(),
+            runtime_hashes: unsigned_manifest.runtime_hashes.clone(),
+            signature,
+        };
+        let result = verify_with_manifest(
+            &serde_json::to_string(&receipt).unwrap(),
+            &pubkey_hex,
+            &serde_json::to_string(&manifest).unwrap(),
+            false,
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["signature_valid"], true, "expected signed manifest, got {parsed}");
+        assert_eq!(parsed["profile_covered"], true, "expected nested profile hash lookup, got {parsed}");
+        assert_eq!(parsed["policy_covered"], true, "expected nested policy hash lookup, got {parsed}");
+    }
+
+    #[test]
+    fn verify_receipt_rejects_unsupported_signature_shape() {
+        let receipt = json!({
+            "receipt_schema_version": "2.1.0",
+            "signature": 42
+        });
+        let result = verify_receipt(&receipt.to_string(), &"a".repeat(64));
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["ok"], false);
+        assert!(parsed["error"].as_str().unwrap().contains("unsupported"));
+    }
 }

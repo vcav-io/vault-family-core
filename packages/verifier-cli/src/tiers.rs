@@ -299,7 +299,7 @@ pub fn verify_manifest_tier(
     manifest_path: &Path,
     receipt_profile_hash: Option<&str>,
     receipt_policy_hash: Option<&str>,
-    receipt_guardian_hash: &str,
+    receipt_guardian_hash: Option<&str>,
     receipt_runtime_hash: Option<&str>,
     strict_runtime: bool,
 ) -> Result<ManifestResult, ManifestVerifyError> {
