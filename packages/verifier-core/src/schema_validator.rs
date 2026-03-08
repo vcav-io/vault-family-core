@@ -14,6 +14,8 @@ pub struct EmbeddedSchemaEntry {
 }
 
 // vault-family-core schemas
+pub const CONTRACT_SCHEMA: &str =
+    include_str!(concat!(env!("OUT_DIR"), "/family/contract.schema.json"));
 pub const RECEIPT_SCHEMA: &str =
     include_str!(concat!(env!("OUT_DIR"), "/family/receipt.schema.json"));
 pub const RECEIPT_V2_SCHEMA: &str =
@@ -77,6 +79,10 @@ pub const VAULT_RESULT_SCHEDULING_COMPAT_V1_SCHEMA: &str = include_str!(concat!(
 
 /// All embedded schemas as a static array.
 pub const SCHEMAS: &[EmbeddedSchemaEntry] = &[
+    EmbeddedSchemaEntry {
+        filename: "contract.schema.json",
+        content: CONTRACT_SCHEMA,
+    },
     EmbeddedSchemaEntry {
         filename: "receipt.schema.json",
         content: RECEIPT_SCHEMA,
@@ -161,6 +167,6 @@ mod tests {
 
     #[test]
     fn test_schema_count() {
-        assert_eq!(SCHEMAS.len(), 16, "Should have 16 embedded family schemas");
+        assert_eq!(SCHEMAS.len(), 17, "Should have 17 embedded family schemas");
     }
 }

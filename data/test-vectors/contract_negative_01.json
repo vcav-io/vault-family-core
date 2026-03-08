@@ -1,0 +1,21 @@
+{
+  "description": "Contract negative: malformed prompt template hash is rejected by the canonical contract schema",
+  "expected": {
+    "schema_validation": "FAIL"
+  },
+  "input": {
+    "contract": {
+      "purpose_code": "COMPATIBILITY",
+      "output_schema_id": "urn:vcav:schema:compatibility.v1",
+      "output_schema": {},
+      "participants": [
+        "agent-alice",
+        "agent-bob"
+      ],
+      "prompt_template_hash": "not-a-hash"
+    }
+  },
+  "schemas": [
+    "https://vcav.io/schemas/contract.schema.json"
+  ]
+}

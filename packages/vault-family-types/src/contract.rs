@@ -111,6 +111,16 @@ pub struct Contract {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jsonschema::JSONSchema;
+    use serde_json::json;
+
+    fn compile_contract_schema() -> JSONSchema {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../schemas/contract.schema.json"
+        ))
+        .unwrap();
+        JSONSchema::compile(&schema).unwrap()
+    }
 
     #[test]
     fn test_contract_serde_roundtrip() {
@@ -153,5 +163,58 @@ mod tests {
         assert!(contract.entropy_budget_bits.is_none());
         assert!(contract.timing_class.is_none());
         assert!(contract.model_profile_id.is_none());
+    }
+
+    #[test]
+    fn test_contract_schema_accepts_current_v2_shape() {
+        let validator = compile_contract_schema();
+        let contract = json!({
+            "purpose_code": "MEDIATION",
+            "output_schema_id": "urn:vcav:schema:mediation.e18.v1",
+            "output_schema": {},
+            "participants": ["agent-alice", "agent-bob"],
+            "prompt_template_hash": "a3f2f8f5ed1b68f2ba0c2fb0216f49f23eb2e8285e4a6575d72a4f75f2ef7e3c",
+            "entropy_budget_bits": 16,
+            "timing_class": "fixed-window",
+            "metadata": {
+                "ui": "agentvault",
+                "flow": "bilateral"
+            },
+            "model_profile_id": "sealed-demo-v2",
+            "enforcement_policy_hash": "6d6c6cc26d91708d7fd8f12cf5d7f7f86d5b59f60f9748f2d2730a4ac89d56be",
+            "output_schema_hash": "8278e0910d750195b448797616e091ad6dd17d43db59e148f8d7b9727e1e48d0",
+            "model_constraints": {
+                "allowed_providers": ["anthropic", "openai"],
+                "allowed_models": ["claude-sonnet-*", "gpt-4.1*"],
+                "min_tier": "mid"
+            },
+            "max_completion_tokens": 512,
+            "session_ttl_secs": 600,
+            "invite_ttl_secs": 300,
+            "entropy_enforcement": "Gate",
+            "relay_verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+        });
+
+        assert!(
+            validator.is_valid(&contract),
+            "current contract shape should validate against contract.schema.json"
+        );
+    }
+
+    #[test]
+    fn test_contract_schema_rejects_invalid_hash_fields() {
+        let validator = compile_contract_schema();
+        let contract = json!({
+            "purpose_code": "COMPATIBILITY",
+            "output_schema_id": "urn:vcav:schema:compatibility.v1",
+            "output_schema": {},
+            "participants": ["agent-alice", "agent-bob"],
+            "prompt_template_hash": "not-a-hash"
+        });
+
+        assert!(
+            !validator.is_valid(&contract),
+            "contract schema should reject malformed hash fields"
+        );
     }
 }

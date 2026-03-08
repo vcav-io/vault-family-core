@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/contract.schema.json",
+  "title": "Contract",
+  "description": "Canonical schema for the current vault-family-core Contract wire format.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "purpose_code",
+    "output_schema_id",
+    "output_schema",
+    "participants",
+    "prompt_template_hash"
+  ],
+  "properties": {
+    "purpose_code": {
+      "type": "string",
+      "enum": [
+        "COMPATIBILITY",
+        "SCHEDULING",
+        "MEDIATION",
+        "NEGOTIATION",
+        "SCHEDULING_COMPAT_V1"
+      ]
+    },
+    "output_schema_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "output_schema": {},
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "prompt_template_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "entropy_budget_bits": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "timing_class": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {},
+    "model_profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "enforcement_policy_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "output_schema_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "model_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed_providers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowed_models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "min_tier": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "max_completion_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "session_ttl_secs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "invite_ttl_secs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "entropy_enforcement": {
+      "type": "string",
+      "enum": [
+        "Advisory",
+        "Gate",
+        "Strict"
+      ]
+    },
+    "relay_verifying_key_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
