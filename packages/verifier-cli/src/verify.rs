@@ -572,7 +572,7 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
             Path::new(manifest_path),
             receipt.model_profile_hash.as_deref(),
             receipt.policy_bundle_hash.as_deref(),
-            &receipt.guardian_policy_hash,
+            Some(&receipt.guardian_policy_hash),
             Some(&receipt.runtime_hash),
             args.strict_runtime,
         ) {

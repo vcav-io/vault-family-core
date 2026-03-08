@@ -6,8 +6,10 @@
 
 use serde::Serialize;
 use verifier_core::tiers::{
-    verify_agreement_hash_from_str, verify_contract_hash_from_bytes, verify_manifest_from_str,
-    verify_policy_hash_from_str, verify_profile_hash_from_str, ManifestResult,
+    receipt_string, verify_agreement_hash_from_str, verify_contract_hash_from_bytes,
+    verify_manifest_from_str, verify_policy_hash_from_str, verify_profile_hash_from_str,
+    ManifestResult, RECEIPT_SCOPE_PREFLIGHT, RECEIPT_SCOPE_TOP_OR_CLAIMS,
+    RECEIPT_SCOPE_TOP_OR_COMMITMENTS,
 };
 use wasm_bindgen::prelude::*;
 
@@ -96,42 +98,6 @@ fn err_json(msg: &str) -> String {
         ok: false,
         error: Some(msg.to_string()),
     })
-}
-
-fn receipt_top_or_claims<'a>(receipt: &'a serde_json::Value, key: &str) -> Option<&'a serde_json::Value> {
-    receipt
-        .get(key)
-        .or_else(|| receipt.get("claims").and_then(|claims| claims.get(key)))
-}
-
-fn receipt_top_or_commitments<'a>(
-    receipt: &'a serde_json::Value,
-    key: &str,
-) -> Option<&'a serde_json::Value> {
-    receipt
-        .get(key)
-        .or_else(|| receipt.get("commitments").and_then(|commitments| commitments.get(key)))
-}
-
-fn receipt_preflight<'a>(
-    receipt: &'a serde_json::Value,
-    key: &str,
-) -> Option<&'a serde_json::Value> {
-    receipt
-        .get("commitments")
-        .and_then(|commitments| commitments.get("preflight_bundle"))
-        .and_then(|bundle| bundle.get(key))
-}
-
-fn receipt_str<'a>(receipt: &'a serde_json::Value, keys: &[(&str, &'static str)]) -> Option<&'a str> {
-    keys.iter()
-        .find_map(|(scope, key)| match *scope {
-            "top_or_claims" => receipt_top_or_claims(receipt, key),
-            "top_or_commitments" => receipt_top_or_commitments(receipt, key),
-            "preflight" => receipt_preflight(receipt, key),
-            _ => None,
-        })
-        .and_then(|value| value.as_str())
 }
 
 // ============================================================================
@@ -223,12 +189,12 @@ pub fn verify_with_artefacts(
     };
 
     // Verify profile hash if present in receipt
-    if let Some(declared_hash) = receipt_str(
+    if let Some(declared_hash) = receipt_string(
         &receipt_val,
         &[
-            ("top_or_claims", "model_profile_hash"),
-            ("top_or_claims", "model_profile_hash_asserted"),
-            ("preflight", "model_profile_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash_asserted"),
+            (RECEIPT_SCOPE_PREFLIGHT, "model_profile_hash"),
         ],
     ) {
         match verify_profile_hash_from_str(profile_json, declared_hash) {
@@ -239,11 +205,11 @@ pub fn verify_with_artefacts(
     }
 
     // Verify policy hash if present in receipt
-    if let Some(declared_hash) = receipt_str(
+    if let Some(declared_hash) = receipt_string(
         &receipt_val,
         &[
-            ("top_or_claims", "policy_bundle_hash"),
-            ("preflight", "policy_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "policy_bundle_hash"),
+            (RECEIPT_SCOPE_PREFLIGHT, "policy_hash"),
         ],
     ) {
         match verify_policy_hash_from_str(policy_json, declared_hash) {
@@ -278,35 +244,34 @@ pub fn verify_with_manifest(
         Err(e) => return err_json(&format!("Failed to parse receipt JSON: {e}")),
     };
 
-    let profile_hash = receipt_str(
+    let profile_hash = receipt_string(
         &receipt_val,
         &[
-            ("top_or_claims", "model_profile_hash"),
-            ("top_or_claims", "model_profile_hash_asserted"),
-            ("preflight", "model_profile_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash_asserted"),
+            (RECEIPT_SCOPE_PREFLIGHT, "model_profile_hash"),
         ],
     );
-    let policy_hash = receipt_str(
+    let policy_hash = receipt_string(
         &receipt_val,
         &[
-            ("top_or_claims", "policy_bundle_hash"),
-            ("preflight", "policy_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "policy_bundle_hash"),
+            (RECEIPT_SCOPE_PREFLIGHT, "policy_hash"),
         ],
     );
-    let guardian_hash = receipt_str(
+    let guardian_hash = receipt_string(
         &receipt_val,
         &[
-            ("top_or_claims", "guardian_policy_hash"),
-            ("top_or_commitments", "guardian_policy_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "guardian_policy_hash"),
+            (RECEIPT_SCOPE_TOP_OR_COMMITMENTS, "guardian_policy_hash"),
         ],
-    )
-    .unwrap_or("");
-    let runtime_hash = receipt_str(
+    );
+    let runtime_hash = receipt_string(
         &receipt_val,
         &[
-            ("top_or_claims", "runtime_hash"),
-            ("top_or_claims", "runtime_hash_asserted"),
-            ("top_or_claims", "runtime_hash_attested"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash_asserted"),
+            (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash_attested"),
         ],
     );
 
@@ -435,7 +400,7 @@ pub fn verify_bundle(
     // --- Agreement hash (Tier 1 sub-check) ---
     if let (Some(agreement_fields), Some(declared_hash)) = (
         bundle.get("agreement_fields"),
-        receipt_str(&receipt_val, &[("top_or_claims", "agreement_hash")]),
+        receipt_string(&receipt_val, &[(RECEIPT_SCOPE_TOP_OR_CLAIMS, "agreement_hash")]),
     ) {
         let fields_str = to_json_safe(agreement_fields);
         match verify_agreement_hash_from_str(&fields_str, declared_hash) {
@@ -450,12 +415,12 @@ pub fn verify_bundle(
     // --- Tier 2: Profile hash ---
     if let (Some(profile_val), Some(declared_hash)) = (
         bundle.get("profile"),
-        receipt_str(
+        receipt_string(
             &receipt_val,
             &[
-                ("top_or_claims", "model_profile_hash"),
-                ("top_or_claims", "model_profile_hash_asserted"),
-                ("preflight", "model_profile_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash_asserted"),
+                (RECEIPT_SCOPE_PREFLIGHT, "model_profile_hash"),
             ],
         ),
     ) {
@@ -479,11 +444,11 @@ pub fn verify_bundle(
     // --- Tier 2: Policy hash ---
     if let (Some(policy_val), Some(declared_hash)) = (
         bundle.get("policy"),
-        receipt_str(
+        receipt_string(
             &receipt_val,
             &[
-                ("top_or_claims", "policy_bundle_hash"),
-                ("preflight", "policy_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "policy_bundle_hash"),
+                (RECEIPT_SCOPE_PREFLIGHT, "policy_hash"),
             ],
         ),
     ) {
@@ -507,7 +472,10 @@ pub fn verify_bundle(
     // --- Tier 2: Contract hash ---
     if let (Some(contract_val), Some(declared_hash)) = (
         bundle.get("contract"),
-        receipt_str(&receipt_val, &[("top_or_commitments", "contract_hash")]),
+        receipt_string(
+            &receipt_val,
+            &[(RECEIPT_SCOPE_TOP_OR_COMMITMENTS, "contract_hash")],
+        ),
     ) {
         let contract_bytes = match contract_val {
             serde_json::Value::String(s) => s.as_bytes().to_vec(),
@@ -532,35 +500,34 @@ pub fn verify_bundle(
     // --- Tier 3: Manifest ---
     if let Some(manifest_val) = bundle.get("manifest") {
         let manifest_str = to_json_safe(manifest_val);
-        let profile_hash = receipt_str(
+        let profile_hash = receipt_string(
             &receipt_val,
             &[
-                ("top_or_claims", "model_profile_hash"),
-                ("top_or_claims", "model_profile_hash_asserted"),
-                ("preflight", "model_profile_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "model_profile_hash_asserted"),
+                (RECEIPT_SCOPE_PREFLIGHT, "model_profile_hash"),
             ],
         );
-        let policy_hash = receipt_str(
+        let policy_hash = receipt_string(
             &receipt_val,
             &[
-                ("top_or_claims", "policy_bundle_hash"),
-                ("preflight", "policy_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "policy_bundle_hash"),
+                (RECEIPT_SCOPE_PREFLIGHT, "policy_hash"),
             ],
         );
-        let guardian_hash = receipt_str(
+        let guardian_hash = receipt_string(
             &receipt_val,
             &[
-                ("top_or_claims", "guardian_policy_hash"),
-                ("top_or_commitments", "guardian_policy_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "guardian_policy_hash"),
+                (RECEIPT_SCOPE_TOP_OR_COMMITMENTS, "guardian_policy_hash"),
             ],
-        )
-        .unwrap_or("");
-        let runtime_hash = receipt_str(
+        );
+        let runtime_hash = receipt_string(
             &receipt_val,
             &[
-                ("top_or_claims", "runtime_hash"),
-                ("top_or_claims", "runtime_hash_asserted"),
-                ("top_or_claims", "runtime_hash_attested"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash_asserted"),
+                (RECEIPT_SCOPE_TOP_OR_CLAIMS, "runtime_hash_attested"),
             ],
         );
 

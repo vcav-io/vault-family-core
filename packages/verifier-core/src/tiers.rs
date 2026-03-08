@@ -220,13 +220,20 @@ fn timing_class_window_seconds(class: &str) -> Option<u64> {
     }
 }
 
-fn receipt_top_or_claims<'a>(receipt: &'a serde_json::Value, key: &str) -> Option<&'a serde_json::Value> {
+pub const RECEIPT_SCOPE_TOP_OR_CLAIMS: &str = "top_or_claims";
+pub const RECEIPT_SCOPE_TOP_OR_COMMITMENTS: &str = "top_or_commitments";
+pub const RECEIPT_SCOPE_PREFLIGHT: &str = "preflight";
+
+pub fn receipt_top_or_claims<'a>(
+    receipt: &'a serde_json::Value,
+    key: &str,
+) -> Option<&'a serde_json::Value> {
     receipt
         .get(key)
         .or_else(|| receipt.get("claims").and_then(|claims| claims.get(key)))
 }
 
-fn receipt_top_or_commitments<'a>(
+pub fn receipt_top_or_commitments<'a>(
     receipt: &'a serde_json::Value,
     key: &str,
 ) -> Option<&'a serde_json::Value> {
@@ -235,7 +242,7 @@ fn receipt_top_or_commitments<'a>(
         .or_else(|| receipt.get("commitments").and_then(|commitments| commitments.get(key)))
 }
 
-fn receipt_preflight<'a>(
+pub fn receipt_preflight<'a>(
     receipt: &'a serde_json::Value,
     key: &str,
 ) -> Option<&'a serde_json::Value> {
@@ -245,27 +252,27 @@ fn receipt_preflight<'a>(
         .and_then(|bundle| bundle.get(key))
 }
 
-fn receipt_string<'a>(
+pub fn receipt_value<'a>(
+    receipt: &'a serde_json::Value,
+    keys: &[(&str, &'static str)],
+) -> Option<&'a serde_json::Value> {
+    keys.iter().find_map(|(scope, key)| match *scope {
+        RECEIPT_SCOPE_TOP_OR_CLAIMS => receipt_top_or_claims(receipt, key),
+        RECEIPT_SCOPE_TOP_OR_COMMITMENTS => receipt_top_or_commitments(receipt, key),
+        RECEIPT_SCOPE_PREFLIGHT => receipt_preflight(receipt, key),
+        _ => None,
+    })
+}
+
+pub fn receipt_string<'a>(
     receipt: &'a serde_json::Value,
     keys: &[(&str, &'static str)],
 ) -> Option<&'a str> {
-    keys.iter().find_map(|(scope, key)| match *scope {
-        "top_or_claims" => receipt_top_or_claims(receipt, key),
-        "top_or_commitments" => receipt_top_or_commitments(receipt, key),
-        "preflight" => receipt_preflight(receipt, key),
-        _ => None,
-    })
-    .and_then(|value| value.as_str())
+    receipt_value(receipt, keys).and_then(|value| value.as_str())
 }
 
-fn receipt_u64(receipt: &serde_json::Value, keys: &[(&str, &'static str)]) -> Option<u64> {
-    keys.iter().find_map(|(scope, key)| match *scope {
-        "top_or_claims" => receipt_top_or_claims(receipt, key),
-        "top_or_commitments" => receipt_top_or_commitments(receipt, key),
-        "preflight" => receipt_preflight(receipt, key),
-        _ => None,
-    })
-    .and_then(|value| value.as_u64())
+pub fn receipt_u64(receipt: &serde_json::Value, keys: &[(&str, &'static str)]) -> Option<u64> {
+    receipt_value(receipt, keys).and_then(|value| value.as_u64())
 }
 
 /// Result of cross-checking receipt fields against contract fields.
@@ -583,7 +590,7 @@ pub fn verify_manifest_from_str(
     manifest_json: &str,
     receipt_profile_hash: Option<&str>,
     receipt_policy_hash: Option<&str>,
-    receipt_guardian_hash: &str,
+    receipt_guardian_hash: Option<&str>,
     receipt_runtime_hash: Option<&str>,
     strict_runtime: bool,
 ) -> Result<ManifestResult, ManifestVerifyError> {
@@ -636,17 +643,16 @@ pub fn verify_manifest_from_str(
     // Check policy coverage: receipt's policy_bundle_hash in policy hashes,
     // or guardian_policy_hash in policy OR contract hashes
     let policy_covered = if let Some(h) = receipt_policy_hash {
-        Some(
-            policy_hashes.contains(h)
-                || policy_hashes.contains(receipt_guardian_hash)
-                || contract_hashes.contains(receipt_guardian_hash),
-        )
+        let covered = policy_hashes.contains(h)
+            || receipt_guardian_hash.is_some_and(|guardian_hash| {
+                policy_hashes.contains(guardian_hash) || contract_hashes.contains(guardian_hash)
+            });
+        Some(covered)
     } else {
         // No policy_bundle_hash in receipt — check guardian_policy_hash only
-        Some(
-            policy_hashes.contains(receipt_guardian_hash)
-                || contract_hashes.contains(receipt_guardian_hash),
-        )
+        receipt_guardian_hash.map(|guardian_hash| {
+            policy_hashes.contains(guardian_hash) || contract_hashes.contains(guardian_hash)
+        })
     };
 
     // Check runtime hashes (only if manifest declares them)
@@ -654,7 +660,8 @@ pub fn verify_manifest_from_str(
         if let Some(ref manifest_rt) = manifest.runtime_hashes {
             let rt_match = receipt_runtime_hash.map(|rh| rh == manifest_rt.runtime_hash);
 
-            let gp_match = Some(receipt_guardian_hash == manifest_rt.guardian_policy_hash);
+            let gp_match =
+                receipt_guardian_hash.map(|guardian_hash| guardian_hash == manifest_rt.guardian_policy_hash);
 
             // In strict mode, mismatches are hard failures
             if strict_runtime {
@@ -1477,7 +1484,7 @@ mod tests {
             &json,
             Some(&"a".repeat(64)),
             Some(&"b".repeat(64)),
-            &"c".repeat(64),
+            Some(&"c".repeat(64)),
             Some(&"d".repeat(64)),
             false,
         )
@@ -1499,7 +1506,7 @@ mod tests {
             &json,
             Some(&"a".repeat(64)),
             Some(&"b".repeat(64)),
-            &gp_hash,
+            Some(&gp_hash),
             Some(&rt_hash),
             false,
         )
@@ -1522,7 +1529,7 @@ mod tests {
             &json,
             Some(&"a".repeat(64)),
             Some(&"b".repeat(64)),
-            &gp_hash,
+            Some(&gp_hash),
             Some(&"f".repeat(64)),
             false,
         )
@@ -1545,7 +1552,7 @@ mod tests {
             &json,
             Some(&"a".repeat(64)),
             Some(&"b".repeat(64)),
-            &"f".repeat(64), // different from manifest
+            Some(&"f".repeat(64)), // different from manifest
             Some(&rt_hash),
             false,
         )
@@ -1567,7 +1574,7 @@ mod tests {
             &json,
             Some(&"a".repeat(64)),
             Some(&"b".repeat(64)),
-            &gp_hash,
+            Some(&gp_hash),
             Some(&"f".repeat(64)), // mismatched
             true,                  // strict
         );
@@ -1588,7 +1595,7 @@ mod tests {
             &json,
             Some(&"a".repeat(64)),
             Some(&"b".repeat(64)),
-            &"f".repeat(64), // mismatched guardian
+            Some(&"f".repeat(64)), // mismatched guardian
             Some(&rt_hash),
             true, // strict
         );
@@ -1609,7 +1616,7 @@ mod tests {
             &json,
             Some(&"a".repeat(64)),
             Some(&"b".repeat(64)),
-            &gp_hash,
+            Some(&gp_hash),
             Some(&rt_hash),
             true, // strict
         )
@@ -1632,7 +1639,7 @@ mod tests {
             &json,
             Some(&"a".repeat(64)),
             Some(&"b".repeat(64)),
-            &gp_hash,
+            Some(&gp_hash),
             None, // no receipt runtime hash
             false,
         )
@@ -1820,7 +1827,7 @@ mod tests {
             &manifest_json_str,
             unsigned.model_profile_hash.as_deref(),
             unsigned.policy_bundle_hash.as_deref(),
-            &unsigned.guardian_policy_hash,
+            Some(&unsigned.guardian_policy_hash),
             Some(&unsigned.runtime_hash),
             false,
         )
@@ -1856,7 +1863,7 @@ mod tests {
             &manifest_json_str,
             unsigned.model_profile_hash.as_deref(),
             unsigned.policy_bundle_hash.as_deref(),
-            &unsigned.guardian_policy_hash,
+            Some(&unsigned.guardian_policy_hash),
             Some(&unsigned.runtime_hash),
             false, // non-strict: mismatch is a warning, not an error
         )
@@ -1921,8 +1928,10 @@ mod tests {
         });
 
         let json = serde_json::to_string(&manifest).unwrap();
+        let guardian_hash = "x".repeat(64);
         let result =
-            verify_manifest_from_str(&json, None, None, &"x".repeat(64), None, false).unwrap();
+            verify_manifest_from_str(&json, None, None, Some(&guardian_hash), None, false)
+                .unwrap();
         // Signature should be invalid because runtime_hashes were tampered
         assert_eq!(result.signature_valid, Some(false));
     }
