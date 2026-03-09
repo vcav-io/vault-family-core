@@ -1,0 +1,8 @@
+{
+  "alignment_id": "align-123",
+  "acceptable_topic_codes": [
+    "salary_alignment",
+    "reference_check"
+  ],
+  "expected_counterparty": "bob-agent"
+}

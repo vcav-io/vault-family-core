@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentVaultTopicAlignmentSelection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["alignment_id", "state"],
+  "properties": {
+    "alignment_id": { "type": "string", "minLength": 1 },
+    "state": {
+      "type": "string",
+      "enum": ["ALIGNED", "NOT_ALIGNED", "REJECTED"]
+    },
+    "selected_topic_code": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": { "const": "ALIGNED" }
+        }
+      },
+      "then": {
+        "required": ["selected_topic_code"]
+      }
+    }
+  ]
+}
