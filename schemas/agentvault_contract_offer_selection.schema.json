@@ -12,6 +12,44 @@
       "enum": ["AGREED", "NO_COMMON_CONTRACT", "REJECTED"]
     },
     "selected_contract_offer_id": { "type": "string", "minLength": 1 },
+    "selected_bespoke_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "purpose_code",
+        "schema_ref",
+        "policy_ref",
+        "program_ref",
+        "acceptable_model_profiles"
+      ],
+      "properties": {
+        "kind": { "type": "string", "const": "bespoke" },
+        "purpose_code": {
+          "type": "string",
+          "enum": ["MEDIATION", "COMPATIBILITY", "REFERENCE", "SUBMISSION", "NEGOTIATION"]
+        },
+        "schema_ref": { "type": "string", "minLength": 1 },
+        "policy_ref": { "type": "string", "minLength": 1 },
+        "program_ref": { "type": "string", "minLength": 1 },
+        "acceptable_model_profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "version", "hash"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "version": { "type": "string", "minLength": 1 },
+              "hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
     "selected_model_profile": {
       "type": "object",
       "additionalProperties": false,
@@ -34,7 +72,11 @@
         }
       },
       "then": {
-        "required": ["selected_contract_offer_id", "selected_model_profile"]
+        "required": ["selected_model_profile"],
+        "oneOf": [
+          { "required": ["selected_contract_offer_id"] },
+          { "required": ["selected_bespoke_contract"] }
+        ]
       }
     }
   ]
