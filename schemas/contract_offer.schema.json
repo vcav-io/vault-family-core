@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/contract_offer.schema.json",
+  "title": "AgentVault Contract Offer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "offer_version",
+    "contract_offer_id",
+    "purpose_code",
+    "schema_ref",
+    "policy_ref",
+    "program_ref",
+    "allowed_model_profiles"
+  ],
+  "properties": {
+    "offer_version": { "type": "string", "minLength": 1 },
+    "contract_offer_id": { "type": "string", "minLength": 1 },
+    "purpose_code": {
+      "type": "string",
+      "enum": ["NEGOTIATION", "MEDIATION", "SCHEDULING", "COMPATIBILITY"]
+    },
+    "schema_ref": { "type": "string", "minLength": 1 },
+    "policy_ref": { "type": "string", "minLength": 1 },
+    "program_ref": { "type": "string", "minLength": 1 },
+    "allowed_model_profiles": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "metadata_defaults": {
+      "type": ["object", "null"]
+    }
+  }
+}
