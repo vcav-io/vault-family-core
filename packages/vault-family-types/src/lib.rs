@@ -15,6 +15,7 @@ pub mod contract_offer;
 pub mod inbox;
 mod lane;
 mod purpose;
+pub mod topic_alignment;
 
 pub use agent_id::{generate_pair_id, normalize_agent_id, PAIR_ID_DOMAIN_PREFIX};
 pub use budget_tier::{BudgetTier, BudgetTierV2, DEFAULT_BUDGET_BITS, ELEVATED_BUDGET_BITS};
@@ -30,3 +31,6 @@ pub use inbox::{
 };
 pub use lane::{ExecutionLane, LaneId};
 pub use purpose::Purpose;
+pub use topic_alignment::{
+    TopicAlignmentProposal, TopicAlignmentSelection, TopicAlignmentSelectionState,
+};
