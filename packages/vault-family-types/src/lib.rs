@@ -11,6 +11,7 @@
 mod agent_id;
 mod budget_tier;
 pub mod contract;
+pub mod contract_offer;
 pub mod inbox;
 mod lane;
 mod purpose;
@@ -18,6 +19,10 @@ mod purpose;
 pub use agent_id::{generate_pair_id, normalize_agent_id, PAIR_ID_DOMAIN_PREFIX};
 pub use budget_tier::{BudgetTier, BudgetTierV2, DEFAULT_BUDGET_BITS, ELEVATED_BUDGET_BITS};
 pub use contract::{Contract, EntropyEnforcementMode, ModelConstraints};
+pub use contract_offer::{
+    AcceptableContractOffer, ContractOffer, ContractOfferProposal, ContractOfferSelection,
+    ContractOfferSelectionState, ModelProfileRef,
+};
 pub use inbox::{
     AcceptInviteRequest, AcceptInviteResponse, CreateInviteRequest, CreateInviteResponse,
     DeclineInviteRequest, DeclineReasonCode, InboxEvent, InboxEventType, InboxQuery, InboxResponse,

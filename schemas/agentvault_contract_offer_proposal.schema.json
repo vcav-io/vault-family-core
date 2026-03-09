@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/agentvault_contract_offer_proposal.schema.json",
+  "title": "AgentVault Contract Offer Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["negotiation_id", "acceptable_offers"],
+  "properties": {
+    "negotiation_id": { "type": "string", "minLength": 1 },
+    "expected_counterparty": { "type": "string", "minLength": 1 },
+    "acceptable_offers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contract_offer_id", "acceptable_model_profiles"],
+        "properties": {
+          "contract_offer_id": { "type": "string", "minLength": 1 },
+          "acceptable_model_profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "version", "hash"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "version": { "type": "string", "minLength": 1 },
+                "hash": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

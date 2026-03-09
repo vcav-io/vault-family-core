@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcav.io/schemas/agentvault_contract_offer_selection.schema.json",
+  "title": "AgentVault Contract Offer Selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["negotiation_id", "state"],
+  "properties": {
+    "negotiation_id": { "type": "string", "minLength": 1 },
+    "state": {
+      "type": "string",
+      "enum": ["AGREED", "NO_COMMON_CONTRACT", "REJECTED"]
+    },
+    "selected_contract_offer_id": { "type": "string", "minLength": 1 },
+    "selected_model_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "hash"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": { "const": "AGREED" }
+        }
+      },
+      "then": {
+        "required": ["selected_contract_offer_id", "selected_model_profile"]
+      }
+    }
+  ]
+}
