@@ -25,15 +25,35 @@ pub struct ContractOffer {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AcceptableContractOffer {
+    #[serde(default = "offer_kind")]
+    pub kind: String,
     pub contract_offer_id: String,
     #[serde(default)]
     pub acceptable_model_profiles: Vec<ModelProfileRef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcceptableBespokeContract {
+    pub kind: String,
+    pub purpose_code: Purpose,
+    pub schema_ref: String,
+    pub policy_ref: String,
+    pub program_ref: String,
+    #[serde(default)]
+    pub acceptable_model_profiles: Vec<ModelProfileRef>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum NegotiableContract {
+    Offer(AcceptableContractOffer),
+    Bespoke(AcceptableBespokeContract),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContractOfferProposal {
     pub negotiation_id: String,
-    pub acceptable_offers: Vec<AcceptableContractOffer>,
+    pub acceptable_offers: Vec<NegotiableContract>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_counterparty: Option<String>,
 }
@@ -53,7 +73,13 @@ pub struct ContractOfferSelection {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_contract_offer_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_bespoke_contract: Option<AcceptableBespokeContract>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_model_profile: Option<ModelProfileRef>,
+}
+
+fn offer_kind() -> String {
+    "offer".to_string()
 }
 
 #[cfg(test)]
@@ -92,6 +118,7 @@ mod tests {
             "negotiation_id": "neg-123",
             "acceptable_offers": [
                 {
+                    "kind": "offer",
                     "contract_offer_id": "agentvault.mediation.v1.standard",
                     "acceptable_model_profiles": [
                         {
@@ -109,6 +136,34 @@ mod tests {
     }
 
     #[test]
+    fn test_contract_offer_proposal_schema_accepts_bespoke_contract_shape() {
+        let validator = compile_schema(include_str!(
+            "../../../schemas/agentvault_contract_offer_proposal.schema.json"
+        ));
+        let value = json!({
+            "negotiation_id": "neg-123",
+            "acceptable_offers": [
+                {
+                    "kind": "bespoke",
+                    "purpose_code": "MEDIATION",
+                    "schema_ref": "vcav_e_mediation_signal_v2",
+                    "policy_ref": "agentvault.default.policy@active",
+                    "program_ref": "agentvault.mediation.program@active",
+                    "acceptable_model_profiles": [
+                        {
+                            "id": "api-claude-sonnet-v1",
+                            "version": "1",
+                            "hash": "5f01005dcfe4c95ee52b5f47958b4943134cc97da487b222dd4f936d474f70f8"
+                        }
+                    ]
+                }
+            ]
+        });
+
+        assert!(validator.is_valid(&value));
+    }
+
+    #[test]
     fn test_contract_offer_selection_schema_accepts_agreed_shape() {
         let validator = compile_schema(include_str!(
             "../../../schemas/agentvault_contract_offer_selection.schema.json"
@@ -117,6 +172,32 @@ mod tests {
             "negotiation_id": "neg-123",
             "state": "AGREED",
             "selected_contract_offer_id": "agentvault.mediation.v1.standard",
+            "selected_model_profile": {
+                "id": "api-claude-sonnet-v1",
+                "version": "1",
+                "hash": "5f01005dcfe4c95ee52b5f47958b4943134cc97da487b222dd4f936d474f70f8"
+            }
+        });
+
+        assert!(validator.is_valid(&value));
+    }
+
+    #[test]
+    fn test_contract_offer_selection_schema_accepts_agreed_bespoke_shape() {
+        let validator = compile_schema(include_str!(
+            "../../../schemas/agentvault_contract_offer_selection.schema.json"
+        ));
+        let value = json!({
+            "negotiation_id": "neg-123",
+            "state": "AGREED",
+            "selected_bespoke_contract": {
+                "kind": "bespoke",
+                "purpose_code": "MEDIATION",
+                "schema_ref": "vcav_e_mediation_signal_v2",
+                "policy_ref": "agentvault.default.policy@active",
+                "program_ref": "agentvault.mediation.program@active",
+                "acceptable_model_profiles": []
+            },
             "selected_model_profile": {
                 "id": "api-claude-sonnet-v1",
                 "version": "1",
