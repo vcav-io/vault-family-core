@@ -429,6 +429,11 @@ pub struct TeeAttestation {
     /// Verifiers recompute the transcript hash and check it matches this field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_data_hex: Option<String>,
+    /// DER-encoded VCEK certificate (base64) extracted from the SEV-SNP
+    /// extended attestation report. Per-chip; verifiers use this to complete
+    /// the VCEK → ASK → ARK signature chain against bundled AMD roots.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snp_vcek_cert: Option<String>,
 }
 
 // ============================================================================
@@ -702,6 +707,7 @@ mod tests {
             receipt_signing_pubkey_hex: Some("c".repeat(64)),
             transcript_hash_hex: Some("d".repeat(128)),
             user_data_hex: Some("e".repeat(128)),
+            snp_vcek_cert: Some("base64vcek".to_string()),
         };
         let json = serde_json::to_string(&att).unwrap();
         let parsed: TeeAttestation = serde_json::from_str(&json).unwrap();
@@ -718,11 +724,13 @@ mod tests {
             receipt_signing_pubkey_hex: None,
             transcript_hash_hex: None,
             user_data_hex: None,
+            snp_vcek_cert: None,
         };
         let json = serde_json::to_string(&att).unwrap();
         assert!(!json.contains("attestation_hash"));
         assert!(!json.contains("receipt_signing_pubkey_hex"));
         assert!(!json.contains("transcript_hash_hex"));
+        assert!(!json.contains("snp_vcek_cert"));
     }
 
     #[test]

@@ -375,6 +375,9 @@
         "user_data_hex": {
           "type": "string",
           "pattern": "^[a-f0-9]{128}$"
+        },
+        "snp_vcek_cert": {
+          "type": "string"
         }
       }
     },
