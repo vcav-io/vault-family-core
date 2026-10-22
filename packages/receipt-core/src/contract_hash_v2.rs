@@ -87,9 +87,25 @@ pub struct ContractV2 {
 impl ContractV2 {
     /// Validate a contract JSON value against the contract hash v2 member set.
     pub fn from_value(contract: &Value) -> Result<Self, ContractHashError> {
-        if !contract.is_object() {
+        let Some(members) = contract.as_object() else {
             return Err(ContractHashError::InvalidContract(
                 "contract must be a JSON object".to_string(),
+            ));
+        };
+        // serde would also read a struct from a JSON array and a unit enum
+        // variant from a one-member object; only the canonical shapes count.
+        let shape_ok = |key: &str, ok: fn(&Value) -> bool| match members.get(key) {
+            None | Some(Value::Null) => true,
+            Some(value) => ok(value),
+        };
+        if !shape_ok("model_constraints", Value::is_object) {
+            return Err(ContractHashError::InvalidContract(
+                "model_constraints must be a JSON object".to_string(),
+            ));
+        }
+        if !shape_ok("entropy_enforcement", Value::is_string) {
+            return Err(ContractHashError::InvalidContract(
+                "entropy_enforcement must be a string".to_string(),
             ));
         }
         serde_json::from_value(contract.clone())
@@ -203,6 +219,75 @@ mod tests {
             json!({"allowed_models": [], "x": 1}),
         );
         assert!(compute_contract_hash_v2(&contract).is_err());
+    }
+
+    fn with_member(key: &str, value: Value) -> Value {
+        let mut contract = minimal();
+        contract.as_object_mut().unwrap().insert(key.into(), value);
+        contract
+    }
+
+    #[test]
+    fn model_constraints_must_be_an_object() {
+        for shape in [
+            json!([]),
+            json!([["anthropic"], ["claude-*"], "mid"]),
+            json!([null, null, null]),
+            json!("anthropic"),
+            json!(1),
+            json!(true),
+        ] {
+            let contract = with_member("model_constraints", shape.clone());
+            assert!(compute_contract_hash_v2(&contract).is_err(), "{shape}");
+        }
+        // The object form is accepted.
+        let contract = with_member("model_constraints", json!({"min_tier": "mid"}));
+        assert!(compute_contract_hash_v2(&contract).is_ok());
+    }
+
+    #[test]
+    fn entropy_enforcement_must_be_a_string() {
+        for shape in [
+            json!({"Gate": null}),
+            json!({"Gate": []}),
+            json!({"Advisory": {}}),
+            json!(["Gate"]),
+            json!(0),
+            json!(true),
+        ] {
+            let contract = with_member("entropy_enforcement", shape.clone());
+            assert!(compute_contract_hash_v2(&contract).is_err(), "{shape}");
+        }
+        for mode in ["Advisory", "Gate", "Strict"] {
+            let contract = with_member("entropy_enforcement", json!(mode));
+            assert!(compute_contract_hash_v2(&contract).is_ok(), "{mode}");
+        }
+    }
+
+    #[test]
+    fn typed_members_reject_other_json_types() {
+        let cases = [
+            ("purpose_code", json!(["COMPATIBILITY"])),
+            ("purpose_code", json!({"COMPATIBILITY": null})),
+            ("participants", json!({"0": "alice", "1": "bob"})),
+            ("participants", json!("alice")),
+            ("prompt_template_hash", json!(7)),
+            ("entropy_budget_bits", json!("8")),
+            ("entropy_budget_bits", json!(8.5)),
+            ("entropy_budget_bits", json!([8])),
+            ("timing_class", json!(["fast"])),
+            ("max_completion_tokens", json!(-1)),
+        ];
+        for (key, value) in cases {
+            let contract = with_member(key, value.clone());
+            assert!(
+                compute_contract_hash_v2(&contract).is_err(),
+                "{key}: {value}"
+            );
+        }
+        for contract in [json!([]), json!(["COMPATIBILITY"]), json!("x"), json!(null)] {
+            assert!(compute_contract_hash_v2(&contract).is_err(), "{contract}");
+        }
     }
 
     #[test]
