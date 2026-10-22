@@ -9,7 +9,8 @@
   limited to +/-(2^53-1), the `VCAV-RECEIPT-V3:` domain separator, nonce-based input
   commitments (`SHA256_N32_JCS_V3`, `VCAV-INPUT-COMMIT-V3:`), contract hash v2
   (`SHA256_JCS_V2`), a fixed `issued_at` format, `claims.budget_usage.scope`, rejection of
-  unknown fields and `null` optionals, and strict Ed25519 verification.
+  unknown fields and `null` optionals, lexical integer forms only for integer fields, and
+  strict Ed25519 verification with a prime-order pinned key.
 - Golden vectors for receipt v3, input commitments, contract hash v2 and RFC 8785
   canonicalisation (including the RFC 8785 reference test data) in `data/test-vectors/`.
 

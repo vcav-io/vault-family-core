@@ -17,7 +17,13 @@ The reference implementation lives in `packages/receipt-core`:
 | Contract hash v2 | `receipt_core::contract_hash_v2` |
 
 Golden vectors live in `data/test-vectors/` (see [Vectors](#9-vectors)). An
-implementation conforms only if it passes every vector.
+implementation conforms only if it passes every vector: every positive vector is accepted
+with the expected values, and every negative vector is **rejected**.
+
+**Error classes are informative.** Negative vectors carry an `expected_error_class` (or
+`expected_error` / `expected_result`) naming the reason the reference implementation reports.
+Conformance requires only that the input is rejected; an implementation may check rules in
+a different order and report a different reason. The classes are kept for diagnostics.
 
 ## 1. Summary of changes from v2
 
@@ -34,6 +40,9 @@ implementation conforms only if it passes every vector.
 | `claims.budget_usage` | no scope | required `scope` (`"SESSION"`) |
 | Numbers | unrestricted | magnitude at most 2^53−1 |
 | Unknown fields / `null` for optional fields | tolerated by some verifiers | rejected |
+
+Negative vectors are pass/fail: a conforming verifier rejects each one. Their error classes are
+informative only (see above).
 
 v2 receipts remain verifiable. Their canonicaliser is frozen (`receipt_core::canonicalize`,
 identifier `JCS_V1`) and is used only for the V1/V2 domains and the other existing v1 hashes.
@@ -82,6 +91,18 @@ any input that:
 4. contains `NaN` or ±Infinity (not representable in JSON text; relevant only to values built
    in code).
 
+**Integer-typed fields.** Every field that this specification types as an integer
+(receipt claims such as `provider_latency_ms`, `token_usage.*`, `budget_usage.*`,
+`entropy_budget_bits`, and contract members such as `entropy_budget_bits`,
+`max_completion_tokens`, `session_ttl_secs`, `invite_ttl_secs`) MUST be written as a JSON
+integer literal matching `0|[1-9][0-9]*`: no sign, no fraction and no exponent. `8.0`, `8e0`,
+`1.234e3` and `-0` are invalid for these fields and verifiers MUST reject them, even though
+they parse to the same number. `JSON.parse` cannot tell these forms apart, so a TypeScript
+verifier needs a lexical check on these fields in its strict parser (the same parser that
+detects duplicate member names). Free-form values (`commitments.output`, contract
+`output_schema` and `metadata`, `preflight_bundle.enforcement_parameters`, input contexts)
+are not restricted this way; their numbers are canonicalised by value (`4.50` → `4.5`).
+
 The limit applies to every v3 input: the unsigned receipt, outputs, input contexts,
 contracts (including `output_schema` and `metadata`), output schemas and preflight bundles.
 A producer that needs larger integers MUST encode them as strings.
@@ -129,7 +150,7 @@ rejected, except inside those two free-form values.
 | `receipt_canonicalization` | string | yes | exactly `"JCS_RFC8785"` |
 | `receipt_id` | string | yes | non-empty (relays use a UUID v4) |
 | `session_id` | string | yes | non-empty |
-| `issued_at` | string | yes | UTC, exactly `YYYY-MM-DDTHH:MM:SSZ` (20 chars, no fraction, no offset), a valid date-time |
+| `issued_at` | string | yes | UTC, exactly `YYYY-MM-DDTHH:MM:SSZ` (20 chars, no fraction, no offset), a valid calendar date-time with hours 00–23, minutes 00–59 and seconds 00–59 (no leap second `60`) |
 | `assurance_level` | string | yes | `SELF_ASSERTED` \| `OPERATOR_AUDITED` \| `PROVIDER_ATTESTED` \| `TEE_ATTESTED` |
 | `operator` | object | yes | Section 3.2 |
 | `commitments` | object | yes | Section 3.3 |
@@ -309,13 +330,36 @@ Anything else is rejected.
 2. The verifying key is **supplied by the verifier's configuration** (a pinned relay key).
    It MUST NOT be taken from the receipt (for example `tee_attestation.receipt_signing_pubkey_hex`).
    If `tee_attestation.receipt_signing_pubkey_hex` is present it MUST equal the pinned key.
-3. `operator.operator_key_fingerprint` MUST equal `H(pinned public key bytes)`.
-4. Verify with **strict** Ed25519 (`ed25519_dalek::VerifyingKey::verify_strict`) over
-   `digest` from Section 4. Strict means, in addition to RFC 8032: reject `s ≥ L`, reject a
-   public key `A` or a signature point `R` of small order (order dividing 8), reject
-   non-canonical point encodings, and use the non-cofactored equation `[s]B = R + [k]A`.
-   TypeScript with `@noble/curves`: `ed25519.verify(sig, digest, pub, { zip215: false })`
-   plus an explicit small-order check on `A` and `R` (`Point.fromHex(x).isSmallOrder()`).
+3. The pinned key `A` MUST be a canonical encoding of a point of **prime order**: not of
+   small order and with no torsion component (`[L]A` is the identity). Reject any other key.
+4. `operator.operator_key_fingerprint` MUST equal `H(pinned public key bytes)`.
+5. Verify the signature `(R, s)` over `digest` from Section 4 with these rules:
+   - `s < L` (reject non-reduced scalars);
+   - `R` is a canonical point encoding of a point of **prime order** (not small order, no
+     torsion component);
+   - the **cofactorless** equation `[s]B = R + [k]A` holds, with
+     `k = SHA-512(R ‖ A ‖ digest) mod L`.
+
+   Why: Ed25519 libraries differ. A cofactored check (`[8][s]B = [8]R + [8][k]A`, used by
+   `@noble/curves` and ZIP-215 verifiers) accepts a signature whose `R` (or `A`) carries a
+   torsion component, while a cofactorless check rejects it, so two verifiers could disagree
+   about the same receipt. With `A` and `R` of prime order the two equations accept exactly the
+   same signatures, so requiring prime order makes every conforming verifier agree.
+
+   Rust: `ed25519_dalek::VerifyingKey::verify_strict` plus a prime-order check of the pinned
+   key (`receipt_core::receipt_v3::is_prime_order_key`). `verify_strict` rejects small-order
+   `A` and `R` and uses the cofactorless equation, which rejects any `R` with a torsion
+   component once `A` has prime order; it does not reject a mixed-order `A`, hence the key
+   check.
+
+   TypeScript with `@noble/curves`: decode `A` and `R` with `ed25519.ExtendedPoint.fromHex`
+   (`ed25519.Point.fromHex` in 2.x) and require that re-encoding gives the same bytes, require `!P.isSmallOrder() && P.isTorsionFree()`
+   for both, require `s < L`, then call `ed25519.verify(sig, digest, pub, { zip215: false })`.
+
+   The negative vectors `small_order_signature_point`, `small_order_public_key`,
+   `mixed_order_signature_point` (cofactored equation holds, cofactorless does not) and
+   `mixed_order_public_key` (cofactorless equation holds, key has a torsion component)
+   cover these rules.
 
 ### 6.4 Internal consistency
 
@@ -396,9 +440,19 @@ contract_hash = H( JCS( normalise(contract) ) )
 4. The result is canonicalised with the v3 profile (Section 2), so numbers anywhere in the
    contract, including `output_schema` and `metadata`, are limited to ±(2^53−1).
 
-Producers and relays SHOULD hash the contract JSON as received or sent, not a value
-re-serialised from a typed struct that adds defaults (the v1 `Contract` struct emits `null`s
-and empty `model_constraints` arrays). Receipts record the algorithm as
+Apply `normalise()` to the contract JSON **as received** (relays) or as sent (clients), never
+to a value re-serialised from the v1 `Contract` struct: that struct emits `null`s for
+absent optionals and adds empty `model_constraints` arrays, which changes the hash.
+
+- The hashed object MUST NOT contain a `contract_hash` member (or any other envelope
+  member). A contract that carries one is rejected by rule 1, not stripped; callers that
+  store a contract together with its hash must remove the hash before calling contract
+  hash v2.
+- Producers MUST omit absent optional members rather than writing `null`. Rule 2 treats
+  `null` as absent, so the hash is unaffected, but other consumers may not.
+- Integer members follow the lexical rule of Section 2.2 (`8`, never `8.0` or `8e0`).
+
+Receipts record the algorithm as
 `commitments.contract_hash_alg: "SHA256_JCS_V2"`. A v3 relay computes only contract hash v2;
 `expected_contract_hash` values in v3 submissions are contract hash v2 values.
 
@@ -429,7 +483,7 @@ of `keys/README.md` (receipts: seed `0x01` × 32, `keys/vault.pub`).
 | `input_commitment_v3.json` | input commitment cases, including wrong-nonce and wrong-context negatives |
 | `contract_hash_v2.json` | contract hash v2 cases, including rejected unknown members |
 | `receipt_v3_positive_01.json`, `receipt_v3_positive_02.json` | signed v3 receipts that MUST verify |
-| `receipt_v3_negative.json` | v3 receipts that MUST be rejected, each with its `error_class` |
+| `receipt_v3_negative.json` | v3 receipts that MUST be rejected, each with an informative `expected_error_class` |
 
 Canonicalisation cases have the shape
 `{"name", "input_json", "expected_canonical", "expected_sha256_hex"}` for accepted inputs and
