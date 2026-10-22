@@ -11,6 +11,17 @@
   (`SHA256_JCS_V2`), a fixed `issued_at` format, `claims.budget_usage.scope`, rejection of
   unknown fields and `null` optionals, lexical integer forms only for integer fields, and
   strict Ed25519 verification with a prime-order pinned key.
+- `verifier-core::receipt_verify`: one version-dispatching receipt verifier (legacy v1,
+  v2 `2.x`, v3 `3.0.0`) shared by `verifier-wasm` and `verifier-cli`, plus the v3
+  participant cross-checks: own-input commitment, received output and contract
+  (contract hash v2, schema hash, participants, prompt template, entropy budget).
+- `verifier-wasm`: `verify_receipt_v3_with_checks`; `verify_bundle` checks v3 contracts
+  with contract hash v2.
+- `verifier-cli`: verifies v2 and v3 receipts (previously v1 only), with
+  `--own-participant-id`, `--own-input`, `--own-nonce-file` and `--received-output` for v3. Checks
+  that exist only for v1 receipts (`--manifest`, `--policy`, `--profile`,
+  `--agreement-fields`, `--validate-output`, `--strict`, `--strict-runtime`) fail with
+  `UNSUPPORTED_CHECK` for v2/v3 receipts.
 - Golden vectors for receipt v3, input commitments, contract hash v2 and RFC 8785
   canonicalisation (including the RFC 8785 reference test data) in `data/test-vectors/`.
 

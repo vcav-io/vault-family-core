@@ -19,6 +19,7 @@ mod keys;
 mod schema_registry;
 mod tiers;
 mod verify;
+mod versioned;
 
 use anyhow::Result;
 use clap::Parser;
@@ -28,6 +29,17 @@ use verify::{VerificationResult, VerificationStatus};
 
 fn main() -> Result<()> {
     let args = Args::parse();
+
+    // Receipts with a receipt_schema_version (v2, v3) use the shared
+    // version-dispatching verifier; legacy v1 receipts use `verify`.
+    if versioned::receipt_schema_version(&args.receipt).is_some() {
+        let result = versioned::verify_versioned(&args);
+        versioned::print(&args, &result)?;
+        if result.valid {
+            return Ok(());
+        }
+        std::process::exit(1);
+    }
 
     let details = verify::verify(&args);
 

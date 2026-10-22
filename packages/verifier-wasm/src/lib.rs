@@ -104,78 +104,15 @@ fn err_json(msg: &str) -> String {
 // Internal signature verification (avoids JSON round-trip)
 // ============================================================================
 
-/// Parse JSON, rejecting objects that repeat a key at any depth.
-///
-/// `serde_json` keeps the last value for a repeated key, while other parsers
-/// may keep the first, so a receipt with repeated keys could be read
-/// differently by the verifier and by whatever displays it.
-fn parse_json_strict(input: &str) -> Result<serde_json::Value, serde_json::Error> {
-    use serde::de::{Deserialize, Deserializer, Error, MapAccess, SeqAccess, Visitor};
-    use serde_json::{Map, Number, Value};
-
-    struct Strict(Value);
-
-    impl<'de> Deserialize<'de> for Strict {
-        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            deserializer.deserialize_any(StrictVisitor)
-        }
-    }
-
-    struct StrictVisitor;
-
-    impl<'de> Visitor<'de> for StrictVisitor {
-        type Value = Strict;
-
-        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("a JSON value")
-        }
-        fn visit_bool<E>(self, v: bool) -> Result<Strict, E> {
-            Ok(Strict(Value::Bool(v)))
-        }
-        fn visit_i64<E>(self, v: i64) -> Result<Strict, E> {
-            Ok(Strict(Value::from(v)))
-        }
-        fn visit_u64<E>(self, v: u64) -> Result<Strict, E> {
-            Ok(Strict(Value::from(v)))
-        }
-        fn visit_f64<E: Error>(self, v: f64) -> Result<Strict, E> {
-            Number::from_f64(v)
-                .map(|n| Strict(Value::Number(n)))
-                .ok_or_else(|| E::custom("non-finite number"))
-        }
-        fn visit_str<E>(self, v: &str) -> Result<Strict, E> {
-            Ok(Strict(Value::String(v.to_owned())))
-        }
-        fn visit_string<E>(self, v: String) -> Result<Strict, E> {
-            Ok(Strict(Value::String(v)))
-        }
-        fn visit_unit<E>(self) -> Result<Strict, E> {
-            Ok(Strict(Value::Null))
-        }
-        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Strict, A::Error> {
-            let mut items = Vec::new();
-            while let Some(Strict(item)) = seq.next_element()? {
-                items.push(item);
-            }
-            Ok(Strict(Value::Array(items)))
-        }
-        fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Strict, A::Error> {
-            let mut obj = Map::new();
-            while let Some(key) = map.next_key::<String>()? {
-                if obj.contains_key(&key) {
-                    return Err(A::Error::custom(format!("duplicate key '{key}'")));
-                }
-                let Strict(value) = map.next_value()?;
-                obj.insert(key, value);
-            }
-            Ok(Strict(Value::Object(obj)))
-        }
-    }
-
-    let mut deserializer = serde_json::Deserializer::from_str(input);
-    let Strict(value) = Strict::deserialize(&mut deserializer)?;
-    deserializer.end()?;
-    Ok(value)
+/// Verify a receipt's signature against the pinned key, dispatching on its
+/// format version (legacy v1, v2, v3). See `verifier_core::receipt_verify`.
+fn verify_receipt_dispatch(
+    receipt_json: &str,
+    pubkey_hex: &str,
+) -> Result<verifier_core::VerifiedReceipt, String> {
+    let public_key = receipt_core::parse_public_key_hex(pubkey_hex)
+        .map_err(|e| format!("Invalid public key: {e}"))?;
+    verifier_core::verify_receipt_json(receipt_json, &public_key)
 }
 
 /// Verify a receipt's Ed25519 signature.
@@ -184,60 +121,7 @@ fn parse_json_strict(input: &str) -> Result<serde_json::Value, serde_json::Error
 /// content covered by the signature. Callers must read tier fields from this
 /// value only, never from the raw input.
 fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<serde_json::Value, String> {
-    let receipt_val = parse_json_strict(receipt_json)
-        .map_err(|e| format!("Failed to parse receipt JSON: {e}"))?;
-
-    let public_key = receipt_core::parse_public_key_hex(pubkey_hex)
-        .map_err(|e| format!("Invalid public key: {e}"))?;
-
-    match receipt_val.get("signature") {
-        Some(signature) if signature.is_object() => {
-            let receipt: receipt_core::ReceiptV2 = serde_json::from_value(receipt_val.clone())
-                .map_err(|e| format!("Failed to parse receipt v2 JSON: {e}"))?;
-            // The v2 signature covers the typed receipt body. Require the parsed
-            // input to equal that body: no unknown fields at any level and no
-            // re-encodings that change a signed value (e.g. timestamps).
-            // Duplicate keys are rejected by `parse_json_strict`.
-            let typed = serde_json::to_value(&receipt)
-                .map_err(|e| format!("Failed to serialize receipt v2: {e}"))?;
-            if typed != receipt_val {
-                return Err(
-                    "Receipt contains fields or encodings not covered by its signature".to_string(),
-                );
-            }
-            let (unsigned, signature) = receipt.split();
-            receipt_core::verify_receipt_v2(&unsigned, &signature, &public_key)
-                .map_err(|e| format!("Signature verification failed: {e}"))?;
-            Ok(typed)
-        }
-        Some(signature) if signature.is_string() => {
-            let signature_hex = signature
-                .as_str()
-                .ok_or_else(|| "Receipt missing 'signature' field".to_string())?;
-
-            let signature = receipt_core::parse_signature_hex(signature_hex)
-                .map_err(|e| format!("Invalid signature: {e}"))?;
-
-            let mut unsigned = receipt_val.clone();
-            if let Some(obj) = unsigned.as_object_mut() {
-                obj.remove("signature");
-            }
-
-            let canonical = receipt_core::canonicalize(&unsigned);
-            let mut message = receipt_core::DOMAIN_PREFIX.as_bytes().to_vec();
-            message.extend(canonical.as_bytes());
-            let hash = receipt_core::signer::hash_message(&message);
-
-            use ed25519_dalek::Verifier;
-            public_key
-                .verify(&hash, &signature)
-                .map_err(|e| format!("Signature verification failed: {e}"))?;
-            // The legacy signature covers every field of the parsed value.
-            Ok(receipt_val)
-        }
-        Some(_) => Err("Receipt has unsupported 'signature' field shape".to_string()),
-        None => Err("Receipt missing 'signature' field".to_string()),
-    }
+    verify_receipt_dispatch(receipt_json, pubkey_hex).map(|r| r.signed_value())
 }
 
 // ============================================================================
@@ -415,7 +299,7 @@ pub fn verify_bundle(
     bundle_json: &str,
     strict_runtime: bool,
 ) -> String {
-    let bundle: serde_json::Value = match serde_json::from_str(bundle_json) {
+    let bundle: serde_json::Value = match receipt_core::parse_json_strict(bundle_json) {
         Ok(v) => v,
         Err(e) => {
             return to_json_safe(&BundleVerifyResult {
@@ -437,7 +321,7 @@ pub fn verify_bundle(
 
     // --- Tier 1: Receipt signature verification ---
     // Tier fields below are read only from the signed content returned here.
-    let receipt_val = match verify_receipt_inner(receipt_json, pubkey_hex) {
+    let verified = match verify_receipt_dispatch(receipt_json, pubkey_hex) {
         Ok(v) => v,
         Err(e) => {
             return to_json_safe(&BundleVerifyResult {
@@ -456,6 +340,8 @@ pub fn verify_bundle(
             })
         }
     };
+
+    let receipt_val = verified.signed_value();
 
     let mut tier: u8 = 1;
     let mut agreement_hash_valid: Option<bool> = None;
@@ -541,7 +427,32 @@ pub fn verify_bundle(
     }
 
     // --- Tier 2: Contract hash ---
-    if let (Some(contract_val), Some(declared_hash)) = (
+    if let (verifier_core::VerifiedReceipt::V3(receipt), Some(contract_val)) =
+        (&verified, bundle.get("contract"))
+    {
+        // v3: contract hash v2 plus the schema, participant, prompt template
+        // and entropy budget bindings (docs/receipt-v3.md, section 6.7).
+        let contract = match contract_val {
+            serde_json::Value::String(s) => {
+                receipt_core::parse_json_strict(s).map_err(|e| e.to_string())
+            }
+            other => Ok(other.clone()),
+        };
+        match contract
+            .and_then(|c| verifier_core::check_contract_v3(receipt, &c).map_err(|e| e.to_string()))
+        {
+            Ok(()) => {
+                contract_hash_valid = Some(true);
+                tier = tier.max(2);
+            }
+            Err(e) => {
+                contract_hash_valid = Some(false);
+                if error.is_none() {
+                    error = Some(format!("Contract check failed: {e}"));
+                }
+            }
+        }
+    } else if let (Some(contract_val), Some(declared_hash)) = (
         bundle.get("contract"),
         receipt_string(
             &receipt_val,
@@ -647,6 +558,95 @@ pub fn verify_bundle(
         manifest_guardian_hash_match: manifest_result.as_ref().and_then(|m| m.guardian_hash_match),
         error,
     })
+}
+
+#[derive(Serialize)]
+struct V3ChecksResult {
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error_class: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+fn v3_checks_err(class: &str, msg: &str) -> String {
+    to_json_safe(&V3ChecksResult {
+        ok: false,
+        error_class: Some(class.to_string()),
+        error: Some(msg.to_string()),
+    })
+}
+
+/// Verify a v3 receipt and run the participant cross-checks of
+/// `docs/receipt-v3.md` sections 6.5 to 6.7.
+///
+/// `checks_json` is an object with optional members:
+/// - `participant_id`, `nonce_hex`, `context`: the caller's own input
+///   (all three together) for the own-input check;
+/// - `received_output`: the output the caller received from the relay;
+/// - `contract`: the contract the caller agreed to.
+///
+/// Returns JSON: `{"ok": true}` or `{"ok": false, "error_class": "...", "error": "..."}`.
+#[wasm_bindgen]
+pub fn verify_receipt_v3_with_checks(
+    receipt_json: &str,
+    pubkey_hex: &str,
+    checks_json: &str,
+) -> String {
+    let checks = match receipt_core::parse_json_strict(checks_json) {
+        Ok(serde_json::Value::Object(map)) => map,
+        Ok(_) => return v3_checks_err("INVALID_CHECKS", "checks must be a JSON object"),
+        Err(e) => return v3_checks_err("INVALID_CHECKS", &e.to_string()),
+    };
+    let receipt = match verify_receipt_dispatch(receipt_json, pubkey_hex) {
+        Ok(verifier_core::VerifiedReceipt::V3(r)) => r,
+        Ok(_) => return v3_checks_err("UNSUPPORTED_VERSION", "receipt is not a v3 receipt"),
+        Err(e) => {
+            let class = e.split(':').next().unwrap_or("VERIFICATION_FAILED");
+            let class = if class.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
+                class
+            } else {
+                "VERIFICATION_FAILED"
+            };
+            return v3_checks_err(class, &e);
+        }
+    };
+
+    let own = (
+        checks.get("participant_id"),
+        checks.get("nonce_hex"),
+        checks.get("context"),
+    );
+    let own_input = match own {
+        (None, None, None) => None,
+        (
+            Some(serde_json::Value::String(id)),
+            Some(serde_json::Value::String(nonce)),
+            Some(ctx),
+        ) => match receipt_core::parse_commitment_nonce(nonce) {
+            Ok(n) => Some((id.as_str(), n, ctx)),
+            Err(e) => return v3_checks_err("INVALID_OWN_INPUT", &e.to_string()),
+        },
+        _ => {
+            return v3_checks_err(
+                "INVALID_CHECKS",
+                "participant_id, nonce_hex and context must be given together",
+            )
+        }
+    };
+    let checks = verifier_core::V3Checks {
+        own_input: own_input.as_ref().map(|(id, n, c)| (*id, n, *c)),
+        received_output: checks.get("received_output"),
+        contract: checks.get("contract"),
+    };
+    match verifier_core::run_v3_checks(&receipt, &checks) {
+        Ok(()) => to_json_safe(&V3ChecksResult {
+            ok: true,
+            error_class: None,
+            error: None,
+        }),
+        Err(e) => v3_checks_err(e.error_class(), &e.to_string()),
+    }
 }
 
 /// Returns the VCAV verifier version string.
@@ -949,10 +949,10 @@ mod tests {
     fn parse_json_strict_matches_serde_json_without_duplicates() {
         let input = r#"{"a":[1,-2,3.5,"x",null,true],"b":{"c":{}},"d":18446744073709551615}"#;
         assert_eq!(
-            parse_json_strict(input).unwrap(),
+            receipt_core::parse_json_strict(input).unwrap(),
             serde_json::from_str::<serde_json::Value>(input).unwrap()
         );
-        assert!(parse_json_strict(r#"{"a":1} trailing"#).is_err());
+        assert!(receipt_core::parse_json_strict(r#"{"a":1} trailing"#).is_err());
     }
 
     #[test]
@@ -1004,5 +1004,213 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         assert_eq!(parsed["ok"], false);
         assert!(parsed["error"].as_str().unwrap().contains("unsupported"));
+    }
+
+    // ------------------------------------------------------------------
+    // Receipt v3
+    // ------------------------------------------------------------------
+
+    struct V3Vector {
+        receipt_json: String,
+        pubkey_hex: String,
+        vector: serde_json::Value,
+    }
+
+    fn v3_vector() -> V3Vector {
+        let vector = load_vector("receipt_v3_positive_01.json");
+        V3Vector {
+            receipt_json: vector["input"]["receipt_json"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+            pubkey_hex: vector["input"]["verifying_key_hex"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+            vector,
+        }
+    }
+
+    fn own_checks(v: &V3Vector, index: usize) -> serde_json::Value {
+        let p = &v.vector["participants_private"][index];
+        json!({
+            "participant_id": p["participant_id"],
+            "nonce_hex": p["nonce_hex"],
+            "context": serde_json::from_str::<serde_json::Value>(p["context_json"].as_str().unwrap()).unwrap(),
+            "received_output": serde_json::from_str::<serde_json::Value>(v.vector["received_output_json"].as_str().unwrap()).unwrap(),
+            "contract": serde_json::from_str::<serde_json::Value>(v.vector["contract_json"].as_str().unwrap()).unwrap(),
+        })
+    }
+
+    fn result(s: &str) -> serde_json::Value {
+        serde_json::from_str(s).unwrap()
+    }
+
+    #[test]
+    fn verify_receipt_accepts_v3_vectors() {
+        for name in ["receipt_v3_positive_01.json", "receipt_v3_positive_02.json"] {
+            let v = load_vector(name);
+            let out = verify_receipt(
+                v["input"]["receipt_json"].as_str().unwrap(),
+                v["input"]["verifying_key_hex"].as_str().unwrap(),
+            );
+            assert_eq!(out, r#"{"ok":true}"#, "{name}");
+        }
+    }
+
+    #[test]
+    fn verify_receipt_rejects_v3_negative_vectors() {
+        let v = load_vector("receipt_v3_negative.json");
+        for case in v["cases"].as_array().unwrap() {
+            let out = result(&verify_receipt(
+                case["receipt_json"].as_str().unwrap(),
+                case["verifying_key_hex"].as_str().unwrap(),
+            ));
+            assert_eq!(out["ok"], false, "{}", case["name"]);
+            assert!(
+                out["error"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with(case["expected_error_class"].as_str().unwrap()),
+                "{}: {out}",
+                case["name"]
+            );
+        }
+    }
+
+    #[test]
+    fn verify_receipt_rejects_v3_duplicate_keys() {
+        let v = v3_vector();
+        let dup = v.receipt_json.replacen(
+            r#""commitments":{"#,
+            &format!(r#""commitments":{{"contract_hash":"{}","#, "3".repeat(64)),
+            1,
+        );
+        assert_ne!(dup, v.receipt_json);
+        assert_rejected(&verify_receipt(&dup, &v.pubkey_hex));
+    }
+
+    #[test]
+    fn v3_checks_pass_for_each_participant() {
+        let v = v3_vector();
+        for i in 0..2 {
+            let out = verify_receipt_v3_with_checks(
+                &v.receipt_json,
+                &v.pubkey_hex,
+                &own_checks(&v, i).to_string(),
+            );
+            assert_eq!(out, r#"{"ok":true}"#);
+        }
+    }
+
+    #[test]
+    fn v3_checks_reject_wrong_nonce() {
+        let v = v3_vector();
+        let mut checks = own_checks(&v, 0);
+        checks["nonce_hex"] = json!("00".repeat(32));
+        let out = result(&verify_receipt_v3_with_checks(
+            &v.receipt_json,
+            &v.pubkey_hex,
+            &checks.to_string(),
+        ));
+        assert_eq!(out["error_class"], "OWN_INPUT_MISMATCH");
+    }
+
+    #[test]
+    fn v3_checks_reject_different_output() {
+        let v = v3_vector();
+        let mut checks = own_checks(&v, 0);
+        checks["received_output"]["decision"] = json!("DECLINE");
+        let out = result(&verify_receipt_v3_with_checks(
+            &v.receipt_json,
+            &v.pubkey_hex,
+            &checks.to_string(),
+        ));
+        assert_eq!(out["error_class"], "OUTPUT_MISMATCH");
+    }
+
+    #[test]
+    fn v3_checks_reject_contract_with_unknown_member() {
+        let v = v3_vector();
+        let mut checks = own_checks(&v, 0);
+        checks["contract"]["contract_hash"] = json!("0".repeat(64));
+        let out = result(&verify_receipt_v3_with_checks(
+            &v.receipt_json,
+            &v.pubkey_hex,
+            &checks.to_string(),
+        ));
+        assert_eq!(out["error_class"], "INVALID_CONTRACT");
+    }
+
+    #[test]
+    fn v3_checks_require_complete_own_input() {
+        let v = v3_vector();
+        let mut checks = own_checks(&v, 0);
+        checks.as_object_mut().unwrap().remove("nonce_hex");
+        let out = result(&verify_receipt_v3_with_checks(
+            &v.receipt_json,
+            &v.pubkey_hex,
+            &checks.to_string(),
+        ));
+        assert_eq!(out["error_class"], "INVALID_CHECKS");
+    }
+
+    #[test]
+    fn v3_checks_reject_v2_receipts() {
+        let (receipt, pubkey_hex) = signed_v2_vector_receipt("receipt_v2_positive_01.json");
+        let out = result(&verify_receipt_v3_with_checks(
+            &receipt.to_string(),
+            &pubkey_hex,
+            "{}",
+        ));
+        assert_eq!(out["error_class"], "UNSUPPORTED_VERSION");
+    }
+
+    #[test]
+    fn verify_bundle_checks_v3_contract_with_contract_hash_v2() {
+        let v = v3_vector();
+        let contract = v.vector["contract_json"].as_str().unwrap();
+        let bundle = json!({ "contract": contract });
+        let out = result(&verify_bundle(
+            &v.receipt_json,
+            &v.pubkey_hex,
+            &bundle.to_string(),
+            false,
+        ));
+        assert_eq!(out["ok"], true, "{out}");
+        assert_eq!(out["contract_hash_valid"], true);
+
+        let mut other: serde_json::Value = serde_json::from_str(contract).unwrap();
+        other["entropy_budget_bits"] = json!(16);
+        let out = result(&verify_bundle(
+            &v.receipt_json,
+            &v.pubkey_hex,
+            &json!({ "contract": other }).to_string(),
+            false,
+        ));
+        assert_eq!(out["ok"], false);
+        assert_eq!(out["contract_hash_valid"], false);
+    }
+
+    #[test]
+    fn verify_bundle_rejects_repeated_keys_in_bundle() {
+        let v = v3_vector();
+        let contract = v.vector["contract_json"].as_str().unwrap();
+        let bundle = format!(
+            r#"{{"contract":{},"contract":{}}}"#,
+            serde_json::to_string(contract).unwrap(),
+            serde_json::to_string(contract).unwrap()
+        );
+        let out = result(&verify_bundle(
+            &v.receipt_json,
+            &v.pubkey_hex,
+            &bundle,
+            false,
+        ));
+        assert_eq!(out["ok"], false);
+        assert!(out["error"]
+            .as_str()
+            .unwrap()
+            .contains("Failed to parse bundle JSON"));
     }
 }

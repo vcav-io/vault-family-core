@@ -56,7 +56,9 @@ pub(crate) struct Args {
     #[arg(long)]
     pub policy: Option<String>,
 
-    /// Path to contract JSON file for contract hash verification (Tier 2)
+    /// Path to contract JSON file for contract hash verification (Tier 2).
+    /// For v3 receipts this runs the full contract check (contract hash v2,
+    /// schema hash, participants, prompt template, entropy budget).
     #[arg(long)]
     pub contract: Option<String>,
 
@@ -71,6 +73,24 @@ pub(crate) struct Args {
     /// Strict contract enforcement: receipt vs contract field mismatches are hard failures
     #[arg(long, default_value = "false")]
     pub strict: bool,
+
+    /// v3 receipts: your participant id, for the own-input commitment check
+    /// (requires --own-input and --own-nonce-file)
+    #[arg(long)]
+    pub own_participant_id: Option<String>,
+
+    /// v3 receipts: path to the JSON context you submitted
+    #[arg(long)]
+    pub own_input: Option<String>,
+
+    /// v3 receipts: path to a file holding the commitment nonce you submitted
+    /// (64 lowercase hex characters)
+    #[arg(long)]
+    pub own_nonce_file: Option<String>,
+
+    /// v3 receipts: path to the output JSON you received from the relay
+    #[arg(long)]
+    pub received_output: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
