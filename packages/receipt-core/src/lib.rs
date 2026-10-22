@@ -42,6 +42,9 @@ pub mod receipt_v3;
 pub mod signer;
 #[cfg(test)]
 mod tamper_tests;
+#[cfg(any(test, feature = "test-support"))]
+#[doc(hidden)]
+pub mod test_support;
 
 // Re-export key types
 pub use agreement::{
@@ -99,10 +102,11 @@ pub use receipt_v3::{
 pub use signer::{
     compute_budget_chain_id, compute_receipt_hash, compute_receipt_key_id,
     create_handoff_signing_message, create_signing_message, create_signing_message_v2,
-    generate_keypair, hash_message, parse_public_key_hex, parse_signature_hex, public_key_to_hex,
-    sign_and_assemble_receipt_v2, sign_handoff, sign_receipt, sign_receipt_v2, verify_handoff,
-    verify_receipt, verify_receipt_v2, SigningError, BUDGET_CHAIN_DOMAIN_PREFIX, DOMAIN_PREFIX,
-    RECEIPT_HASH_DOMAIN_PREFIX, RECEIPT_HASH_PLACEHOLDER, SESSION_HANDOFF_DOMAIN_PREFIX,
+    generate_keypair, hash_message, is_lower_hex, parse_public_key_hex, parse_signature_hex,
+    public_key_to_hex, sign_and_assemble_receipt_v2, sign_handoff, sign_receipt, sign_receipt_v2,
+    verify_ed25519_strict, verify_handoff, verify_receipt, verify_receipt_v2, SigningError,
+    BUDGET_CHAIN_DOMAIN_PREFIX, DOMAIN_PREFIX, RECEIPT_HASH_DOMAIN_PREFIX,
+    RECEIPT_HASH_PLACEHOLDER, SESSION_HANDOFF_DOMAIN_PREFIX,
 };
 pub use vault_family_types::{ExecutionLane, LaneId};
 

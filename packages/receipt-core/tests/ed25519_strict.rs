@@ -1,4 +1,6 @@
-//! Receipt v2 and v3 signatures are verified with strict Ed25519 semantics.
+//! Receipt v2 and v3 signatures are verified with strict Ed25519 semantics,
+//! and the existing hex-signed vectors (v1 receipts, handoffs, manifests)
+//! verify under the strict checks.
 //!
 //! The signatures built here satisfy the unbatched Ed25519 equation, so
 //! `VerifyingKey::verify` accepts them; strict verification rejects them
@@ -267,4 +269,113 @@ fn prime_order_key_check_accepts_normal_keys() {
         let key = SigningKey::from_bytes(&[seed; 32]).verifying_key();
         assert!(receipt_core::receipt_v3::is_prime_order_key(&key));
     }
+}
+
+/// Strict verification of a legacy (v1) receipt given as JSON with a hex
+/// `signature`, computed as the verifiers do.
+fn verify_v1_receipt_value(receipt: &serde_json::Value, key_hex: &str) {
+    let key = receipt_core::parse_public_key_hex(key_hex).unwrap();
+    let mut unsigned = receipt.clone();
+    let sig_hex = unsigned
+        .as_object_mut()
+        .unwrap()
+        .remove("signature")
+        .unwrap();
+    let sig = receipt_core::parse_signature_hex(sig_hex.as_str().unwrap()).unwrap();
+    let mut message = receipt_core::DOMAIN_PREFIX.as_bytes().to_vec();
+    message.extend(receipt_core::canonicalize(&unsigned).as_bytes());
+    receipt_core::verify_ed25519_strict(&key, &hash_message(&message), &sig).unwrap();
+}
+
+#[test]
+fn hex_signed_vectors_verify_strictly() {
+    // v1 receipts
+    let v = load_vector("receipt-verification-v1.json");
+    let mut receipt = v["input"]["unsigned_receipt"].clone();
+    receipt["signature"] = v["expected"]["signature_hex"].clone();
+    verify_v1_receipt_value(&receipt, v["input"]["verifying_key_hex"].as_str().unwrap());
+    let v = load_vector("receipt_v2_vector_02.json");
+    verify_v1_receipt_value(
+        &v["input"]["signed_receipt"],
+        v["input"]["verifying_key_hex"].as_str().unwrap(),
+    );
+    for name in [
+        "verification_tier1_positive_01.json",
+        "verification_tier2_positive_01.json",
+        "verification_tier3_positive_01.json",
+    ] {
+        let v = load_vector(name);
+        verify_v1_receipt_value(
+            &v["input"]["receipt"],
+            v["input"]["public_key_hex"].as_str().unwrap(),
+        );
+    }
+
+    // Handoff, signed by both parties.
+    let v = load_vector("handoff_positive_01.json");
+    let handoff: receipt_core::UnsignedSessionHandoff =
+        serde_json::from_value(v["input"]["unsigned_handoff"].clone()).unwrap();
+    for party in ["initiator", "acceptor"] {
+        let key = receipt_core::parse_public_key_hex(
+            v["input"][format!("{party}_verifying_key_hex")]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        receipt_core::verify_handoff(
+            &handoff,
+            v["expected"][format!("{party}_signature_hex")]
+                .as_str()
+                .unwrap(),
+            &key,
+        )
+        .unwrap();
+    }
+
+    // Manifests.
+    let v = load_vector("manifest_positive_01.json");
+    let manifest: receipt_core::PublicationManifest =
+        serde_json::from_value(v["expected"]["signed_manifest"].clone()).unwrap();
+    let key = receipt_core::parse_public_key_hex(&manifest.operator_public_key_hex).unwrap();
+    receipt_core::verify_manifest(&manifest, &key).unwrap();
+    let v = load_vector("verification_tier3_positive_01.json");
+    let manifest: receipt_core::PublicationManifest =
+        serde_json::from_value(v["input"]["manifest"].clone()).unwrap();
+    let key = receipt_core::parse_public_key_hex(&manifest.operator_public_key_hex).unwrap();
+    receipt_core::verify_manifest(&manifest, &key).unwrap();
+}
+
+/// Re-encode the final base64url character with different trailing bits.
+fn with_trailing_bits(b64: &str) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut bytes = b64.as_bytes().to_vec();
+    let last = bytes.pop().unwrap();
+    let idx = ALPHABET.iter().position(|c| *c == last).unwrap();
+    bytes.push(ALPHABET[idx ^ 1]);
+    String::from_utf8(bytes).unwrap()
+}
+
+#[test]
+fn base64url_signatures_must_be_canonical() {
+    // 64 bytes in unpadded base64url leave 4 unused bits in the last
+    // character; a different value there decodes to the same bytes.
+    let (receipt, _) = v2_receipt();
+    let (unsigned, signature) = receipt.split();
+    let pk = SigningKey::from_bytes(&[0x01; 32]).verifying_key();
+    verify_receipt_v2(&unsigned, &signature, &pk).unwrap();
+    let altered = SignatureV2 {
+        value: with_trailing_bits(&signature.value),
+        ..signature
+    };
+    assert!(verify_receipt_v2(&unsigned, &altered, &pk).is_err());
+
+    let sk = SigningKey::from_bytes(&[0x01; 32]);
+    let receipt = sign_and_assemble_receipt_v3(sample_unsigned_receipt_v3(&sk), &sk).unwrap();
+    let (unsigned, signature) = receipt.split();
+    verify_receipt_v3(&unsigned, &signature, &sk.verifying_key()).unwrap();
+    let altered = SignatureV3 {
+        value: with_trailing_bits(&signature.value),
+        ..signature
+    };
+    assert!(verify_receipt_v3(&unsigned, &altered, &sk.verifying_key()).is_err());
 }

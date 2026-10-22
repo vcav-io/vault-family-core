@@ -9,7 +9,7 @@
 //! - Receipt hash: sha256("vcav/receipt_hash/v1" || JCS(unsigned_receipt_with_placeholder))
 //! - Budget chain id: "chain-" + hex(sha256("vcav/budget_chain/v1" || JCS(chain_id_core)))
 
-use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -19,6 +19,7 @@ use crate::receipt::UnsignedReceipt;
 use crate::receipt_v2::{
     ReceiptV2, SignatureAlgorithm, SignatureV2, UnsignedReceiptV2, DOMAIN_PREFIX_V2,
 };
+use crate::receipt_v3::is_prime_order_key;
 
 // ============================================================================
 // Constants
@@ -71,7 +72,7 @@ pub enum SigningError {
     Serialization(#[from] serde_json::Error),
 
     /// Invalid signature format
-    #[error("Invalid signature format: expected 128 hex characters")]
+    #[error("Invalid signature format: expected 128 lowercase hex characters")]
     InvalidSignatureFormat,
 
     /// Invalid signature bytes
@@ -201,15 +202,42 @@ pub fn verify_receipt(
     let message = create_signing_message(receipt)?;
     let hash = hash_message(&message);
 
-    // Verify
+    verify_ed25519_strict(public_key, &hash, &signature)
+}
+
+/// Verify an Ed25519 signature with strict semantics.
+///
+/// Requires `public_key` to be a canonical point of prime order
+/// ([`is_prime_order_key`]) and uses `verify_strict`, which rejects
+/// non-canonical and small-order `R` components. With a prime-order key, this
+/// accepts exactly the signatures a cofactored verifier with prime-order `R`
+/// accepts, so implementations built on either agree.
+pub fn verify_ed25519_strict(
+    public_key: &VerifyingKey,
+    message: &[u8],
+    signature: &Signature,
+) -> Result<(), SigningError> {
+    if !is_prime_order_key(public_key) {
+        return Err(SigningError::InvalidPublicKeyBytes(
+            "key is not a canonical prime-order point".to_string(),
+        ));
+    }
     public_key
-        .verify(&hash, &signature)
+        .verify_strict(message, signature)
         .map_err(|_| SigningError::VerificationFailed)
 }
 
-/// Parse a 128-character hex string into a Signature.
+/// Whether `s` consists of exactly `len` lowercase hex characters.
+pub fn is_lower_hex(s: &str, len: usize) -> bool {
+    s.len() == len && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// Parse a signature given as exactly 128 lowercase hex characters.
+///
+/// Upper-case and mixed-case hex are rejected so that each signature has a
+/// single accepted encoding.
 pub fn parse_signature_hex(hex_str: &str) -> Result<Signature, SigningError> {
-    if hex_str.len() != 128 {
+    if !is_lower_hex(hex_str, 128) {
         return Err(SigningError::InvalidSignatureFormat);
     }
 
@@ -302,10 +330,7 @@ pub fn verify_handoff(
     let message = create_handoff_signing_message(handoff)?;
     let hash = hash_message(&message);
 
-    // Verify
-    public_key
-        .verify(&hash, &signature)
-        .map_err(|_| SigningError::VerificationFailed)
+    verify_ed25519_strict(public_key, &hash, &signature)
 }
 
 // ============================================================================
@@ -373,9 +398,7 @@ pub fn verify_receipt_v2(
     let message = create_signing_message_v2(receipt)?;
     let hash = hash_message(&message);
 
-    public_key
-        .verify_strict(&hash, &ed_sig)
-        .map_err(|_| SigningError::VerificationFailed)
+    verify_ed25519_strict(public_key, &hash, &ed_sig)
 }
 
 /// Assemble a complete v2 receipt from its unsigned body and a signing key.
@@ -755,10 +778,7 @@ mod tests {
     fn test_parse_signature_hex_invalid_hex() {
         let invalid = "g".repeat(128); // 'g' is not a hex digit
         let result = parse_signature_hex(&invalid);
-        assert!(matches!(
-            result,
-            Err(SigningError::InvalidSignatureBytes(_))
-        ));
+        assert!(matches!(result, Err(SigningError::InvalidSignatureFormat)));
     }
 
     // ==================== Public Key Parsing Tests ====================
@@ -816,7 +836,7 @@ mod tests {
     #[test]
     fn test_signing_error_display() {
         let err = SigningError::InvalidSignatureFormat;
-        assert!(err.to_string().contains("128 hex"));
+        assert!(err.to_string().contains("128 lowercase hex"));
 
         let err = SigningError::VerificationFailed;
         assert!(err.to_string().contains("failed"));
@@ -842,6 +862,77 @@ mod tests {
             model_profile_hash: None,
             policy_bundle_hash: None,
         }
+    }
+
+    // ==================== Strict Ed25519 Tests ====================
+
+    #[test]
+    fn receipt_v1_rejects_weak_signatures_and_keys() {
+        let unsigned = sample_unsigned_receipt();
+        let msg = hash_message(&create_signing_message(&unsigned).unwrap());
+        let accepted = crate::test_support::weak_signature_cases_accepted(
+            |_| msg.to_vec(),
+            |key, sig| verify_receipt(&unsigned, &hex::encode(sig.to_bytes()), key).is_ok(),
+        );
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    #[test]
+    fn handoff_rejects_weak_signatures_and_keys() {
+        let unsigned = sample_unsigned_handoff();
+        let msg = hash_message(&create_handoff_signing_message(&unsigned).unwrap());
+        let accepted = crate::test_support::weak_signature_cases_accepted(
+            |_| msg.to_vec(),
+            |key, sig| verify_handoff(&unsigned, &hex::encode(sig.to_bytes()), key).is_ok(),
+        );
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    #[test]
+    fn receipt_v2_rejects_weak_keys() {
+        use crate::receipt_v2::SignatureV2;
+        use base64::Engine;
+        let receipt: crate::receipt_v2::ReceiptV2 = serde_json::from_value(
+            serde_json::from_str::<serde_json::Value>(include_str!(
+                "../../../data/test-vectors/receipt_v2_vector_01.json"
+            ))
+            .unwrap()["input"]["signed_receipt"]
+                .clone(),
+        )
+        .unwrap();
+        let (unsigned, signature) = receipt.split();
+        let msg = hash_message(&create_signing_message_v2(&unsigned).unwrap());
+        let accepted = crate::test_support::weak_signature_cases_accepted(
+            |_| msg.to_vec(),
+            |key, sig| {
+                let sig = SignatureV2 {
+                    value: base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sig.to_bytes()),
+                    ..signature.clone()
+                };
+                verify_receipt_v2(&unsigned, &sig, key).is_ok()
+            },
+        );
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    #[test]
+    fn signature_hex_must_be_lowercase() {
+        let (signing_key, verifying_key) = generate_keypair();
+        let unsigned = sample_unsigned_receipt();
+        let sig = sign_receipt(&unsigned, &signing_key).unwrap();
+        verify_receipt(&unsigned, &sig, &verifying_key).unwrap();
+        let upper = sig.to_uppercase();
+        assert_ne!(upper, sig);
+        assert!(matches!(
+            verify_receipt(&unsigned, &upper, &verifying_key),
+            Err(SigningError::InvalidSignatureFormat)
+        ));
+        let handoff = sample_unsigned_handoff();
+        let sig = sign_handoff(&handoff, &signing_key).unwrap();
+        assert!(matches!(
+            verify_handoff(&handoff, &sig.to_uppercase(), &verifying_key),
+            Err(SigningError::InvalidSignatureFormat)
+        ));
     }
 
     #[test]

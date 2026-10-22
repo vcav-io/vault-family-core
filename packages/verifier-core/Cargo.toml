@@ -20,3 +20,4 @@ thiserror.workspace = true
 serde_json = "1.0"
 
 [dev-dependencies]
+receipt-core = { path = "../receipt-core", features = ["test-support"] }

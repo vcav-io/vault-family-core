@@ -5,12 +5,12 @@
 //!
 //! Signature covers: SHA-256("VCAV-MANIFEST-V1:" || canonical_json(unsigned_manifest))
 
-use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::canonicalize::canonicalize_serializable;
-use crate::signer::{hash_message, parse_signature_hex, SigningError};
+use crate::signer::{hash_message, parse_signature_hex, verify_ed25519_strict, SigningError};
 
 // ============================================================================
 // Constants
@@ -175,9 +175,7 @@ pub fn verify_manifest(
     let unsigned = manifest.to_unsigned();
     let message = create_manifest_signing_message(&unsigned)?;
     let hash = hash_message(&message);
-    public_key
-        .verify(&hash, &signature)
-        .map_err(|_| SigningError::VerificationFailed)
+    verify_ed25519_strict(public_key, &hash, &signature)
 }
 
 #[cfg(test)]
@@ -218,6 +216,49 @@ mod tests {
             artefacts: sample_artefacts(),
             runtime_hashes: None,
         }
+    }
+
+    fn assemble(unsigned: &UnsignedManifest, signature: String) -> PublicationManifest {
+        PublicationManifest {
+            manifest_version: unsigned.manifest_version.clone(),
+            operator_id: unsigned.operator_id.clone(),
+            operator_key_id: unsigned.operator_key_id.clone(),
+            operator_public_key_hex: unsigned.operator_public_key_hex.clone(),
+            protocol_version: unsigned.protocol_version.clone(),
+            published_at: unsigned.published_at.clone(),
+            artefacts: unsigned.artefacts.clone(),
+            runtime_hashes: unsigned.runtime_hashes.clone(),
+            signature,
+        }
+    }
+
+    // ==================== Strict Ed25519 Tests ====================
+
+    #[test]
+    fn manifest_rejects_weak_signatures_and_keys() {
+        let message_for = |key: &VerifyingKey| {
+            let unsigned = sample_unsigned_manifest(key);
+            hash_message(&create_manifest_signing_message(&unsigned).unwrap()).to_vec()
+        };
+        let accepted =
+            crate::test_support::weak_signature_cases_accepted(message_for, |key, sig| {
+                let manifest =
+                    assemble(&sample_unsigned_manifest(key), hex::encode(sig.to_bytes()));
+                verify_manifest(&manifest, key).is_ok()
+            });
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    #[test]
+    fn manifest_signature_hex_must_be_lowercase() {
+        let (sk, vk) = generate_keypair();
+        let unsigned = sample_unsigned_manifest(&vk);
+        let signature = sign_manifest(&unsigned, &sk).unwrap();
+        assert!(verify_manifest(&assemble(&unsigned, signature.clone()), &vk).is_ok());
+        assert!(matches!(
+            verify_manifest(&assemble(&unsigned, signature.to_uppercase()), &vk),
+            Err(SigningError::InvalidSignatureFormat)
+        ));
     }
 
     // ==================== Domain Prefix Tests ====================

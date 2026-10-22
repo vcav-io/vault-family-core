@@ -20,7 +20,7 @@ pub mod grant_v2;
 
 use std::fmt;
 
-use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -104,7 +104,7 @@ pub enum EnvelopeError {
     InvalidTimestamp(String),
 
     /// Invalid signature format.
-    #[error("invalid signature: expected 128 hex characters")]
+    #[error("invalid signature: expected 128 lowercase hex characters")]
     InvalidSignatureFormat,
 
     /// Invalid signature bytes.
@@ -316,6 +316,10 @@ pub fn sign_envelope(
 }
 
 /// Verify a message envelope's signature.
+///
+/// The key must be a canonical point of prime order, the signature must be
+/// 128 lowercase hex characters, and it is checked with strict Ed25519
+/// verification.
 pub fn verify_envelope(
     envelope: &MessageEnvelope,
     public_key: &VerifyingKey,
@@ -336,14 +340,26 @@ pub fn verify_envelope(
     let message = create_signing_message(&unsigned)?;
     let hash = hash_message(&message);
 
-    public_key
-        .verify(&hash, &signature)
-        .map_err(|_| EnvelopeError::VerificationFailed)
+    verify_strict_prime_order(public_key, &hash, &signature)
 }
 
-/// Parse a 128-character hex string into an Ed25519 Signature.
+/// Strict Ed25519 verification under a canonical prime-order key.
+pub(crate) fn verify_strict_prime_order(
+    public_key: &VerifyingKey,
+    message: &[u8],
+    signature: &ed25519_dalek::Signature,
+) -> Result<(), EnvelopeError> {
+    receipt_core::verify_ed25519_strict(public_key, message, signature).map_err(|e| match e {
+        receipt_core::SigningError::InvalidPublicKeyBytes(msg) => {
+            EnvelopeError::InvalidPublicKeyBytes(msg)
+        }
+        _ => EnvelopeError::VerificationFailed,
+    })
+}
+
+/// Parse a signature given as exactly 128 lowercase hex characters.
 fn parse_signature_hex(hex_str: &str) -> Result<ed25519_dalek::Signature, EnvelopeError> {
-    if hex_str.len() != 128 {
+    if !receipt_core::is_lower_hex(hex_str, 128) {
         return Err(EnvelopeError::InvalidSignatureFormat);
     }
     let bytes =
@@ -422,6 +438,53 @@ mod tests {
             ifc_policy_hash: policy_hash,
             label_receipt,
         }
+    }
+
+    // -- Strict Ed25519 tests --
+
+    fn assemble_envelope(unsigned: &UnsignedEnvelope, signature: String) -> MessageEnvelope {
+        let u = unsigned.clone();
+        MessageEnvelope {
+            version: u.version,
+            envelope_id: u.envelope_id,
+            created_at: u.created_at,
+            sender: u.sender,
+            recipient: u.recipient,
+            label: u.label,
+            payload: u.payload,
+            ifc_policy_hash: u.ifc_policy_hash,
+            label_receipt: u.label_receipt,
+            ifc_signature: signature,
+        }
+    }
+
+    #[test]
+    fn verify_envelope_rejects_weak_signatures_and_keys() {
+        let unsigned = sample_unsigned_envelope();
+        let msg = hash_message(&create_signing_message(&unsigned).unwrap());
+        let accepted = receipt_core::test_support::weak_signature_cases_accepted(
+            |_| msg.to_vec(),
+            |key, sig| {
+                verify_envelope(
+                    &assemble_envelope(&unsigned, hex::encode(sig.to_bytes())),
+                    key,
+                )
+                .is_ok()
+            },
+        );
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    #[test]
+    fn verify_envelope_requires_lowercase_signature_hex() {
+        let (sk, vk) = sample_keypair();
+        let unsigned = sample_unsigned_envelope();
+        let sig = sign_envelope(&unsigned, &sk).unwrap();
+        verify_envelope(&assemble_envelope(&unsigned, sig.clone()), &vk).unwrap();
+        assert!(matches!(
+            verify_envelope(&assemble_envelope(&unsigned, sig.to_uppercase()), &vk),
+            Err(EnvelopeError::InvalidSignatureFormat)
+        ));
     }
 
     // -- EnvelopeVersion tests --
