@@ -930,16 +930,14 @@ mod tests {
     #[test]
     fn test_domain_separator_v1_v2_isolation() {
         use crate::receipt::UnsignedReceipt;
-        use crate::signer::{
-            generate_keypair, sign_receipt, sign_receipt_v2, verify_receipt, verify_receipt_v2,
-        };
+        use crate::signer::{generate_keypair, sign_receipt_v2};
 
         // Build a minimal v1 receipt and a v2 receipt using the same key
-        let (signing_key, verifying_key) = generate_keypair();
+        let (signing_key, _verifying_key) = generate_keypair();
 
         // v2 sign + try to verify with the v1 verifier (must fail)
         let unsigned_v2 = sample_unsigned();
-        let sig_v2 = sign_receipt_v2(&unsigned_v2, &signing_key).unwrap();
+        let _sig_v2 = sign_receipt_v2(&unsigned_v2, &signing_key).unwrap();
 
         // Encode the v2 signature as the hex string v1 verify expects
         // (they should be completely different because of domain separation)

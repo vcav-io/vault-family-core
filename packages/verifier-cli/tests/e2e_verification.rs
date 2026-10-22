@@ -225,7 +225,7 @@ fn write_receipt_file(
         output_schema_id: unsigned.output_schema_id.clone(),
         output_schema_hash: unsigned.output_schema_hash.clone(),
         attestation: unsigned.attestation.clone(),
-        signal_class: unsigned.signal_class.clone(),
+        signal_class: unsigned.signal_class,
         entropy_budget_bits: unsigned.entropy_budget_bits,
         schema_entropy_ceiling_bits: unsigned.schema_entropy_ceiling_bits,
         prompt_template_hash: unsigned.prompt_template_hash.clone(),
