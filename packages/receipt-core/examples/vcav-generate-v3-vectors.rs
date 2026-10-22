@@ -705,7 +705,6 @@ fn positive_02_unsigned(sk: &SigningKey) -> UnsignedReceiptV3 {
     let c = &mut unsigned.commitments;
     c.output = None;
     c.output_hash = sha256_hex(b"");
-    c.rejected_output_hash = Some(sha256_hex(br#"{"decision":"MAYBE"}"#));
     c.effective_config_hash = Some(sha256_hex(
         receipt_core::jcs::canonicalize_v3_serializable(&bundle)
             .unwrap()
@@ -1343,6 +1342,23 @@ fn generate_receipts(dir: &Path) {
             &pk_hex,
             "SCHEMA_VIOLATION",
             "integer fields are JSON integers without sign, fraction or exponent",
+        );
+    }
+    for (name, field) in [
+        ("assembled_prompt_hash_present", "assembled_prompt_hash"),
+        ("rejected_output_hash_present", "rejected_output_hash"),
+    ] {
+        push(
+            name,
+            sign_raw(
+                &edit(&|v| v["commitments"][field] = json!("7".repeat(64))),
+                DOMAIN_PREFIX_V3,
+                &sk,
+            )
+            .to_string(),
+            &pk_hex,
+            "SCHEMA_VIOLATION",
+            "field is not part of receipt v3",
         );
     }
     push(

@@ -27,6 +27,14 @@
 
 ### Changed
 
+- Receipt v3: removed `commitments.assembled_prompt_hash` and
+  `commitments.rejected_output_hash` from `CommitmentsV3`, `docs/receipt-v3.md` and the
+  vectors. A v3 receipt that carries either field is rejected. The spec adds a normative
+  rule (section 8) that receipt fields never hold an unsalted hash of input-derived values
+  or of output that was not released; input-derived values appear only through the salted
+  input commitments. `receipt_schema_version` stays `3.0.0` (no relay has emitted v3 yet).
+  v2 receipts and their verification are unchanged.
+
 - Renamed AgentVault → Selkey. Contract offer IDs and refs in fixtures now use the
   `selkey.` prefix (e.g. `selkey.mediation.v1.standard`). The
   `agentvault_*.schema.json` files are now `selkey_*.schema.json`, and their schema

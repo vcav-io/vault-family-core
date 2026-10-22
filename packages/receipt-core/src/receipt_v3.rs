@@ -95,6 +95,11 @@ pub struct InputCommitmentV3 {
 }
 
 /// Verifiable commitments made by the relay.
+///
+/// No field may hold an unsalted hash of a value derived from a
+/// participant's input or of output that was not released (see
+/// `docs/receipt-v3.md`, section 8). Inputs appear only through
+/// `input_commitments`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CommitmentsV3 {
@@ -103,7 +108,6 @@ pub struct CommitmentsV3 {
     pub schema_hash: String,
     pub output_hash: String,
     pub input_commitments: Vec<InputCommitmentV3>,
-    pub assembled_prompt_hash: String,
     pub prompt_assembly_version: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<Value>,
@@ -119,8 +123,6 @@ pub struct CommitmentsV3 {
     pub output_media_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preflight_bundle_uri: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rejected_output_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initiator_submission_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -440,17 +442,12 @@ impl UnsignedReceiptV3 {
         require_hex64("commitments.contract_hash", &c.contract_hash)?;
         require_hex64("commitments.schema_hash", &c.schema_hash)?;
         require_hex64("commitments.output_hash", &c.output_hash)?;
-        require_hex64(
-            "commitments.assembled_prompt_hash",
-            &c.assembled_prompt_hash,
-        )?;
         for (name, value) in [
             ("commitments.prompt_template_hash", &c.prompt_template_hash),
             (
                 "commitments.effective_config_hash",
                 &c.effective_config_hash,
             ),
-            ("commitments.rejected_output_hash", &c.rejected_output_hash),
             (
                 "commitments.initiator_submission_hash",
                 &c.initiator_submission_hash,
@@ -728,7 +725,6 @@ pub fn sample_unsigned_receipt_v3(signing_key: &SigningKey) -> UnsignedReceiptV3
                     scheme: InputCommitmentScheme::Sha256N32JcsV3,
                 },
             ],
-            assembled_prompt_hash: "7".repeat(64),
             prompt_assembly_version: "1.0.0".to_string(),
             output: Some(output),
             prompt_template_hash: Some("8".repeat(64)),
@@ -737,7 +733,6 @@ pub fn sample_unsigned_receipt_v3(signing_key: &SigningKey) -> UnsignedReceiptV3
             output_retrieval_uri: None,
             output_media_type: None,
             preflight_bundle_uri: None,
-            rejected_output_hash: None,
             initiator_submission_hash: None,
             responder_submission_hash: None,
         },
