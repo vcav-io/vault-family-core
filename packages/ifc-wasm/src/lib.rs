@@ -10,6 +10,9 @@
 //! ```
 
 #![forbid(unsafe_code)]
+// The grant functions here still use the deprecated v1 `CapabilityGrant`
+// (`VCAV-GRANT-V1`); the current format is `message_envelope::grant_v2`.
+#![allow(deprecated)]
 
 mod grant_registry;
 

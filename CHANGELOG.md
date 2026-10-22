@@ -25,7 +25,21 @@
 - Golden vectors for receipt v3, input commitments, contract hash v2 and RFC 8785
   canonicalisation (including the RFC 8785 reference test data) in `data/test-vectors/`.
 
+- `message-envelope::grant_v2`: recipient-issued IFC grants (`VCAV-IFC-GRANT-V2`), matching
+  the TypeScript implementation byte for byte. `verify_grant_v2` takes the issuer key from
+  the caller, checks field formats and `grant_id`, and uses strict Ed25519 verification
+  with a prime-order key. Golden vectors in `data/test-vectors/ifc/ifc_grant_v2_*.json`
+  (one produced by TypeScript, the others by Rust).
+- `afal-core`: `DomainPrefix::IfcGrantV2` and `DomainPrefix::canonicalization()`. The V1
+  AFAL message types keep the legacy canonicaliser; `VCAV-IFC-GRANT-V2:` uses RFC 8785,
+  as the TypeScript signer does.
+- `receipt-core::key_id`: the Ed25519 key id `ed25519:` + hex(SHA-256(raw key bytes)).
+
 ### Changed
+
+- Deprecated `message_envelope::grant::CapabilityGrant`, `UnsignedGrant`, `sign_grant` and
+  `verify_grant` (`VCAV-GRANT-V1`) in favour of `grant_v2`. `verify_grant` checks the
+  signature against the key carried in the grant.
 
 - Receipt v3: removed `commitments.assembled_prompt_hash` and
   `commitments.rejected_output_hash` from `CommitmentsV3`, `docs/receipt-v3.md` and the

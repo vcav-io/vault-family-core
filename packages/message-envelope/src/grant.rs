@@ -1,4 +1,15 @@
-//! Capability grants for IFC-controlled cross-agent delegation.
+//! Capability grants for IFC-controlled cross-agent delegation (deprecated).
+//!
+//! # Deprecated
+//!
+//! [`CapabilityGrant`] (`VCAV-GRANT-V1`) is superseded by the recipient-issued
+//! [`crate::grant_v2::IfcGrantV2`] (`VCAV-IFC-GRANT-V2`), the format the
+//! TypeScript implementation uses. The two formats differ in fields
+//! (`pair_id`, `purposes` and a full `Label` here) and in signing.
+//! [`verify_grant`] checks the signature against the `issuer_public_key`
+//! carried in the grant itself, so it shows that the grant is internally
+//! consistent, not who issued it; callers must compare that key against a
+//! key they trust. New code should use [`crate::grant_v2`].
 //!
 //! A [`CapabilityGrant`] allows one agent (issuer) to delegate specific
 //! communication capabilities to another agent (audience). Grants are
@@ -15,6 +26,8 @@
 //! 6. Sign the 32-byte digest with Ed25519.
 
 #![allow(clippy::module_name_repetitions)]
+// The module defines the deprecated items and uses them internally.
+#![allow(deprecated)]
 
 use ed25519_dalek::{Signer, SigningKey, Verifier};
 use serde::{Deserialize, Serialize};
@@ -224,6 +237,7 @@ pub struct GrantProvenance {
 }
 
 /// An unsigned grant containing all fields except grant_id and signature.
+#[deprecated(note = "use message_envelope::grant_v2::IfcGrantV2 (VCAV-IFC-GRANT-V2)")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnsignedGrant {
     /// Format version.
@@ -268,6 +282,7 @@ struct SignableGrant {
 }
 
 /// A signed capability grant with content-addressed ID and Ed25519 signature.
+#[deprecated(note = "use message_envelope::grant_v2::IfcGrantV2 (VCAV-IFC-GRANT-V2)")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilityGrant {
     /// Format version.
@@ -353,6 +368,7 @@ fn extract_unsigned(grant: &CapabilityGrant) -> UnsignedGrant {
 
 /// Sign an unsigned grant. Computes the content-addressed grant_id, then
 /// signs all fields (including grant_id) with Ed25519.
+#[deprecated(note = "use message_envelope::grant_v2::sign_grant_v2")]
 pub fn sign_grant(
     unsigned: &UnsignedGrant,
     signing_key: &SigningKey,
@@ -385,6 +401,13 @@ pub fn sign_grant(
 ///
 /// Recomputes the content-addressed grant_id and verifies the Ed25519 signature.
 /// Does NOT check expiry — that is a runtime concern.
+///
+/// The signature is checked against the `issuer_public_key` in the grant, so
+/// a valid result does not identify the issuer; compare that key with a
+/// trusted key.
+#[deprecated(
+    note = "use message_envelope::grant_v2::verify_grant_v2, which takes the issuer key from the caller"
+)]
 pub fn verify_grant(grant: &CapabilityGrant) -> Result<(), EnvelopeError> {
     // 1. Recompute grant_id from unsigned fields
     let unsigned = extract_unsigned(grant);

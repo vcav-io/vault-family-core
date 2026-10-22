@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+afal-core = { path = "../afal-core" }
 ifc-engine = { path = "../ifc-engine" }
 receipt-core = { path = "../receipt-core" }
 serde.workspace = true
