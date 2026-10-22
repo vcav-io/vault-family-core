@@ -2,7 +2,7 @@
 //!
 //! These schemas are embedded at compile time via build.rs. vault-family-core
 //! envelope schemas and vault result schemas are included. Protocol-specific
-//! schemas (vcav, agentvault) must be provided at runtime via --schema-dir or
+//! schemas (vcav, selkey) must be provided at runtime via --schema-dir or
 //! schema bundles.
 
 /// A named embedded schema entry.

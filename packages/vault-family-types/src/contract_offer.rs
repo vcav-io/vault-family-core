@@ -97,13 +97,13 @@ mod tests {
         let validator = compile_schema(include_str!("../../../schemas/contract_offer.schema.json"));
         let value = json!({
             "offer_version": "1",
-            "contract_offer_id": "agentvault.mediation.v1.standard",
+            "contract_offer_id": "selkey.mediation.v1.standard",
             "purpose_code": "MEDIATION",
             "schema_ref": "vcav_e_mediation_signal_v2",
-            "policy_ref": "agentvault.default.policy@active",
-            "program_ref": "agentvault.mediation.program@active",
+            "policy_ref": "selkey.default.policy@active",
+            "program_ref": "selkey.mediation.program@active",
             "allowed_model_profiles": ["api-claude-sonnet-v1"],
-            "metadata_defaults": {"source": "agentvault"}
+            "metadata_defaults": {"source": "selkey"}
         });
 
         assert!(validator.is_valid(&value));
@@ -112,14 +112,14 @@ mod tests {
     #[test]
     fn test_contract_offer_proposal_schema_accepts_offer_scoped_profiles() {
         let validator = compile_schema(include_str!(
-            "../../../schemas/agentvault_contract_offer_proposal.schema.json"
+            "../../../schemas/selkey_contract_offer_proposal.schema.json"
         ));
         let value = json!({
             "negotiation_id": "neg-123",
             "acceptable_offers": [
                 {
                     "kind": "offer",
-                    "contract_offer_id": "agentvault.mediation.v1.standard",
+                    "contract_offer_id": "selkey.mediation.v1.standard",
                     "acceptable_model_profiles": [
                         {
                             "id": "api-claude-sonnet-v1",
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn test_contract_offer_proposal_schema_accepts_bespoke_contract_shape() {
         let validator = compile_schema(include_str!(
-            "../../../schemas/agentvault_contract_offer_proposal.schema.json"
+            "../../../schemas/selkey_contract_offer_proposal.schema.json"
         ));
         let value = json!({
             "negotiation_id": "neg-123",
@@ -147,8 +147,8 @@ mod tests {
                     "kind": "bespoke",
                     "purpose_code": "MEDIATION",
                     "schema_ref": "vcav_e_mediation_signal_v2",
-                    "policy_ref": "agentvault.default.policy@active",
-                    "program_ref": "agentvault.mediation.program@active",
+                    "policy_ref": "selkey.default.policy@active",
+                    "program_ref": "selkey.mediation.program@active",
                     "acceptable_model_profiles": [
                         {
                             "id": "api-claude-sonnet-v1",
@@ -166,12 +166,12 @@ mod tests {
     #[test]
     fn test_contract_offer_selection_schema_accepts_agreed_shape() {
         let validator = compile_schema(include_str!(
-            "../../../schemas/agentvault_contract_offer_selection.schema.json"
+            "../../../schemas/selkey_contract_offer_selection.schema.json"
         ));
         let value = json!({
             "negotiation_id": "neg-123",
             "state": "AGREED",
-            "selected_contract_offer_id": "agentvault.mediation.v1.standard",
+            "selected_contract_offer_id": "selkey.mediation.v1.standard",
             "selected_model_profile": {
                 "id": "api-claude-sonnet-v1",
                 "version": "1",
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn test_contract_offer_selection_schema_accepts_agreed_bespoke_shape() {
         let validator = compile_schema(include_str!(
-            "../../../schemas/agentvault_contract_offer_selection.schema.json"
+            "../../../schemas/selkey_contract_offer_selection.schema.json"
         ));
         let value = json!({
             "negotiation_id": "neg-123",
@@ -194,8 +194,8 @@ mod tests {
                 "kind": "bespoke",
                 "purpose_code": "MEDIATION",
                 "schema_ref": "vcav_e_mediation_signal_v2",
-                "policy_ref": "agentvault.default.policy@active",
-                "program_ref": "agentvault.mediation.program@active",
+                "policy_ref": "selkey.default.policy@active",
+                "program_ref": "selkey.mediation.program@active",
                 "acceptable_model_profiles": []
             },
             "selected_model_profile": {
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn test_contract_offer_selection_rejects_missing_selected_fields_for_agreed() {
         let validator = compile_schema(include_str!(
-            "../../../schemas/agentvault_contract_offer_selection.schema.json"
+            "../../../schemas/selkey_contract_offer_selection.schema.json"
         ));
         let value = json!({
             "negotiation_id": "neg-123",

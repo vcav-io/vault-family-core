@@ -1,15 +1,15 @@
 {
   "offer_version": "1",
-  "contract_offer_id": "agentvault.mediation.v1.standard",
+  "contract_offer_id": "selkey.mediation.v1.standard",
   "purpose_code": "MEDIATION",
   "schema_ref": "vcav_e_mediation_signal_v2",
-  "policy_ref": "agentvault.default.policy@active",
-  "program_ref": "agentvault.mediation.program@active",
+  "policy_ref": "selkey.default.policy@active",
+  "program_ref": "selkey.mediation.program@active",
   "allowed_model_profiles": [
     "api-claude-sonnet-v1",
     "api-gpt5-v1"
   ],
   "metadata_defaults": {
-    "source": "agentvault"
+    "source": "selkey"
   }
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AgentVaultTopicAlignmentProposal",
+  "title": "SelkeyTopicAlignmentProposal",
   "type": "object",
   "additionalProperties": false,
   "required": ["alignment_id", "acceptable_topic_codes"],

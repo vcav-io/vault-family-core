@@ -3,7 +3,7 @@
 ## 1. Purpose
 
 `vault-family-core` is the cryptographic and type-system foundation for the VCAV protocol
-family. All protocol implementations — the VCAV relay, AgentVault, and any cross-language
+family. All protocol implementations — the VCAV relay, Selkey, and any cross-language
 clients — depend on it for shared types, content-addressed signing, receipt generation, and
 verification. It establishes the invariants (frozen wire formats, domain-separated signatures,
 canonical JSON) that allow independent implementations to interoperate and auditors to verify
@@ -62,7 +62,7 @@ Dependencies flow downward. No crate depends on anything above it in this diagra
 - `verifier-core` depends only on `receipt-core`; it is intentionally WASM-compatible with
   no filesystem access.
 - `escalation-interface` is a zero-dependency stub that defines the trait surface for
-  AgentVault-to-VCAV escalation; it carries no logic.
+  Selkey-to-VCAV escalation; it carries no logic.
 
 ---
 

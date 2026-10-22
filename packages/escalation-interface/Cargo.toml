@@ -1,6 +1,6 @@
 [package]
 name = "escalation-interface"
-description = "Escalation interface types for AgentVault → VCAV escalation"
+description = "Escalation interface types for Selkey → VCAV escalation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

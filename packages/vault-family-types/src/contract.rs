@@ -179,7 +179,7 @@ mod tests {
             "entropy_budget_bits": 16,
             "timing_class": "fixed-window",
             "metadata": {
-                "ui": "agentvault",
+                "ui": "selkey",
                 "flow": "bilateral"
             },
             "model_profile_id": "sealed-demo-v2",

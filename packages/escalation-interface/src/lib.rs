@@ -1,20 +1,20 @@
 #![forbid(unsafe_code)]
 //! # escalation-interface
 //!
-//! Escalation interface types for AgentVault → VCAV escalation.
+//! Escalation interface types for Selkey → VCAV escalation.
 //!
 //! This crate is a stub — it contains type definitions and a trait signature only.
 //! No implementation lives here; implementations belong in the VCAV codebase.
 
 use serde::{Deserialize, Serialize};
 
-/// The reason an AgentVault session is requesting escalation to VCAV.
+/// The reason an Selkey session is requesting escalation to VCAV.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum EscalationReason {
     /// The operation requires a sealed lane that only VCAV can provide.
     RequiresSealedLane,
     /// The session's sensitivity level has exceeded the threshold permitted
-    /// by the current AgentVault policy.
+    /// by the current Selkey policy.
     SensitivityThresholdExceeded,
     /// The principal explicitly requested elevation to VCAV.
     PrincipalRequest,
@@ -29,12 +29,12 @@ pub struct CapabilityClaim {
     pub description: Option<String>,
 }
 
-/// A request from AgentVault to VCAV to escalate the current session.
+/// A request from Selkey to VCAV to escalate the current session.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EscalationRequest {
     /// Caller-generated UUID used for idempotency.
     pub escalation_id: String,
-    /// SHA-256 hash of the originating AgentVault receipt envelope.
+    /// SHA-256 hash of the originating Selkey receipt envelope.
     pub receipt_envelope_hash: String,
     /// Why escalation is being requested.
     pub reason: EscalationReason,

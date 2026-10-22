@@ -6,7 +6,7 @@
 //! This crate measures and tracks information release. It does **not** enforce
 //! limits, normalize timing, or bind to hardware attestation. Enforcement is
 //! the responsibility of the consuming runtime (e.g. the vault runtime for VCAV,
-//! relay for AgentVault).
+//! relay for Selkey).
 //!
 //! ## Design principles
 //!
