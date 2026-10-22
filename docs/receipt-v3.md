@@ -16,7 +16,7 @@ The reference implementation lives in `packages/receipt-core`:
 | Input commitments v3 | `receipt_core::commitment_v3` |
 | Contract hash v2 | `receipt_core::contract_hash_v2` |
 
-Golden vectors live in `data/test-vectors/` (see [Vectors](#9-vectors)). An
+Golden vectors live in `data/test-vectors/` (see [Vectors](#10-vectors)). An
 implementation conforms only if it passes every vector: every positive vector is accepted
 with the expected values, and every negative vector is **rejected**.
 
@@ -40,6 +40,7 @@ a different order and report a different reason. The classes are kept for diagno
 | `claims.budget_usage` | no scope | required `scope` (`"SESSION"`) |
 | Numbers | unrestricted | magnitude at most 2^53−1 |
 | Unknown fields / `null` for optional fields | tolerated by some verifiers | rejected |
+| `commitments.assembled_prompt_hash`, `commitments.rejected_output_hash` | present | removed (Section 8); a receipt carrying either is rejected |
 
 Negative vectors are pass/fail: a conforming verifier rejects each one. Their error classes are
 informative only (see above).
@@ -179,7 +180,6 @@ rejected, except inside those two free-form values.
 | `schema_hash` | hex64 | `H(JCS(output_schema))` of the schema the relay enforced |
 | `output_hash` | hex64 | `H(JCS(output))` of the accepted output. When no output was accepted (`claims.status` other than `success`) it is `H("")` (SHA-256 of zero bytes, `e3b0c442…b855`) |
 | `input_commitments` | array | one entry per contract participant, in `contract.participants` order (Section 3.4) |
-| `assembled_prompt_hash` | hex64 | `H(JCS({"system": <string>, "user_message": <string>}))` of the assembled prompt, computed once before the first provider call |
 | `prompt_assembly_version` | string | e.g. `"1.0.0"` |
 | `output` | any JSON, optional | inline output; if present, `output_hash` MUST equal `H(JCS(output))` |
 | `prompt_template_hash` | hex64, optional | if present MUST equal `contract.prompt_template_hash` |
@@ -188,9 +188,8 @@ rejected, except inside those two free-form values.
 | `output_retrieval_uri` | string, optional | |
 | `output_media_type` | string, optional | |
 | `preflight_bundle_uri` | string, optional | |
-| `rejected_output_hash` | hex64, optional | `H(JCS(rejected_output))` for failure receipts |
-| `initiator_submission_hash` | hex64, optional | TEE lane: SHA-256 of the initiator's ciphertext bytes |
-| `responder_submission_hash` | hex64, optional | TEE lane: SHA-256 of the responder's ciphertext bytes |
+| `initiator_submission_hash` | hex64, optional | TEE lane: SHA-256 of the initiator's encrypted submission (ciphertext bytes, never plaintext; see Section 8) |
+| `responder_submission_hash` | hex64, optional | TEE lane: SHA-256 of the responder's encrypted submission (ciphertext bytes, never plaintext; see Section 8) |
 
 ### 3.4 `commitments.input_commitments[]`
 
@@ -456,20 +455,48 @@ Receipts record the algorithm as
 `commitments.contract_hash_alg: "SHA256_JCS_V2"`. A v3 relay computes only contract hash v2;
 `expected_contract_hash` values in v3 submissions are contract hash v2 values.
 
-## 8. Producer checklist (relays)
+## 8. Receipt field privacy (normative)
+
+Receipts are given to every participant and may be shown to third parties, so they carry
+information derived from participants' inputs only in salted form.
+
+1. **No receipt field may contain an unsalted hash (or any other deterministic digest) of a
+   value derived from a participant's input, or of output that was not released to the
+   participants.** This covers, for example, the assembled prompt, any context or
+   combination of contexts, provider requests and responses, and rejected or withheld
+   output.
+2. Values derived from a participant's input appear in a receipt **only** through the
+   salted input commitments of Section 5 (`input_commitments`).
+3. `output_hash` and `output` cover only output that was released to the participants. When
+   no output was released, `output_hash` is `H("")` (Section 3.3).
+4. `initiator_submission_hash` and `responder_submission_hash` MAY appear only as hashes of
+   ciphertext produced with a fresh, secret key and nonce (the TEE lane's encrypted
+   submissions). They MUST NOT be computed over plaintext.
+5. Verifiers reject unknown fields (Section 6.2), so a v3 receipt that carries any field not
+   listed in Section 3 is rejected. Receipt v3 does not define `assembled_prompt_hash` or
+   `rejected_output_hash`; both were present in v2 and are removed in v3.
+6. The same rule applies to any future field and to anything a relay binds into
+   attestation evidence it places in the receipt (for example a TEE transcript hash).
+
+Informative: non-hash claims such as `claims.token_usage` and `claims.provider_latency_ms`
+reveal coarse size and timing information about a session. Producers SHOULD consider this
+when deciding whether to include them.
+
+## 9. Producer checklist (relays)
 
 1. Require `commitment_nonce` (Section 5.2) and compute `input_commitments` in
    `contract.participants` order with scheme `SHA256_N32_JCS_V3`.
 2. Compute `contract_hash` with contract hash v2 from the contract JSON, and set
    `contract_hash_alg`.
-3. Compute `schema_hash`, `output_hash`, `assembled_prompt_hash`, `rejected_output_hash`,
+3. Compute `schema_hash`, `output_hash`,
    `effective_config_hash` with `JCS` (Section 2), rejecting out-of-range numbers.
 4. Set `issued_at` in the `YYYY-MM-DDTHH:MM:SSZ` form, `budget_usage.scope = "SESSION"` and
    `bits_used_before = 0`.
-5. Omit absent optional fields; never emit `null`.
+5. Omit absent optional fields; never emit `null`. Do not add any hash of input-derived values
+   or withheld output (Section 8).
 6. Sign as in Section 4; set `operator_key_fingerprint = H(public key bytes)`.
 
-## 9. Vectors
+## 10. Vectors
 
 All files are in `data/test-vectors/` and are produced by
 `cargo run -p receipt-core --example vcav-generate-v3-vectors`. Signing keys use the fixed seeds
