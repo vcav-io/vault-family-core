@@ -1009,7 +1009,7 @@ mod tests {
 
         let retired_dir = dir.path().join("retired");
         fs::create_dir_all(&retired_dir).unwrap();
-        let retired_path = retired_dir.join(format!("{}.json", retired_key_id));
+        let retired_path = retired_dir.join(format!("{retired_key_id}.json"));
         let retired_json = serde_json::json!({
             "key_id": retired_key_id,
             "verifying_key_hex": retired_verifying_key_hex
@@ -1553,10 +1553,7 @@ mod tests {
             .join("schemas");
 
         if !schema_dir.exists() {
-            eprintln!(
-                "Skipping test: schemas directory not found at {:?}",
-                schema_dir
-            );
+            eprintln!("Skipping test: schemas directory not found at {schema_dir:?}");
             return;
         }
 
@@ -1949,11 +1946,7 @@ mod tests {
                         assert_eq!(
                             details.status,
                             VerificationStatus::Ok,
-                            "Failed for decision={}, confidence={}, reason={}, hint={}",
-                            decision,
-                            confidence,
-                            reason,
-                            hint
+                            "Failed for decision={decision}, confidence={confidence}, reason={reason}, hint={hint}"
                         );
                         assert_eq!(details.output_schema_valid, Some(true));
                     }
@@ -2338,7 +2331,7 @@ mod tests {
         writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
 
         let mut pubkey_file = NamedTempFile::new().unwrap();
-        writeln!(pubkey_file, "{}", vk_hex).unwrap();
+        writeln!(pubkey_file, "{vk_hex}").unwrap();
 
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
@@ -2384,7 +2377,7 @@ mod tests {
         writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
 
         let mut pubkey_file = NamedTempFile::new().unwrap();
-        writeln!(pubkey_file, "{}", vk_hex).unwrap();
+        writeln!(pubkey_file, "{vk_hex}").unwrap();
 
         let args = Args {
             receipt: receipt_file.path().to_str().unwrap().to_string(),
@@ -2459,7 +2452,7 @@ mod tests {
         writeln!(receipt_file, "{}", serde_json::to_string(&receipt).unwrap()).unwrap();
 
         let mut pubkey_file = NamedTempFile::new().unwrap();
-        writeln!(pubkey_file, "{}", vk_hex).unwrap();
+        writeln!(pubkey_file, "{vk_hex}").unwrap();
 
         let agreement_fields = &vector["input"]["agreement_fields"]["session_agreement_fields"];
         let mut agreement_file = NamedTempFile::new().unwrap();

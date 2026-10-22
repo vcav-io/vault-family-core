@@ -851,7 +851,7 @@ mod tests {
             serde_json::from_str(&rt.receive_message(recv_input)).unwrap();
         let var_id = recv["data"]["variable_id"].as_str().unwrap();
 
-        let inspect_input = format!(r#"{{"variable_id": "{}"}}"#, var_id);
+        let inspect_input = format!(r#"{{"variable_id": "{var_id}"}}"#);
         let resp: serde_json::Value =
             serde_json::from_str(&rt.inspect_variable(&inspect_input)).unwrap();
         assert_eq!(resp["ok"], true);
@@ -874,7 +874,7 @@ mod tests {
             serde_json::from_str(&rt.receive_message(recv_input)).unwrap();
         let var_id = recv["data"]["variable_id"].as_str().unwrap();
 
-        let inspect_input = format!(r#"{{"variable_id": "{}"}}"#, var_id);
+        let inspect_input = format!(r#"{{"variable_id": "{var_id}"}}"#);
         let resp: serde_json::Value =
             serde_json::from_str(&rt.inspect_variable(&inspect_input)).unwrap();
         assert_eq!(resp["ok"], false);
@@ -1419,7 +1419,7 @@ mod tests {
                 "b".repeat(64)
             );
             let resp: serde_json::Value = serde_json::from_str(&rt.create_grant(&input)).unwrap();
-            assert_eq!(resp["ok"], true, "grant {} failed", i);
+            assert_eq!(resp["ok"], true, "grant {i} failed");
         }
 
         // 257th should fail

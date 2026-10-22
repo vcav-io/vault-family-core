@@ -419,9 +419,9 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             filename
         );
-        let content = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
-        serde_json::from_str(&content).unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
+        let content =
+            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("Failed to read {path}: {e}"));
+        serde_json::from_str(&content).unwrap_or_else(|e| panic!("Failed to parse {path}: {e}"))
     }
 
     #[test]

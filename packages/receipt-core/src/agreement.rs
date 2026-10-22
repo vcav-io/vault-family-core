@@ -350,11 +350,11 @@ mod tests {
             for (i, fixture) in pre_tests.iter().enumerate() {
                 let fields: PreAgreementFields = serde_json::from_value(fixture["fields"].clone())
                     .unwrap_or_else(|e| {
-                        panic!("Failed to parse pre-agreement fixture {} fields: {}", i, e)
+                        panic!("Failed to parse pre-agreement fixture {i} fields: {e}")
                     });
                 let expected = fixture["expected_hash"]
                     .as_str()
-                    .unwrap_or_else(|| panic!("Pre-agreement fixture {} missing expected_hash", i));
+                    .unwrap_or_else(|| panic!("Pre-agreement fixture {i} missing expected_hash"));
 
                 let computed = compute_pre_agreement_hash(&fields).unwrap();
                 assert_eq!(
@@ -378,11 +378,11 @@ mod tests {
             for (i, fixture) in full_tests.iter().enumerate() {
                 let fields: SessionAgreementFields =
                     serde_json::from_value(fixture["fields"].clone()).unwrap_or_else(|e| {
-                        panic!("Failed to parse full agreement fixture {} fields: {}", i, e)
+                        panic!("Failed to parse full agreement fixture {i} fields: {e}")
                     });
-                let expected = fixture["expected_hash"].as_str().unwrap_or_else(|| {
-                    panic!("Full agreement fixture {} missing expected_hash", i)
-                });
+                let expected = fixture["expected_hash"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("Full agreement fixture {i} missing expected_hash"));
 
                 let computed = compute_agreement_hash(&fields).unwrap();
                 assert_eq!(

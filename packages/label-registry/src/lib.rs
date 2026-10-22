@@ -396,7 +396,7 @@ mod tests {
                 // Context should be join of bottom and public/trusted/bot = same label
                 assert_eq!(context_label, label);
             }
-            other => panic!("Expected Direct, got {:?}", other),
+            other => panic!("Expected Direct, got {other:?}"),
         }
         assert_eq!(reg.variable_count(), 0);
         assert_eq!(reg.sequence(), 1);
@@ -423,7 +423,7 @@ mod tests {
                 // Context unchanged (still bottom)
                 assert_eq!(context_label, Label::bottom());
             }
-            other => panic!("Expected Hide, got {:?}", other),
+            other => panic!("Expected Hide, got {other:?}"),
         }
         assert_eq!(reg.variable_count(), 1);
     }
@@ -482,7 +482,7 @@ mod tests {
         let decision = reg.receive_message(&label, "true".to_string(), Purpose::Compatibility);
         let var_id = match decision {
             ReceiveDecision::Hide { variable_id, .. } => variable_id,
-            other => panic!("Expected Hide, got {:?}", other),
+            other => panic!("Expected Hide, got {other:?}"),
         };
 
         let value = reg.inspect_variable(&var_id).unwrap();
@@ -502,7 +502,7 @@ mod tests {
         let decision = reg.receive_message(&label, "secret".to_string(), Purpose::Compatibility);
         let var_id = match decision {
             ReceiveDecision::Hide { variable_id, .. } => variable_id,
-            other => panic!("Expected Hide, got {:?}", other),
+            other => panic!("Expected Hide, got {other:?}"),
         };
 
         assert_eq!(
@@ -522,7 +522,7 @@ mod tests {
         let decision = reg.receive_message(&label, "data".to_string(), Purpose::Compatibility);
         let var_id = match decision {
             ReceiveDecision::Hide { variable_id, .. } => variable_id,
-            other => panic!("Expected Hide, got {:?}", other),
+            other => panic!("Expected Hide, got {other:?}"),
         };
 
         assert_eq!(
@@ -553,7 +553,7 @@ mod tests {
         let decision = reg.receive_message(&label, "yes".to_string(), Purpose::Compatibility);
         let var_id = match decision {
             ReceiveDecision::Hide { variable_id, .. } => variable_id,
-            other => panic!("Expected Hide, got {:?}", other),
+            other => panic!("Expected Hide, got {other:?}"),
         };
 
         // Inspect 16 times (the limit)
@@ -668,7 +668,7 @@ mod tests {
         let decision = reg.evaluate_outbound(&label, &bob(), Purpose::Compatibility);
         match decision {
             PolicyDecision::Allow { .. } => {}
-            other => panic!("Expected Allow, got {:?}", other),
+            other => panic!("Expected Allow, got {other:?}"),
         }
     }
 

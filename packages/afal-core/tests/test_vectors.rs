@@ -18,7 +18,7 @@ fn load_vector(filename: &str) -> serde_json::Value {
         filename
     );
     let contents =
-        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("Failed to read {path}: {e}"));
     serde_json::from_str(&contents).unwrap()
 }
 
@@ -249,10 +249,7 @@ fn replay_timestamp_bounds_match_vector() {
         assert_eq!(
             result.is_ok(),
             expected_ok,
-            "timestamp case '{}': expected ok={}, got {:?}",
-            label,
-            expected_ok,
-            result
+            "timestamp case '{label}': expected ok={expected_ok}, got {result:?}"
         );
     }
 }
@@ -270,10 +267,7 @@ fn replay_nonce_format_matches_vector() {
         assert_eq!(
             result.is_ok(),
             expected_valid,
-            "nonce case '{}': expected valid={}, got {:?}",
-            label,
-            expected_valid,
-            result
+            "nonce case '{label}': expected valid={expected_valid}, got {result:?}"
         );
     }
 }

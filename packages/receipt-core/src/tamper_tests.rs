@@ -742,7 +742,7 @@ mod tests {
 
             match ledger.apply_receipt(&r_fork).unwrap_err() {
                 LedgerError::UnexpectedPrev { .. } => {} // expected
-                other => panic!("Expected UnexpectedPrev, got {:?}", other),
+                other => panic!("Expected UnexpectedPrev, got {other:?}"),
             }
         }
 
@@ -795,7 +795,7 @@ mod tests {
             // r2_b is a fork — its prev points to r1, but ledger already moved to r2_a
             match ledger.apply_receipt(&r2_b).unwrap_err() {
                 LedgerError::UnexpectedPrev { .. } => {}
-                other => panic!("Expected UnexpectedPrev, got {:?}", other),
+                other => panic!("Expected UnexpectedPrev, got {other:?}"),
             }
         }
 
@@ -982,8 +982,7 @@ mod tests {
             for prefix in &ALL_PREFIXES {
                 assert!(
                     seen.insert(*prefix),
-                    "Duplicate domain prefix found: {}",
-                    prefix
+                    "Duplicate domain prefix found: {prefix}"
                 );
             }
         }
@@ -1159,14 +1158,12 @@ mod tests {
                     if sign_prefix == verify_prefix {
                         assert!(
                             result.is_ok(),
-                            "Same-domain verification failed for '{}'",
-                            sign_prefix
+                            "Same-domain verification failed for '{sign_prefix}'"
                         );
                     } else {
                         assert!(
                             result.is_err(),
-                            "Cross-domain verification should fail: signed with '{}', verified with '{}'",
-                            sign_prefix, verify_prefix
+                            "Cross-domain verification should fail: signed with '{sign_prefix}', verified with '{verify_prefix}'"
                         );
                     }
                 }

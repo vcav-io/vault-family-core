@@ -20,7 +20,7 @@ cargo build --workspace
 cargo test --workspace
 
 # Lint (must be clean — CI enforces -D warnings)
-cargo clippy --workspace -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings
 
 # Check formatting (does not modify files)
 cargo fmt --all -- --check
@@ -50,7 +50,7 @@ Please call this out clearly in your PR description.
 
 1. Fork the repository and create a branch from `main`.
 2. Make your changes. Ensure `cargo test --workspace` and
-   `cargo clippy --workspace -- -D warnings` both pass locally.
+   `cargo clippy --workspace --all-targets -- -D warnings` both pass locally.
 3. Open a pull request against `main`. Fill in the PR description with
    what changed and why.
 4. CI must pass before a PR can be merged. A maintainer will review and merge.

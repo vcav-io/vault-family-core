@@ -391,7 +391,7 @@ mod tests {
         let decision = policy.evaluate(&label, &bob, &Label::bottom(), Purpose::Compatibility, 1);
         let label_receipt = match decision {
             ifc_engine::PolicyDecision::Allow { label_receipt, .. } => label_receipt,
-            other => panic!("Expected Allow, got {:?}", other),
+            other => panic!("Expected Allow, got {other:?}"),
         };
         let policy_hash = policy_config_hash(&config).unwrap();
 

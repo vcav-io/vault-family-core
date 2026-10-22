@@ -372,7 +372,7 @@ mod tests {
             contract_key: contract_key.to_string(),
             entropy_millibits,
             timestamp: ts,
-            receipt_hash: format!("receipt-hash-{}", session_id),
+            receipt_hash: format!("receipt-hash-{session_id}"),
         }
     }
 
@@ -619,7 +619,7 @@ mod tests {
         for i in 0u64..5 {
             ledger
                 .append(make_entry(
-                    &format!("s{}", i),
+                    &format!("s{i}"),
                     "pair1",
                     CONTRACT_KEY_NONE,
                     1000,
