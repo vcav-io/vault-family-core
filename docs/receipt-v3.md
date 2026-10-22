@@ -462,11 +462,12 @@ information derived from participants' inputs only in salted form.
 
 1. **No receipt field may contain an unsalted hash (or any other deterministic digest) of a
    value derived from a participant's input, or of output that was not released to the
-   participants.** This covers, for example, the assembled prompt, any context or
+   participants, other than output released to the participants (item 3).** This covers, for example, the assembled prompt, any context or
    combination of contexts, provider requests and responses, and rejected or withheld
    output.
 2. Values derived from a participant's input appear in a receipt **only** through the
-   salted input commitments of Section 5 (`input_commitments`).
+   salted input commitments of Section 5 (`input_commitments`), and through output released
+   to the participants (item 3).
 3. `output_hash` and `output` cover only output that was released to the participants. When
    no output was released, `output_hash` is `H("")` (Section 3.3).
 4. `initiator_submission_hash` and `responder_submission_hash` MAY appear only as hashes of
