@@ -19,12 +19,20 @@
 //!   chain, validate model identity against the operator profile, and check
 //!   compartment IDs and contract enforcement.
 //!
+//! ## Receipt versions
+//!
+//! [`receipt_verify::verify_receipt_json`] dispatches on the receipt format:
+//! legacy v1, v2 (`2.x`) and v3 (`3.0.0`, `docs/receipt-v3.md`). The v3
+//! cross-checks (own input, received output, contract) are in
+//! [`receipt_verify`].
+//!
 //! ## Schema Validation
 //!
 //! Embedded schemas (compiled into the binary at build time via `build.rs`) are
 //! exposed through [`schema_validator::SCHEMAS`] for use in both local validation
 //! and downstream crates.
 
+pub mod receipt_verify;
 pub mod schema_validator;
 pub mod tiers;
 
@@ -38,4 +46,8 @@ pub use tiers::{
     ProfileDigestV1, TierResult, TtlBounds,
 };
 
+pub use receipt_verify::{
+    check_contract_v3, check_own_input_v3, check_received_output_v3, run_v3_checks,
+    verify_receipt_json, V3CheckError, V3Checks, VerifiedReceipt,
+};
 pub use schema_validator::{EmbeddedSchemaEntry, SCHEMAS};

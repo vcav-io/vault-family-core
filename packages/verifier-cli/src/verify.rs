@@ -1054,6 +1054,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1104,6 +1108,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1138,6 +1146,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1176,6 +1188,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1213,6 +1229,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1260,6 +1280,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1299,6 +1323,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1341,6 +1369,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1380,6 +1412,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1416,6 +1452,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1442,6 +1482,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1473,6 +1517,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1529,6 +1577,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1560,6 +1612,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1589,6 +1645,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1749,6 +1809,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1785,6 +1849,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1871,6 +1939,10 @@ mod tests {
                             manifest: None,
                             strict_runtime: false,
                             strict: false,
+                            own_participant_id: None,
+                            own_input: None,
+                            own_nonce_file: None,
+                            received_output: None,
                         };
 
                         let details = verify(&args);
@@ -1942,6 +2014,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -1995,6 +2071,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2023,6 +2103,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2054,6 +2138,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2269,6 +2357,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2311,6 +2403,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2391,6 +2487,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2466,6 +2566,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2494,6 +2598,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2562,6 +2670,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2620,6 +2732,10 @@ mod tests {
             manifest: None,
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2735,6 +2851,10 @@ mod tests {
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2785,6 +2905,10 @@ mod tests {
             manifest: Some(tampered_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2882,6 +3006,10 @@ mod tests {
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -2983,6 +3111,10 @@ mod tests {
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
@@ -3127,6 +3259,10 @@ mod tests {
             manifest: Some(manifest_file.path().to_str().unwrap().to_string()),
             strict_runtime: false,
             strict: false,
+            own_participant_id: None,
+            own_input: None,
+            own_nonce_file: None,
+            received_output: None,
         };
 
         let details = verify(&args);
