@@ -439,7 +439,7 @@ mod tests {
                     }
                 );
             }
-            other => panic!("Expected Escalate, got {:?}", other),
+            other => panic!("Expected Escalate, got {other:?}"),
         }
     }
 
@@ -465,7 +465,7 @@ mod tests {
                     }
                 );
             }
-            other => panic!("Expected Escalate, got {:?}", other),
+            other => panic!("Expected Escalate, got {other:?}"),
         }
     }
 
@@ -483,7 +483,7 @@ mod tests {
         let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Allow { tier, .. } => assert_eq!(tier, Tier::Tier1),
-            other => panic!("Expected Allow, got {:?}", other),
+            other => panic!("Expected Allow, got {other:?}"),
         }
     }
 
@@ -501,7 +501,7 @@ mod tests {
         let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Allow { tier, .. } => assert_eq!(tier, Tier::Tier1),
-            other => panic!("Expected Allow, got {:?}", other),
+            other => panic!("Expected Allow, got {other:?}"),
         }
     }
 
@@ -519,7 +519,7 @@ mod tests {
         let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Allow { tier, .. } => assert_eq!(tier, Tier::Tier1),
-            other => panic!("Expected Allow, got {:?}", other),
+            other => panic!("Expected Allow, got {other:?}"),
         }
     }
 
@@ -537,7 +537,7 @@ mod tests {
         let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Escalate { to_tier, .. } => assert_eq!(to_tier, Tier::Tier2),
-            other => panic!("Expected Escalate to Tier2, got {:?}", other),
+            other => panic!("Expected Escalate to Tier2, got {other:?}"),
         }
     }
 
@@ -555,7 +555,7 @@ mod tests {
         let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Escalate { to_tier, .. } => assert_eq!(to_tier, Tier::Tier3),
-            other => panic!("Expected Escalate to Tier3, got {:?}", other),
+            other => panic!("Expected Escalate to Tier3, got {other:?}"),
         }
     }
 
@@ -575,7 +575,7 @@ mod tests {
         let decision = policy.evaluate(&label, &bob, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Escalate { to_tier, .. } => assert_eq!(to_tier, Tier::Tier2),
-            other => panic!("Expected Escalate to Tier2, got {:?}", other),
+            other => panic!("Expected Escalate to Tier2, got {other:?}"),
         }
     }
 
@@ -594,7 +594,7 @@ mod tests {
         let decision = policy.evaluate(&label, &bob, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Escalate { to_tier, .. } => assert_eq!(to_tier, Tier::Tier3),
-            other => panic!("Expected Escalate to Tier3, got {:?}", other),
+            other => panic!("Expected Escalate to Tier3, got {other:?}"),
         }
     }
 
@@ -614,7 +614,7 @@ mod tests {
             PolicyDecision::Block { reason } => {
                 assert_eq!(reason, BlockReason::NoReaders);
             }
-            other => panic!("Expected Block, got {:?}", other),
+            other => panic!("Expected Block, got {other:?}"),
         }
     }
 
@@ -632,7 +632,7 @@ mod tests {
         let decision = policy.evaluate(&label, &alice, &Label::bottom(), Purpose::Compatibility, 1);
         match decision {
             PolicyDecision::Allow { tier, .. } => assert_eq!(tier, Tier::Tier1),
-            other => panic!("Expected Allow Tier1, got {:?}", other),
+            other => panic!("Expected Allow Tier1, got {other:?}"),
         }
     }
 
@@ -656,7 +656,7 @@ mod tests {
                     "Receipt type_tag_bits must equal label's entropy_bits"
                 );
             }
-            other => panic!("Expected Allow, got {:?}", other),
+            other => panic!("Expected Allow, got {other:?}"),
         }
     }
 
@@ -677,7 +677,7 @@ mod tests {
             PolicyDecision::Allow { label_receipt, .. } => {
                 assert_eq!(label_receipt.sequence, 42);
             }
-            other => panic!("Expected Allow, got {:?}", other),
+            other => panic!("Expected Allow, got {other:?}"),
         }
     }
 
@@ -741,7 +741,7 @@ mod tests {
                 match decision {
                     PolicyDecision::Allow { tier, .. } => prop_assert_eq!(tier, Tier::Tier1),
                     other => return Err(TestCaseError::fail(format!(
-                        "Expected Allow Tier1, got {:?}", other
+                        "Expected Allow Tier1, got {other:?}"
                     ))),
                 }
             }
@@ -757,7 +757,7 @@ mod tests {
                 match decision {
                     PolicyDecision::Escalate { to_tier, .. } => prop_assert_eq!(to_tier, Tier::Tier3),
                     other => return Err(TestCaseError::fail(format!(
-                        "Expected Escalate Tier3, got {:?}", other
+                        "Expected Escalate Tier3, got {other:?}"
                     ))),
                 }
             }

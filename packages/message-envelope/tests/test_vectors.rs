@@ -48,7 +48,7 @@ fn make_valid_envelope(signing_key: &SigningKey) -> (MessageEnvelope, String) {
     let decision = policy.evaluate(&label, &bob, &Label::bottom(), Purpose::Compatibility, 1);
     let label_receipt = match decision {
         PolicyDecision::Allow { label_receipt, .. } => label_receipt,
-        other => panic!("Expected Allow, got {:?}", other),
+        other => panic!("Expected Allow, got {other:?}"),
     };
     let policy_hash = policy_config_hash(&config).unwrap();
     let pubkey_hex = hex::encode(signing_key.verifying_key().as_bytes());
@@ -155,7 +155,7 @@ fn test_vector_policy_blocked_envelope() {
     let decision = policy.evaluate(&label, &bob, &Label::bottom(), Purpose::Compatibility, 1);
     match decision {
         PolicyDecision::Block { .. } => {} // expected
-        other => panic!("Expected Block for nobody-label, got {:?}", other),
+        other => panic!("Expected Block for nobody-label, got {other:?}"),
     }
 }
 

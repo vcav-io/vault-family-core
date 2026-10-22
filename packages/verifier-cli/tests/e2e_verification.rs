@@ -263,8 +263,7 @@ fn vcav_verify_bin() -> std::path::PathBuf {
             return debug_path;
         }
         panic!(
-            "vcav-verify binary not found at {:?} or {:?}. Run `cargo build` first.",
-            path, debug_path
+            "vcav-verify binary not found at {path:?} or {debug_path:?}. Run `cargo build` first."
         );
     }
     path
@@ -591,8 +590,7 @@ fn test_cli_tier1_valid_receipt() {
     // First line should indicate success status (SKIPPED_SCHEMA, not FAIL_SIGNATURE)
     assert!(
         stdout.starts_with("SKIPPED_SCHEMA"),
-        "Expected SKIPPED_SCHEMA status, got: {}",
-        stdout
+        "Expected SKIPPED_SCHEMA status, got: {stdout}"
     );
 }
 
@@ -642,8 +640,7 @@ fn test_cli_tier1_tampered_receipt_fails() {
 
     assert!(
         stdout.contains("FAIL_SIGNATURE"),
-        "Should report signature failure, got: {}",
-        stdout
+        "Should report signature failure, got: {stdout}"
     );
 }
 

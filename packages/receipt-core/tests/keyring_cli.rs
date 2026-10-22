@@ -219,11 +219,11 @@ fn rotate_creates_new_key_and_archives_old() {
     // Old key archived in signing dir
     let archived = signing_dir
         .join("archived")
-        .join(format!("{}.json", old_key_id));
+        .join(format!("{old_key_id}.json"));
     assert!(archived.exists(), "old key should be archived");
 
     // Verifier dir has retired + active + TRUST_ROOT
-    let retired = verifier_dir.join(format!("{}.json", old_key_id));
+    let retired = verifier_dir.join(format!("{old_key_id}.json"));
     assert!(retired.exists(), "retired key should exist in verifier dir");
     assert!(verifier_dir.join("active.json").exists());
     assert!(

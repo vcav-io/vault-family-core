@@ -1674,9 +1674,9 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             filename
         );
-        let content = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
-        serde_json::from_str(&content).unwrap_or_else(|e| panic!("Failed to parse {}: {}", path, e))
+        let content =
+            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("Failed to read {path}: {e}"));
+        serde_json::from_str(&content).unwrap_or_else(|e| panic!("Failed to parse {path}: {e}"))
     }
 
     /// Helper: extract the unsigned receipt fields from a signed receipt JSON value,
@@ -2610,14 +2610,12 @@ mod tests {
             assert_eq!(
                 result.format_valid,
                 Some(true),
-                "format_valid failed for vector: {}",
-                label
+                "format_valid failed for vector: {label}"
             );
             assert_eq!(
                 result.derivation_valid,
                 Some(true),
-                "derivation_valid failed for vector: {}",
-                label
+                "derivation_valid failed for vector: {label}"
             );
         }
     }
@@ -2650,16 +2648,14 @@ mod tests {
             assert_eq!(
                 result.format_valid,
                 Some(expected_format),
-                "format_valid failed for vector: {}",
-                label
+                "format_valid failed for vector: {label}"
             );
 
             if let Some(expected_derivation) = vec.get("expected_derivation_valid") {
                 assert_eq!(
                     result.derivation_valid,
                     Some(expected_derivation.as_bool().unwrap()),
-                    "derivation_valid failed for vector: {}",
-                    label
+                    "derivation_valid failed for vector: {label}"
                 );
             }
         }
