@@ -70,7 +70,11 @@ pub struct ContractV2 {
     pub enforcement_policy_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_schema_hash: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "model_constraints_object"
+    )]
     pub model_constraints: Option<ModelConstraintsV2>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_completion_tokens: Option<u32>,
@@ -78,34 +82,57 @@ pub struct ContractV2 {
     pub session_ttl_secs: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invite_ttl_secs: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "enforcement_mode_string"
+    )]
     pub entropy_enforcement: Option<EntropyEnforcementMode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub relay_verifying_key_hex: Option<String>,
 }
 
+// serde would also read a struct from a JSON array and a unit enum variant
+// from a one-member object such as {"Gate":null}. These field deserialisers
+// accept only the canonical shapes (or null, meaning absent) on every
+// deserialisation path.
+
+fn model_constraints_object<'de, D>(deserializer: D) -> Result<Option<ModelConstraintsV2>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    match Value::deserialize(deserializer)? {
+        Value::Null => Ok(None),
+        value @ Value::Object(_) => serde_json::from_value(value)
+            .map(Some)
+            .map_err(D::Error::custom),
+        _ => Err(D::Error::custom("model_constraints must be a JSON object")),
+    }
+}
+
+fn enforcement_mode_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<EntropyEnforcementMode>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    match Value::deserialize(deserializer)? {
+        Value::Null => Ok(None),
+        value @ Value::String(_) => serde_json::from_value(value)
+            .map(Some)
+            .map_err(D::Error::custom),
+        _ => Err(D::Error::custom("entropy_enforcement must be a string")),
+    }
+}
+
 impl ContractV2 {
     /// Validate a contract JSON value against the contract hash v2 member set.
     pub fn from_value(contract: &Value) -> Result<Self, ContractHashError> {
-        let Some(members) = contract.as_object() else {
+        if !contract.is_object() {
             return Err(ContractHashError::InvalidContract(
                 "contract must be a JSON object".to_string(),
-            ));
-        };
-        // serde would also read a struct from a JSON array and a unit enum
-        // variant from a one-member object; only the canonical shapes count.
-        let shape_ok = |key: &str, ok: fn(&Value) -> bool| match members.get(key) {
-            None | Some(Value::Null) => true,
-            Some(value) => ok(value),
-        };
-        if !shape_ok("model_constraints", Value::is_object) {
-            return Err(ContractHashError::InvalidContract(
-                "model_constraints must be a JSON object".to_string(),
-            ));
-        }
-        if !shape_ok("entropy_enforcement", Value::is_string) {
-            return Err(ContractHashError::InvalidContract(
-                "entropy_enforcement must be a string".to_string(),
             ));
         }
         serde_json::from_value(contract.clone())
@@ -262,6 +289,33 @@ mod tests {
             let contract = with_member("entropy_enforcement", json!(mode));
             assert!(compute_contract_hash_v2(&contract).is_ok(), "{mode}");
         }
+    }
+
+    #[test]
+    fn direct_deserialisation_requires_canonical_shapes() {
+        for (key, value) in [
+            ("model_constraints", json!([])),
+            ("entropy_enforcement", json!({"Gate": null})),
+        ] {
+            let contract = with_member(key, value.clone());
+            assert!(
+                serde_json::from_value::<ContractV2>(contract.clone()).is_err(),
+                "{key}: {value}"
+            );
+            assert!(
+                serde_json::from_str::<ContractV2>(&contract.to_string()).is_err(),
+                "{key}: {value}"
+            );
+        }
+        let contract = with_member("entropy_enforcement", json!("Gate"));
+        let parsed = serde_json::from_value::<ContractV2>(contract).unwrap();
+        assert_eq!(
+            parsed.entropy_enforcement,
+            Some(EntropyEnforcementMode::Gate)
+        );
+        let contract = with_member("model_constraints", Value::Null);
+        let parsed = serde_json::from_value::<ContractV2>(contract).unwrap();
+        assert_eq!(parsed.model_constraints, None);
     }
 
     #[test]
