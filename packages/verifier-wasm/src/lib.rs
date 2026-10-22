@@ -104,13 +104,87 @@ fn err_json(msg: &str) -> String {
 // Internal signature verification (avoids JSON round-trip)
 // ============================================================================
 
+/// Parse JSON, rejecting objects that repeat a key at any depth.
+///
+/// `serde_json` keeps the last value for a repeated key, while other parsers
+/// may keep the first, so a receipt with repeated keys could be read
+/// differently by the verifier and by whatever displays it.
+fn parse_json_strict(input: &str) -> Result<serde_json::Value, serde_json::Error> {
+    use serde::de::{Deserialize, Deserializer, Error, MapAccess, SeqAccess, Visitor};
+    use serde_json::{Map, Number, Value};
+
+    struct Strict(Value);
+
+    impl<'de> Deserialize<'de> for Strict {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            deserializer.deserialize_any(StrictVisitor)
+        }
+    }
+
+    struct StrictVisitor;
+
+    impl<'de> Visitor<'de> for StrictVisitor {
+        type Value = Strict;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a JSON value")
+        }
+        fn visit_bool<E>(self, v: bool) -> Result<Strict, E> {
+            Ok(Strict(Value::Bool(v)))
+        }
+        fn visit_i64<E>(self, v: i64) -> Result<Strict, E> {
+            Ok(Strict(Value::from(v)))
+        }
+        fn visit_u64<E>(self, v: u64) -> Result<Strict, E> {
+            Ok(Strict(Value::from(v)))
+        }
+        fn visit_f64<E: Error>(self, v: f64) -> Result<Strict, E> {
+            Number::from_f64(v)
+                .map(|n| Strict(Value::Number(n)))
+                .ok_or_else(|| E::custom("non-finite number"))
+        }
+        fn visit_str<E>(self, v: &str) -> Result<Strict, E> {
+            Ok(Strict(Value::String(v.to_owned())))
+        }
+        fn visit_string<E>(self, v: String) -> Result<Strict, E> {
+            Ok(Strict(Value::String(v)))
+        }
+        fn visit_unit<E>(self) -> Result<Strict, E> {
+            Ok(Strict(Value::Null))
+        }
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Strict, A::Error> {
+            let mut items = Vec::new();
+            while let Some(Strict(item)) = seq.next_element()? {
+                items.push(item);
+            }
+            Ok(Strict(Value::Array(items)))
+        }
+        fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Strict, A::Error> {
+            let mut obj = Map::new();
+            while let Some(key) = map.next_key::<String>()? {
+                if obj.contains_key(&key) {
+                    return Err(A::Error::custom(format!("duplicate key '{key}'")));
+                }
+                let Strict(value) = map.next_value()?;
+                obj.insert(key, value);
+            }
+            Ok(Strict(Value::Object(obj)))
+        }
+    }
+
+    let mut deserializer = serde_json::Deserializer::from_str(input);
+    let Strict(value) = Strict::deserialize(&mut deserializer)?;
+    deserializer.end()?;
+    Ok(value)
+}
+
 /// Verify a receipt's Ed25519 signature.
 ///
 /// On success, returns the receipt as a JSON value containing exactly the
 /// content covered by the signature. Callers must read tier fields from this
 /// value only, never from the raw input.
 fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<serde_json::Value, String> {
-    let receipt_val: serde_json::Value = serde_json::from_str(receipt_json)
+    let receipt_val = parse_json_strict(receipt_json)
         .map_err(|e| format!("Failed to parse receipt JSON: {e}"))?;
 
     let public_key = receipt_core::parse_public_key_hex(pubkey_hex)
@@ -120,9 +194,10 @@ fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<serde_js
         Some(signature) if signature.is_object() => {
             let receipt: receipt_core::ReceiptV2 = serde_json::from_value(receipt_val.clone())
                 .map_err(|e| format!("Failed to parse receipt v2 JSON: {e}"))?;
-            // The v2 signature covers the typed receipt body. Require the input to
-            // be exactly that body: no unknown fields at any level and no
-            // alternative encodings of signed values (e.g. timestamps).
+            // The v2 signature covers the typed receipt body. Require the parsed
+            // input to equal that body: no unknown fields at any level and no
+            // re-encodings that change a signed value (e.g. timestamps).
+            // Duplicate keys are rejected by `parse_json_strict`.
             let typed = serde_json::to_value(&receipt)
                 .map_err(|e| format!("Failed to serialize receipt v2: {e}"))?;
             if typed != receipt_val {
@@ -157,7 +232,7 @@ fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<serde_js
             public_key
                 .verify(&hash, &signature)
                 .map_err(|e| format!("Signature verification failed: {e}"))?;
-            // The legacy signature covers every field of the parsed input.
+            // The legacy signature covers every field of the parsed value.
             Ok(receipt_val)
         }
         Some(_) => Err("Receipt has unsupported 'signature' field shape".to_string()),
@@ -843,6 +918,41 @@ mod tests {
         let (mut receipt, pubkey_hex) = signed_v2_vector_receipt("receipt_v2_positive_02.json");
         receipt["commitments"]["guardian_policy_hash"] = json!("4".repeat(64));
         assert_rejected(&verify_receipt(&receipt.to_string(), &pubkey_hex));
+    }
+
+    #[test]
+    fn verify_receipt_rejects_duplicate_keys() {
+        let (receipt, pubkey_hex) = signed_v2_vector_receipt("receipt_v2_positive_01.json");
+        let genuine = receipt.to_string();
+        assert!(genuine.starts_with('{'));
+        assert_eq!(verify_receipt(&genuine, &pubkey_hex), r#"{"ok":true}"#);
+
+        // A repeated top-level key placed before the signed one.
+        let top_level = format!(
+            r#"{{"commitments":{{"contract_hash":"{}"}},{}"#,
+            "3".repeat(64),
+            &genuine[1..]
+        );
+        assert_rejected(&verify_receipt(&top_level, &pubkey_hex));
+
+        // A repeated nested key placed before the signed one.
+        let nested = genuine.replacen(
+            r#""commitments":{"#,
+            &format!(r#""commitments":{{"contract_hash":"{}","#, "3".repeat(64)),
+            1,
+        );
+        assert_ne!(nested, genuine);
+        assert_rejected(&verify_receipt(&nested, &pubkey_hex));
+    }
+
+    #[test]
+    fn parse_json_strict_matches_serde_json_without_duplicates() {
+        let input = r#"{"a":[1,-2,3.5,"x",null,true],"b":{"c":{}},"d":18446744073709551615}"#;
+        assert_eq!(
+            parse_json_strict(input).unwrap(),
+            serde_json::from_str::<serde_json::Value>(input).unwrap()
+        );
+        assert!(parse_json_strict(r#"{"a":1} trailing"#).is_err());
     }
 
     #[test]

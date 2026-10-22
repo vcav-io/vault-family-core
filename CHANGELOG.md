@@ -11,6 +11,10 @@
   `https://vcav.io/schemas/selkey_contract_offer_{proposal,selection}.schema.json`
   (vcav.io serves both the old `agentvault_*` and new `selkey_*` URLs). Other `$id` URLs,
   `VCAV-*` domain separators and the signed `receipt_v2_*` test vectors are unchanged.
+- `verifier-wasm` and `verifier-cli` accept a v2 receipt only if its parsed JSON equals the
+  signed receipt body: unknown fields, explicit `null`s for optional fields, re-encoded signed
+  values and repeated object keys are now rejected. Tier checks read only signed content.
+  Receipts produced by the relay are unaffected.
 
 ## 0.1.0 (2026-02-24)
 
