@@ -61,6 +61,21 @@ Each positive vector gives the signer seed, the `unsigned` grant, `grant_id =
 hex(SHA-256(JCS(unsigned)))`, `digest_hex = SHA-256("VCAV-IFC-GRANT-V2:" || JCS(unsigned +
 grant_id))` and the Ed25519 signature. JCS is RFC 8785.
 
+### Key rotation vectors
+
+`afal-key-rotation-*.json` cover agent key rotation statements (`VCAV-KEY-ROTATION-V1`, see
+`packages/afal-core/src/key_rotation.rs`), checked by
+`packages/afal-core/tests/key_rotation_vectors.rs`:
+
+- `afal-key-rotation-ts-01.json` -- produced by the TypeScript implementation (selkey-mcp)
+- `afal-key-rotation-v1.json` -- positive and negative cases produced by the Rust
+  implementation; regenerate with `VFC_WRITE_VECTORS=1 cargo test -p afal-core --test
+  key_rotation_vectors`
+
+A statement `{agent_id, old_fpr, new_fpr, issued_at, signature}` is signed by the old key over
+`SHA-256("VCAV-KEY-ROTATION-V1:" || JCS(statement without signature))`, JCS being RFC 8785.
+Fingerprints are `"ed25519:" + hex(SHA-256(raw 32-byte key))`.
+
 Canonicalisation cases give JSON text (`input_json`), the expected canonical string and the
 SHA-256 (lowercase hex) of its UTF-8 bytes, so they can be consumed directly from TypeScript.
 

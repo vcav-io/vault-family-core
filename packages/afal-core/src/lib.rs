@@ -5,6 +5,7 @@
 //!
 //! This crate defines the canonical types and operations for the AFAL protocol:
 //! agent descriptors, PROPOSE/ADMIT/DENY/COMMIT/MESSAGE message types,
+//! key rotation statements,
 //! domain-separated Ed25519 signing, and replay protection primitives.
 //!
 //! ## Design principles
@@ -21,6 +22,7 @@
 pub mod admit;
 pub mod commit;
 pub mod descriptor;
+pub mod key_rotation;
 pub mod message;
 pub mod propose;
 pub mod replay;
@@ -44,6 +46,11 @@ pub use descriptor::{
     validate_descriptor, verify_descriptor_signature, AgentDescriptor, Capabilities, Endpoints,
     EnvelopeKey, IdentityKey, LabelRequirements, ModelProfileRef, PolicyCommitments,
     ValidationWarning,
+};
+pub use key_rotation::{
+    key_rotation_signing_digest, parse_key_rotation_json, sign_key_rotation,
+    validate_unsigned_key_rotation, verify_key_rotation, KeyRotationError, KeyRotationStatement,
+    UnsignedKeyRotation,
 };
 pub use message::{validate_message, AfalMessage, MessagePayload, UnsignedAfalMessage};
 pub use propose::{validate_propose, ProposeMessage, UnsignedPropose};

@@ -157,6 +157,7 @@ and must never change without a versioned migration path.
 | Receipt schema version | `1.0.0` | `receipt-core::receipt::SCHEMA_VERSION` |
 | AFAL PROPOSE/ADMIT/DENY/COMMIT/MESSAGE prefixes | `VCAV-{TYPE}-V1:` | `afal-core::types::DomainPrefix` |
 | IFC grant v2 prefix (RFC 8785) | `VCAV-IFC-GRANT-V2:` | `afal-core::types::DomainPrefix::IfcGrantV2` |
+| Key rotation statement prefix (RFC 8785) | `VCAV-KEY-ROTATION-V1:` | `afal-core::types::DomainPrefix::KeyRotation` |
 | AFAL canonicaliser per prefix | legacy `JCS_V1` for the V1 message types, RFC 8785 for newer types | `afal-core::types::DomainPrefix::canonicalization` |
 | Ed25519 key id | `ed25519:` + hex(SHA-256(32 key bytes)) | `receipt-core::key_id` |
 

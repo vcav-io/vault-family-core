@@ -16,7 +16,7 @@
 //!   MESSAGE, REQUEST) use the frozen legacy canonicaliser
 //!   (`receipt_core::canonicalize`, `JCS_V1`), so their existing signatures
 //!   and vectors are unchanged.
-//! - Newer types (`VCAV-IFC-GRANT-V2:`) use RFC 8785 with the v3 number range
+//! - Newer types (`VCAV-IFC-GRANT-V2:`, `VCAV-KEY-ROTATION-V1:`) use RFC 8785 with the v3 number range
 //!   check (`receipt_core::canonicalize_v3`). The TypeScript signer
 //!   (`afal-signing.ts`, `json-canonicalize`) uses RFC 8785 for every prefix,
 //!   so for these types the two implementations agree byte for byte.

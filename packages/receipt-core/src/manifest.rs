@@ -22,6 +22,14 @@ pub const MANIFEST_DOMAIN_PREFIX: &str = "VCAV-MANIFEST-V1:";
 /// Compute a stable operator key identifier from the hex-encoded public key.
 ///
 /// Format: `opkey-` + 64 lowercase hex (SHA-256 of the UTF-8 bytes of `public_key_hex`).
+///
+/// This is the label carried in the signed `operator_key_id` field of
+/// `VCAV-MANIFEST-V1` manifests, kept as is so existing manifests and vectors
+/// stay reproducible. It hashes the hex text, so it depends on the case of the
+/// input and differs from the Ed25519 key id used elsewhere
+/// ([`crate::key_id::ed25519_key_id`], `"ed25519:"` + SHA-256 of the raw key
+/// bytes). Verifiers do not recompute it; to identify an operator key, use
+/// [`crate::key_id::ed25519_key_id`] on `operator_public_key_hex`.
 pub fn compute_operator_key_id(public_key_hex: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(public_key_hex.as_bytes());
