@@ -573,6 +573,21 @@ fn generate_contract_hash_v2(dir: &Path) {
             "INVALID_CONTRACT",
         ),
         (
+            "model_constraints_as_array",
+            with(r#","model_constraints":[]"#),
+            "INVALID_CONTRACT",
+        ),
+        (
+            "model_constraints_as_positional_array",
+            with(r#","model_constraints":[["anthropic"],["claude-*"],"mid"]"#),
+            "INVALID_CONTRACT",
+        ),
+        (
+            "enforcement_mode_as_object",
+            with(r#","entropy_enforcement":{"Gate":null}"#),
+            "INVALID_CONTRACT",
+        ),
+        (
             "null_required_member",
             minimal.replace(r#""purpose_code":"MEDIATION""#, r#""purpose_code":null"#),
             "INVALID_CONTRACT",
