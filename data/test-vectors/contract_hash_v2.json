@@ -56,6 +56,21 @@
       "contract_json": "[]",
       "expected_error": "INVALID_CONTRACT",
       "name": "not_an_object"
+    },
+    {
+      "contract_json": "{\"purpose_code\":\"MEDIATION\",\"output_schema_id\":\"urn:vcav:schema:mediation.e18.v1\",\"output_schema\":{},\"participants\":[\"agent-alice\",\"agent-bob\"],\"prompt_template_hash\":\"a3f2f8f5ed1b68f2ba0c2fb0216f49f23eb2e8285e4a6575d72a4f75f2ef7e3c\",\"output_schema_hash\":\"8278e0910d750195b448797616e091ad6dd17d43db59e148f8d7b9727e1e48d0\",\"entropy_budget_bits\":8.0}",
+      "expected_error": "INVALID_CONTRACT",
+      "name": "integer_field_with_fraction"
+    },
+    {
+      "contract_json": "{\"purpose_code\":\"MEDIATION\",\"output_schema_id\":\"urn:vcav:schema:mediation.e18.v1\",\"output_schema\":{},\"participants\":[\"agent-alice\",\"agent-bob\"],\"prompt_template_hash\":\"a3f2f8f5ed1b68f2ba0c2fb0216f49f23eb2e8285e4a6575d72a4f75f2ef7e3c\",\"output_schema_hash\":\"8278e0910d750195b448797616e091ad6dd17d43db59e148f8d7b9727e1e48d0\",\"entropy_budget_bits\":8e0}",
+      "expected_error": "INVALID_CONTRACT",
+      "name": "integer_field_with_exponent"
+    },
+    {
+      "contract_json": "{\"purpose_code\":\"MEDIATION\",\"output_schema_id\":\"urn:vcav:schema:mediation.e18.v1\",\"output_schema\":{},\"participants\":[\"agent-alice\",\"agent-bob\"],\"prompt_template_hash\":\"a3f2f8f5ed1b68f2ba0c2fb0216f49f23eb2e8285e4a6575d72a4f75f2ef7e3c\",\"output_schema_hash\":\"8278e0910d750195b448797616e091ad6dd17d43db59e148f8d7b9727e1e48d0\",\"max_completion_tokens\":-0}",
+      "expected_error": "INVALID_CONTRACT",
+      "name": "integer_field_negative_zero"
     }
   ],
   "positive": [

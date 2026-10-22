@@ -20,6 +20,7 @@ base64.workspace = true
 unicode-normalization.workspace = true
 serde_json_canonicalizer.workspace = true
 subtle.workspace = true
+curve25519-dalek = "4.1"
 
 [[bin]]
 name = "vcav-agreement-hash"
@@ -43,4 +44,3 @@ path = "src/bin/vcav-receipt-key.rs"
 
 [dev-dependencies]
 proptest.workspace = true
-curve25519-dalek = "4.1"

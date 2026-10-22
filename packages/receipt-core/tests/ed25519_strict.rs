@@ -4,7 +4,10 @@
 //! `VerifyingKey::verify` accepts them; strict verification rejects them
 //! because a point has small order.
 
+use curve25519_dalek::constants::EIGHT_TORSION;
+use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::IsIdentity;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use receipt_core::receipt_v2::{ReceiptV2, SignatureAlgorithm, SignatureV2};
 use receipt_core::receipt_v3::{
@@ -135,7 +138,7 @@ fn v3_rejects_small_order_public_key() {
     };
     assert_eq!(
         verify_receipt_v3(&unsigned, &signature, &weak),
-        Err(ReceiptV3Error::SignatureInvalid)
+        Err(ReceiptV3Error::InvalidKey)
     );
 }
 
@@ -170,4 +173,98 @@ fn v3_rejects_non_reduced_scalar() {
         .verifying_key()
         .verify(&digest, &Signature::from_bytes(&bytes))
         .is_err());
+}
+
+fn challenge(r: &[u8; 32], a: &[u8; 32], message: &[u8]) -> Scalar {
+    let mut h = Sha512::new();
+    h.update(r);
+    h.update(a);
+    h.update(message);
+    Scalar::from_bytes_mod_order_wide(&h.finalize().into())
+}
+
+fn v3_signature(bytes: &[u8; 64]) -> SignatureV3 {
+    SignatureV3 {
+        alg: SignatureAlgorithm::Ed25519,
+        value: b64url(bytes),
+        signed_fields: "ALL_EXCEPT_SIGNATURE".to_string(),
+    }
+}
+
+#[test]
+fn v3_rejects_mixed_order_signature_point() {
+    // R = rB + T with T of order 8, s = r + k*a. The cofactored equation
+    // [8][s]B = [8]R + [8][k]A holds; the cofactorless one does not.
+    let sk = SigningKey::from_bytes(&[0x01; 32]);
+    let pk = sk.verifying_key();
+    let unsigned = sample_unsigned_receipt_v3(&sk);
+    let digest = signing_digest_v3(&unsigned).unwrap();
+    let r = Scalar::from_bytes_mod_order_wide(&Sha512::digest(b"mixed-order-r").into());
+    let r_point = EdwardsPoint::mul_base(&r) + EIGHT_TORSION[1];
+    let r_bytes = r_point.compress().to_bytes();
+    let k = challenge(&r_bytes, pk.as_bytes(), &digest);
+    let s = r + k * sk.to_scalar();
+    let mut bytes = [0u8; 64];
+    bytes[..32].copy_from_slice(&r_bytes);
+    bytes[32..].copy_from_slice(s.as_bytes());
+
+    let a_point = CompressedEdwardsY(*pk.as_bytes()).decompress().unwrap();
+    let residual = EdwardsPoint::mul_base(&s) - r_point - a_point * k;
+    assert!(!residual.is_identity(), "cofactorless equation fails");
+    assert!(
+        residual.mul_by_cofactor().is_identity(),
+        "cofactored equation holds"
+    );
+
+    assert_eq!(
+        verify_receipt_v3(&unsigned, &v3_signature(&bytes), &pk),
+        Err(ReceiptV3Error::SignatureInvalid)
+    );
+}
+
+#[test]
+fn v3_rejects_pinned_key_with_torsion_component() {
+    // A = a0*B + T. With k a multiple of 8, [s]B = R + [k]A holds exactly,
+    // so verify_strict alone accepts the signature.
+    let a0 = SigningKey::from_bytes(&[0x05; 32]);
+    let a_bytes = (EdwardsPoint::mul_base(&a0.to_scalar()) + EIGHT_TORSION[1])
+        .compress()
+        .to_bytes();
+    let key = VerifyingKey::from_bytes(&a_bytes).unwrap();
+    let mut unsigned = sample_unsigned_receipt_v3(&a0);
+    unsigned.operator.operator_key_fingerprint =
+        receipt_core::receipt_v3::operator_key_fingerprint(&key);
+    let digest = signing_digest_v3(&unsigned).unwrap();
+    let bytes = (0u32..)
+        .find_map(|i| {
+            let r = Scalar::from_bytes_mod_order_wide(
+                &Sha512::digest([b"mixed-order-a".as_slice(), &i.to_le_bytes()].concat()).into(),
+            );
+            let r_bytes = EdwardsPoint::mul_base(&r).compress().to_bytes();
+            let k = challenge(&r_bytes, &a_bytes, &digest);
+            (k.as_bytes()[0] % 8 == 0).then(|| {
+                let s = r + k * a0.to_scalar();
+                let mut bytes = [0u8; 64];
+                bytes[..32].copy_from_slice(&r_bytes);
+                bytes[32..].copy_from_slice(s.as_bytes());
+                bytes
+            })
+        })
+        .unwrap();
+    assert!(key
+        .verify_strict(&digest, &Signature::from_bytes(&bytes))
+        .is_ok());
+    assert!(!receipt_core::receipt_v3::is_prime_order_key(&key));
+    assert_eq!(
+        verify_receipt_v3(&unsigned, &v3_signature(&bytes), &key),
+        Err(ReceiptV3Error::InvalidKey)
+    );
+}
+
+#[test]
+fn prime_order_key_check_accepts_normal_keys() {
+    for seed in [0x01u8, 0x02, 0x03, 0x42] {
+        let key = SigningKey::from_bytes(&[seed; 32]).verifying_key();
+        assert!(receipt_core::receipt_v3::is_prime_order_key(&key));
+    }
 }

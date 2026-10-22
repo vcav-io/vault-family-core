@@ -18,7 +18,10 @@
 
 use std::path::{Path, PathBuf};
 
+use curve25519_dalek::constants::EIGHT_TORSION;
+use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::IsIdentity;
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
 use receipt_core::commitment_v3::{
     compute_input_commitment_v3, parse_commitment_nonce, verify_input_commitment_v3,
@@ -588,6 +591,21 @@ fn generate_contract_hash_v2(dir: &Path) {
             "DUPLICATE_KEY",
         ),
         ("not_an_object", "[]".to_string(), "INVALID_CONTRACT"),
+        (
+            "integer_field_with_fraction",
+            with(r#","entropy_budget_bits":8.0"#),
+            "INVALID_CONTRACT",
+        ),
+        (
+            "integer_field_with_exponent",
+            with(r#","entropy_budget_bits":8e0"#),
+            "INVALID_CONTRACT",
+        ),
+        (
+            "integer_field_negative_zero",
+            with(r#","max_completion_tokens":-0"#),
+            "INVALID_CONTRACT",
+        ),
     ];
     let negatives: Vec<Value> = negatives_src
         .into_iter()
@@ -755,6 +773,75 @@ fn small_order_r_signature(sk: &SigningKey, digest: &[u8; 32]) -> [u8; 64] {
     sig[..32].copy_from_slice(&r);
     sig[32..].copy_from_slice(s.as_bytes());
     sig
+}
+
+/// Deterministic scalar from a label.
+fn label_scalar(label: &[u8]) -> Scalar {
+    Scalar::from_bytes_mod_order_wide(&Sha512::digest(label).into())
+}
+
+/// Ed25519 challenge `k = SHA-512(R || A || M) mod L`.
+fn challenge(r: &[u8; 32], a: &[u8; 32], message: &[u8]) -> Scalar {
+    let mut h = Sha512::new();
+    h.update(r);
+    h.update(a);
+    h.update(message);
+    Scalar::from_bytes_mod_order_wide(&h.finalize().into())
+}
+
+/// Signature `(R = rB + T, s = r + k*a)` with `T` of order 8.
+fn mixed_order_r_signature(sk: &SigningKey, digest: &[u8; 32]) -> [u8; 64] {
+    let torsion = EIGHT_TORSION[1];
+    assert!(
+        !(torsion + torsion + torsion + torsion).is_identity(),
+        "T has order 8"
+    );
+    let r = label_scalar(b"vcav-v3-vectors/mixed-order-r");
+    let r_bytes = (EdwardsPoint::mul_base(&r) + torsion).compress().to_bytes();
+    let k = challenge(&r_bytes, sk.verifying_key().as_bytes(), digest);
+    let s = r + k * sk.to_scalar();
+    let mut sig = [0u8; 64];
+    sig[..32].copy_from_slice(&r_bytes);
+    sig[32..].copy_from_slice(s.as_bytes());
+    sig
+}
+
+/// Signature under `A = a0*B + T` whose challenge is a multiple of 8, so the
+/// cofactorless equation `[s]B = R + [k]A` holds.
+fn mixed_order_key_signature(a0: &SigningKey, a_bytes: &[u8; 32], digest: &[u8; 32]) -> [u8; 64] {
+    for i in 0u32.. {
+        let r = label_scalar(
+            &[
+                b"vcav-v3-vectors/mixed-order-a/".as_slice(),
+                &i.to_le_bytes(),
+            ]
+            .concat(),
+        );
+        let r_bytes = EdwardsPoint::mul_base(&r).compress().to_bytes();
+        let k = challenge(&r_bytes, a_bytes, digest);
+        if k.as_bytes()[0] % 8 != 0 {
+            continue;
+        }
+        let s = r + k * a0.to_scalar();
+        let mut sig = [0u8; 64];
+        sig[..32].copy_from_slice(&r_bytes);
+        sig[32..].copy_from_slice(s.as_bytes());
+        return sig;
+    }
+    unreachable!()
+}
+
+/// Whether `[8]([s]B - R - [k]A)` is the identity (the cofactored equation).
+fn cofactored_equation_holds(pk: &VerifyingKey, digest: &[u8; 32], sig: &[u8; 64]) -> bool {
+    let r_bytes: [u8; 32] = sig[..32].try_into().unwrap();
+    let s_bytes: [u8; 32] = sig[32..].try_into().unwrap();
+    let r_point = CompressedEdwardsY(r_bytes).decompress().unwrap();
+    let a_point = CompressedEdwardsY(*pk.as_bytes()).decompress().unwrap();
+    let s = Scalar::from_canonical_bytes(s_bytes).unwrap();
+    let k = challenge(&r_bytes, pk.as_bytes(), digest);
+    (EdwardsPoint::mul_base(&s) - r_point - a_point * k)
+        .mul_by_cofactor()
+        .is_identity()
 }
 
 fn receipt_digest(body: &Value) -> [u8; 32] {
@@ -1175,8 +1262,123 @@ fn generate_receipts(dir: &Path) {
             "small_order_public_key",
             body.to_string(),
             &hex::encode(weak),
+            "INVALID_KEY",
+            "pinned key has small order; with R = identity and s = 0 the non-strict Ed25519 equation holds for every message",
+        );
+    }
+
+    {
+        let digest = receipt_digest(&good);
+        let sig = mixed_order_r_signature(&sk, &digest);
+        let ed = ed25519_dalek::Signature::from_bytes(&sig);
+        assert!(pk.verify(&digest, &ed).is_err());
+        assert!(pk.verify_strict(&digest, &ed).is_err());
+        assert!(cofactored_equation_holds(&pk, &digest, &sig));
+        push(
+            "mixed_order_signature_point",
+            edit(&|v| v["signature"]["value"] = json!(b64url(&sig))).to_string(),
+            &pk_hex,
             "SIGNATURE_INVALID",
-            "pinned key has small order; accepted by non-strict Ed25519 verification, rejected by strict verification",
+            "R = rB + T with T of order 8 and s = r + k*a: the cofactored equation holds, the cofactorless equation does not",
+        );
+    }
+    {
+        // Pinned key A = A0 + T (T of order 8). The signature is chosen so
+        // that k is a multiple of 8, so the cofactorless equation holds and
+        // ed25519-dalek's verify_strict accepts it; v3 rejects the key.
+        let a0 = SigningKey::from_bytes(&[0x05; 32]);
+        let a_point = EdwardsPoint::mul_base(&a0.to_scalar()) + EIGHT_TORSION[1];
+        let a_bytes = a_point.compress().to_bytes();
+        let mixed_key = VerifyingKey::from_bytes(&a_bytes).unwrap();
+        let body = edit(&|v| {
+            v["operator"]["operator_key_fingerprint"] = json!(operator_key_fingerprint(&mixed_key));
+        });
+        let digest = receipt_digest(&body);
+        let sig = mixed_order_key_signature(&a0, &a_bytes, &digest);
+        let ed = ed25519_dalek::Signature::from_bytes(&sig);
+        assert!(mixed_key.verify_strict(&digest, &ed).is_ok());
+        let mut body = body;
+        body["signature"]["value"] = json!(b64url(&sig));
+        push(
+            "mixed_order_public_key",
+            body.to_string(),
+            &hex::encode(a_bytes),
+            "INVALID_KEY",
+            "pinned key has a torsion component; the signature satisfies the cofactorless equation, but v3 keys must have prime order",
+        );
+    }
+    push(
+        "issued_at_leap_second",
+        sign_raw(
+            &edit(&|v| v["issued_at"] = json!("2026-10-22T12:00:60Z")),
+            DOMAIN_PREFIX_V3,
+            &sk,
+        )
+        .to_string(),
+        &pk_hex,
+        "INVALID_FIELD",
+        "seconds are 00-59",
+    );
+    for (name, from, to) in [
+        (
+            "integer_field_with_fraction",
+            r#""provider_latency_ms":1234"#,
+            r#""provider_latency_ms":1234.0"#,
+        ),
+        (
+            "integer_field_with_exponent",
+            r#""provider_latency_ms":1234"#,
+            r#""provider_latency_ms":1.234e3"#,
+        ),
+        (
+            "integer_field_negative_zero",
+            r#""bits_used_before":0"#,
+            r#""bits_used_before":-0"#,
+        ),
+    ] {
+        assert_eq!(good_json.matches(from).count(), 1, "{name}");
+        push(
+            name,
+            good_json.replace(from, to),
+            &pk_hex,
+            "SCHEMA_VIOLATION",
+            "integer fields are JSON integers without sign, fraction or exponent",
+        );
+    }
+    push(
+        "unknown_member_in_token_usage",
+        sign_raw(
+            &edit(&|v| v["claims"]["token_usage"]["cached_tokens"] = json!(0)),
+            DOMAIN_PREFIX_V3,
+            &sk,
+        )
+        .to_string(),
+        &pk_hex,
+        "NON_CANONICAL_ENCODING",
+        "unknown member inside claims.token_usage",
+    );
+    {
+        let good2: Value = serde_json::to_value(
+            sign_and_assemble_receipt_v3(positive_02_unsigned(&sk), &sk).unwrap(),
+        )
+        .unwrap();
+        let mut tee = good2.clone();
+        tee["tee_attestation"]["platform"] = json!("x");
+        push(
+            "unknown_member_in_tee_attestation",
+            sign_raw(&tee, DOMAIN_PREFIX_V3, &sk).to_string(),
+            &pk_hex,
+            "NON_CANONICAL_ENCODING",
+            "unknown member inside tee_attestation",
+        );
+        let mut bundle = good2;
+        bundle["commitments"]["preflight_bundle"]["extra_hash"] = json!("0".repeat(64));
+        push(
+            "unknown_member_in_preflight_bundle",
+            sign_raw(&bundle, DOMAIN_PREFIX_V3, &sk).to_string(),
+            &pk_hex,
+            "NON_CANONICAL_ENCODING",
+            "unknown member inside commitments.preflight_bundle (outside enforcement_parameters)",
         );
     }
 
@@ -1184,11 +1386,11 @@ fn generate_receipts(dir: &Path) {
         dir,
         "receipt_v3_negative.json",
         &json!({
-            "description": "v3 receipts that MUST be rejected. Verify receipt_json against verifying_key_hex (the pinned key) per docs/receipt-v3.md sections 6.2-6.4; the first failing rule determines expected_error_class.",
+            "description": "v3 receipts that MUST be rejected. Verify receipt_json against verifying_key_hex (the pinned key) per docs/receipt-v3.md sections 6.2-6.4. Conformance means the receipt is rejected; expected_error_class is informative (the class the reference implementation reports) and other implementations may report a different reason.",
             "error_classes": [
                 "PARSE_ERROR", "DUPLICATE_KEY", "NUMBER_OUT_OF_RANGE", "UNSUPPORTED_VERSION",
                 "SCHEMA_VIOLATION", "NON_CANONICAL_ENCODING", "INVALID_FIELD", "SIGNATURE_FORMAT",
-                "KEY_MISMATCH", "SIGNATURE_INVALID", "OUTPUT_HASH_MISMATCH", "CONFIG_HASH_MISMATCH",
+                "KEY_MISMATCH", "INVALID_KEY", "SIGNATURE_INVALID", "OUTPUT_HASH_MISMATCH", "CONFIG_HASH_MISMATCH",
                 "BUDGET_SCOPE_VIOLATION"
             ],
             "cases": negatives,

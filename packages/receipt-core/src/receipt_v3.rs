@@ -300,6 +300,8 @@ pub enum ReceiptV3Error {
     KeyMismatch(String),
     #[error("signature verification failed")]
     SignatureInvalid,
+    #[error("pinned key is not a valid prime-order Ed25519 point")]
+    InvalidKey,
     #[error("output_hash does not match the inline output")]
     OutputHashMismatch,
     #[error("effective_config_hash does not match the preflight bundle")]
@@ -324,6 +326,7 @@ impl ReceiptV3Error {
             Self::SignatureFormat(_) => "SIGNATURE_FORMAT",
             Self::KeyMismatch(_) => "KEY_MISMATCH",
             Self::SignatureInvalid => "SIGNATURE_INVALID",
+            Self::InvalidKey => "INVALID_KEY",
             Self::OutputHashMismatch => "OUTPUT_HASH_MISMATCH",
             Self::ConfigHashMismatch => "CONFIG_HASH_MISMATCH",
             Self::BudgetScopeViolation(_) => "BUDGET_SCOPE_VIOLATION",
@@ -354,10 +357,29 @@ pub fn format_issued_at_v3(at: DateTime<Utc>) -> String {
 
 /// Whether `s` is a valid v3 `issued_at` value.
 pub fn is_valid_issued_at_v3(s: &str) -> bool {
+    // Seconds are 00-59; chrono's parser would also accept a leap second (60).
     s.len() == 20
+        && s.is_ascii()
+        && s.as_bytes()[17] <= b'5'
         && NaiveDateTime::parse_from_str(s, ISSUED_AT_FORMAT_V3)
             .map(|dt| dt.format(ISSUED_AT_FORMAT_V3).to_string() == s)
             .unwrap_or(false)
+}
+
+/// Whether `key` is usable as a pinned v3 receipt key: its encoding
+/// is canonical and decompresses to a point of prime order (not small
+/// order, no torsion component).
+///
+/// With a prime-order key, the strict (cofactorless) Ed25519 check used here
+/// and a cofactored check with prime-order `R` accept the same signatures,
+/// so implementations built on either agree.
+pub fn is_prime_order_key(key: &VerifyingKey) -> bool {
+    let bytes = key.as_bytes();
+    curve25519_dalek::edwards::CompressedEdwardsY(*bytes)
+        .decompress()
+        .is_some_and(|p| {
+            p.compress().as_bytes() == bytes && !p.is_small_order() && p.is_torsion_free()
+        })
 }
 
 /// `hex(SHA-256(public key bytes))`, the expected `operator_key_fingerprint`.
@@ -564,7 +586,8 @@ pub fn decode_signature_v3(signature: &SignatureV3) -> Result<Signature, Receipt
 
 /// Verify a v3 receipt's signature against the pinned relay key.
 ///
-/// Runs [`UnsignedReceiptV3::validate`], checks that the receipt names the
+/// Runs [`UnsignedReceiptV3::validate`], requires the pinned key to have
+/// prime order ([`is_prime_order_key`]), checks that the receipt names the
 /// pinned key (`operator_key_fingerprint` and, if present,
 /// `tee_attestation.receipt_signing_pubkey_hex`), and verifies the signature
 /// with strict Ed25519 semantics.
@@ -575,6 +598,9 @@ pub fn verify_receipt_v3(
 ) -> Result<(), ReceiptV3Error> {
     unsigned.validate()?;
     let ed_sig = decode_signature_v3(signature)?;
+    if !is_prime_order_key(pinned_key) {
+        return Err(ReceiptV3Error::InvalidKey);
+    }
     if unsigned.operator.operator_key_fingerprint != operator_key_fingerprint(pinned_key) {
         return Err(ReceiptV3Error::KeyMismatch(
             "operator_key_fingerprint does not match the pinned key".to_string(),
@@ -983,6 +1009,8 @@ mod tests {
             "2026-10-22 12:00:00Z",
             "2026-02-30T12:00:00Z",
             "2026-10-22T24:00:00Z",
+            "2026-10-22T12:00:60Z",
+            "2026-12-31T23:59:60Z",
         ] {
             assert!(!is_valid_issued_at_v3(bad), "{bad}");
         }

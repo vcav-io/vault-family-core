@@ -9,7 +9,8 @@
   limited to +/-(2^53-1), the `VCAV-RECEIPT-V3:` domain separator, nonce-based input
   commitments (`SHA256_N32_JCS_V3`, `VCAV-INPUT-COMMIT-V3:`), contract hash v2
   (`SHA256_JCS_V2`), a fixed `issued_at` format, `claims.budget_usage.scope`, rejection of
-  unknown fields and `null` optionals, and strict Ed25519 verification.
+  unknown fields and `null` optionals, lexical integer forms only for integer fields, and
+  strict Ed25519 verification with a prime-order pinned key.
 - `verifier-core::receipt_verify`: one version-dispatching receipt verifier (legacy v1,
   v2 `2.x`, v3 `3.0.0`) shared by `verifier-wasm` and `verifier-cli`, plus the v3
   participant cross-checks: own-input commitment, received output and contract
