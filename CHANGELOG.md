@@ -51,6 +51,11 @@
   canonicaliser for the v1/v2 formats; its output is unchanged.
 - `serde_json`'s `float_roundtrip` feature is now enabled workspace-wide (required by
   `serde_json_canonicalizer`), so JSON floats parse to the correctly rounded double.
+- Ed25519 verification is strict on every path: v1 receipts (`verify_receipt` and the
+  shared verifier), handoffs, manifests, v2 receipts, AFAL messages, message envelopes and
+  v1 grants require a canonical prime-order key and use `verify_strict`
+  (`receipt_core::verify_ed25519_strict`). Hex signatures must be 128 lowercase hex
+  characters. All existing vectors verify unchanged.
 
 ## 0.1.0 (2026-02-24)
 

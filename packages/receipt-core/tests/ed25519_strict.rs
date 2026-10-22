@@ -1,4 +1,6 @@
-//! Receipt v2 and v3 signatures are verified with strict Ed25519 semantics.
+//! Receipt v2 and v3 signatures are verified with strict Ed25519 semantics,
+//! and the existing hex-signed vectors (v1 receipts, handoffs, manifests)
+//! verify under the strict checks.
 //!
 //! The signatures built here satisfy the unbatched Ed25519 equation, so
 //! `VerifyingKey::verify` accepts them; strict verification rejects them
@@ -267,4 +269,78 @@ fn prime_order_key_check_accepts_normal_keys() {
         let key = SigningKey::from_bytes(&[seed; 32]).verifying_key();
         assert!(receipt_core::receipt_v3::is_prime_order_key(&key));
     }
+}
+
+/// Strict verification of a legacy (v1) receipt given as JSON with a hex
+/// `signature`, computed as the verifiers do.
+fn verify_v1_receipt_value(receipt: &serde_json::Value, key_hex: &str) {
+    let key = receipt_core::parse_public_key_hex(key_hex).unwrap();
+    let mut unsigned = receipt.clone();
+    let sig_hex = unsigned
+        .as_object_mut()
+        .unwrap()
+        .remove("signature")
+        .unwrap();
+    let sig = receipt_core::parse_signature_hex(sig_hex.as_str().unwrap()).unwrap();
+    let mut message = receipt_core::DOMAIN_PREFIX.as_bytes().to_vec();
+    message.extend(receipt_core::canonicalize(&unsigned).as_bytes());
+    receipt_core::verify_ed25519_strict(&key, &hash_message(&message), &sig).unwrap();
+}
+
+#[test]
+fn hex_signed_vectors_verify_strictly() {
+    // v1 receipts
+    let v = load_vector("receipt-verification-v1.json");
+    let mut receipt = v["input"]["unsigned_receipt"].clone();
+    receipt["signature"] = v["expected"]["signature_hex"].clone();
+    verify_v1_receipt_value(&receipt, v["input"]["verifying_key_hex"].as_str().unwrap());
+    let v = load_vector("receipt_v2_vector_02.json");
+    verify_v1_receipt_value(
+        &v["input"]["signed_receipt"],
+        v["input"]["verifying_key_hex"].as_str().unwrap(),
+    );
+    for name in [
+        "verification_tier1_positive_01.json",
+        "verification_tier2_positive_01.json",
+        "verification_tier3_positive_01.json",
+    ] {
+        let v = load_vector(name);
+        verify_v1_receipt_value(
+            &v["input"]["receipt"],
+            v["input"]["public_key_hex"].as_str().unwrap(),
+        );
+    }
+
+    // Handoff, signed by both parties.
+    let v = load_vector("handoff_positive_01.json");
+    let handoff: receipt_core::UnsignedSessionHandoff =
+        serde_json::from_value(v["input"]["unsigned_handoff"].clone()).unwrap();
+    for party in ["initiator", "acceptor"] {
+        let key = receipt_core::parse_public_key_hex(
+            v["input"][format!("{party}_verifying_key_hex")]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        receipt_core::verify_handoff(
+            &handoff,
+            v["expected"][format!("{party}_signature_hex")]
+                .as_str()
+                .unwrap(),
+            &key,
+        )
+        .unwrap();
+    }
+
+    // Manifests.
+    let v = load_vector("manifest_positive_01.json");
+    let manifest: receipt_core::PublicationManifest =
+        serde_json::from_value(v["expected"]["signed_manifest"].clone()).unwrap();
+    let key = receipt_core::parse_public_key_hex(&manifest.operator_public_key_hex).unwrap();
+    receipt_core::verify_manifest(&manifest, &key).unwrap();
+    let v = load_vector("verification_tier3_positive_01.json");
+    let manifest: receipt_core::PublicationManifest =
+        serde_json::from_value(v["input"]["manifest"].clone()).unwrap();
+    let key = receipt_core::parse_public_key_hex(&manifest.operator_public_key_hex).unwrap();
+    receipt_core::verify_manifest(&manifest, &key).unwrap();
 }

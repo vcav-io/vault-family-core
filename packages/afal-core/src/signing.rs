@@ -7,7 +7,7 @@
 //!   4. digest = SHA-256(prefixed)                 // 32 bytes
 //!   5. signature = Ed25519.sign(digest, secret)   // 64 bytes → 128 hex
 
-use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use sha2::{Digest, Sha256};
 
 use receipt_core::canonicalize_serializable;
@@ -73,7 +73,9 @@ pub fn sign_afal_message<T: serde::Serialize>(
 
 /// Verify a domain-separated Ed25519 signature.
 ///
-/// `signature_hex` is the 128-char hex signature.
+/// `signature_hex` is the signature as 128 lowercase hex characters. The key
+/// must be a canonical point of prime order, and the signature is checked
+/// with strict Ed25519 verification (`verify_strict`).
 /// `pubkey_bytes` is the 32-byte Ed25519 public key.
 pub fn verify_afal_signature<T: serde::Serialize>(
     domain: DomainPrefix,
@@ -83,6 +85,9 @@ pub fn verify_afal_signature<T: serde::Serialize>(
 ) -> Result<(), SigningError> {
     let digest = compute_digest(domain, message)?;
 
+    if !receipt_core::is_lower_hex(signature_hex, 128) {
+        return Err(SigningError::InvalidSignature);
+    }
     let sig_bytes: [u8; 64] = hex::decode(signature_hex)
         .map_err(SigningError::InvalidHex)?
         .try_into()
@@ -95,8 +100,7 @@ pub fn verify_afal_signature<T: serde::Serialize>(
     let verifying_key =
         VerifyingKey::from_bytes(pubkey_bytes).map_err(|_| SigningError::InvalidSignature)?;
 
-    verifying_key
-        .verify(&digest, &signature)
+    receipt_core::verify_ed25519_strict(&verifying_key, &digest, &signature)
         .map_err(|_| SigningError::InvalidSignature)
 }
 
@@ -217,6 +221,37 @@ mod tests {
         let pubkey_bytes = key.verifying_key().to_bytes();
         let result = verify_afal_signature(DomainPrefix::Propose, &tampered, &sig, &pubkey_bytes);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn afal_signature_rejects_weak_signatures_and_keys() {
+        let value = serde_json::json!({"proposal_version": "1", "from": "alice", "to": "bob"});
+        let msg = compute_digest(DomainPrefix::Propose, &value).unwrap();
+        let accepted = receipt_core::test_support::weak_signature_cases_accepted(
+            |_| msg.to_vec(),
+            |key, sig| {
+                verify_afal_signature(
+                    DomainPrefix::Propose,
+                    &value,
+                    &hex::encode(sig.to_bytes()),
+                    key.as_bytes(),
+                )
+                .is_ok()
+            },
+        );
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    #[test]
+    fn afal_signature_hex_must_be_lowercase() {
+        let key = SigningKey::from_bytes(&[0x07; 32]);
+        let value = serde_json::json!({"test": "data"});
+        let sig = sign_afal_message(DomainPrefix::Propose, &value, &key).unwrap();
+        let pk = key.verifying_key().to_bytes();
+        verify_afal_signature(DomainPrefix::Propose, &value, &sig, &pk).unwrap();
+        assert!(
+            verify_afal_signature(DomainPrefix::Propose, &value, &sig.to_uppercase(), &pk).is_err()
+        );
     }
 
     #[test]

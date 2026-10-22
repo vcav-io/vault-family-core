@@ -16,7 +16,7 @@
 
 #![allow(clippy::module_name_repetitions)]
 
-use ed25519_dalek::{Signer, SigningKey, Verifier};
+use ed25519_dalek::{Signer, SigningKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -403,7 +403,10 @@ pub fn verify_grant(grant: &CapabilityGrant) -> Result<(), EnvelopeError> {
     message.extend(canonical.as_bytes());
     let hash = hash_message(&message);
 
-    // 4. Parse and verify signature
+    // 4. Parse and verify signature (128 lowercase hex, strict Ed25519)
+    if !receipt_core::is_lower_hex(&grant.signature, 128) {
+        return Err(EnvelopeError::InvalidSignatureFormat);
+    }
     let sig_bytes = hex::decode(&grant.signature)
         .map_err(|e| EnvelopeError::InvalidSignatureBytes(e.to_string()))?;
     let sig_array: [u8; 64] = sig_bytes
@@ -411,9 +414,7 @@ pub fn verify_grant(grant: &CapabilityGrant) -> Result<(), EnvelopeError> {
         .map_err(|_| EnvelopeError::InvalidSignatureBytes("expected 64 bytes".to_string()))?;
     let signature = ed25519_dalek::Signature::from_bytes(&sig_array);
 
-    verifying_key
-        .verify(&hash, &signature)
-        .map_err(|_| EnvelopeError::VerificationFailed)
+    crate::verify_strict_prime_order(&verifying_key, &hash, &signature)
 }
 
 // ============================================================================
@@ -468,6 +469,68 @@ mod tests {
             issued_at: "2026-01-15T10:00:00Z".to_string(),
             expires_at: "2026-02-14T10:00:00Z".to_string(),
         }
+    }
+
+    // -- Strict Ed25519 tests --
+
+    fn grant_with_key(key: &VerifyingKey) -> (UnsignedGrant, String) {
+        let mut unsigned = sample_unsigned_grant();
+        unsigned.issuer_public_key = hex::encode(key.as_bytes());
+        let grant_id = generate_grant_id(&unsigned).unwrap();
+        (unsigned, grant_id)
+    }
+
+    fn grant_signing_hash(unsigned: &UnsignedGrant, grant_id: &str) -> [u8; 32] {
+        let canonical = canonicalize_serializable(&build_signable(unsigned, grant_id)).unwrap();
+        let mut message = GRANT_DOMAIN_PREFIX.as_bytes().to_vec();
+        message.extend(canonical.as_bytes());
+        hash_message(&message)
+    }
+
+    fn assemble(unsigned: &UnsignedGrant, grant_id: &str, signature: String) -> CapabilityGrant {
+        let s = build_signable(unsigned, grant_id);
+        CapabilityGrant {
+            version: s.version,
+            grant_id: s.grant_id,
+            issuer: s.issuer,
+            issuer_public_key: s.issuer_public_key,
+            audience: s.audience,
+            label: s.label,
+            scope: s.scope,
+            permissions: s.permissions,
+            provenance: s.provenance,
+            issued_at: s.issued_at,
+            expires_at: s.expires_at,
+            signature,
+        }
+    }
+
+    #[test]
+    fn verify_grant_rejects_weak_signatures_and_keys() {
+        let accepted = receipt_core::test_support::weak_signature_cases_accepted(
+            |key| {
+                let (unsigned, grant_id) = grant_with_key(key);
+                grant_signing_hash(&unsigned, &grant_id).to_vec()
+            },
+            |key, sig| {
+                let (unsigned, grant_id) = grant_with_key(key);
+                verify_grant(&assemble(&unsigned, &grant_id, hex::encode(sig.to_bytes()))).is_ok()
+            },
+        );
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    #[test]
+    fn verify_grant_requires_lowercase_signature_hex() {
+        let (sk, _) = deterministic_keypair();
+        let grant = sign_grant(&sample_unsigned_grant(), &sk).unwrap();
+        verify_grant(&grant).unwrap();
+        let mut upper = grant;
+        upper.signature = upper.signature.to_uppercase();
+        assert!(matches!(
+            verify_grant(&upper),
+            Err(EnvelopeError::InvalidSignatureFormat)
+        ));
     }
 
     // -- GrantVersion tests --

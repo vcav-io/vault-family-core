@@ -7,7 +7,6 @@
 //! Tier 3 (Manifest): Tier 1/2 + manifest signature verification and artefact coverage
 
 use base64::Engine;
-use ed25519_dalek::Verifier;
 use receipt_core::{
     attestation::{compute_challenge_hash, AttestationEnvironment, AttestationEvidence},
     canonicalize::canonicalize_serializable,
@@ -1090,7 +1089,7 @@ pub fn verify_attestation(
                 }
             };
 
-            match public_key.verify(&signing_hash, &signature) {
+            match receipt_core::verify_ed25519_strict(&public_key, &signing_hash, &signature) {
                 Ok(_) => AttestationVerificationResult {
                     status: Some("verified".to_string()),
                     environment: Some(environment_str),

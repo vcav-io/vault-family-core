@@ -13,7 +13,7 @@
 //! Every path parses the JSON text strictly (repeated keys are rejected) and
 //! returns only signature-covered content.
 
-use ed25519_dalek::{Verifier, VerifyingKey};
+use ed25519_dalek::VerifyingKey;
 use receipt_core::commitment_v3::{verify_input_commitment_v3, CommitmentError};
 use receipt_core::contract_hash_v2::{ContractHashError, ContractV2};
 use receipt_core::jcs::{canonicalize_v3, hash_v3, JcsError};
@@ -108,8 +108,7 @@ pub fn verify_receipt_json(
             message.extend(canonical.as_bytes());
             let hash = receipt_core::signer::hash_message(&message);
 
-            public_key
-                .verify(&hash, &signature)
+            receipt_core::verify_ed25519_strict(public_key, &hash, &signature)
                 .map_err(|e| format!("Signature verification failed: {e}"))?;
             // The legacy signature covers every field of the parsed value.
             Ok(VerifiedReceipt::Legacy(receipt_val))
@@ -322,6 +321,44 @@ mod tests {
     fn key(hex_str: &str) -> VerifyingKey {
         let bytes: [u8; 32] = hex::decode(hex_str).unwrap().try_into().unwrap();
         VerifyingKey::from_bytes(&bytes).unwrap()
+    }
+
+    fn legacy_receipt_json(unsigned: &Value, signature_hex: &str) -> String {
+        let mut receipt = unsigned.clone();
+        receipt["signature"] = Value::String(signature_hex.to_string());
+        receipt.to_string()
+    }
+
+    #[test]
+    fn legacy_receipt_rejects_weak_signatures_and_keys() {
+        let vector = load("receipt-verification-v1.json");
+        let unsigned = vector["input"]["unsigned_receipt"].clone();
+        let mut message = receipt_core::DOMAIN_PREFIX.as_bytes().to_vec();
+        message.extend(receipt_core::canonicalize(&unsigned).as_bytes());
+        let msg = receipt_core::signer::hash_message(&message);
+        let accepted = receipt_core::test_support::weak_signature_cases_accepted(
+            |_| msg.to_vec(),
+            |key, sig| {
+                verify_receipt_json(
+                    &legacy_receipt_json(&unsigned, &hex::encode(sig.to_bytes())),
+                    key,
+                )
+                .is_ok()
+            },
+        );
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    #[test]
+    fn legacy_receipt_vector_verifies_and_requires_lowercase_hex() {
+        let vector = load("receipt-verification-v1.json");
+        let unsigned = &vector["input"]["unsigned_receipt"];
+        let sig = vector["expected"]["signature_hex"].as_str().unwrap();
+        let pk = key(vector["input"]["verifying_key_hex"].as_str().unwrap());
+        verify_receipt_json(&legacy_receipt_json(unsigned, sig), &pk).unwrap();
+        assert!(
+            verify_receipt_json(&legacy_receipt_json(unsigned, &sig.to_uppercase()), &pk).is_err()
+        );
     }
 
     struct Fixture {

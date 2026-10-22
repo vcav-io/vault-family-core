@@ -19,4 +19,5 @@ chrono.workspace = true
 rand.workspace = true
 
 [dev-dependencies]
+receipt-core = { path = "../receipt-core", features = ["test-support"] }
 proptest.workspace = true
