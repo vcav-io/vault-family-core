@@ -104,8 +104,12 @@ fn err_json(msg: &str) -> String {
 // Internal signature verification (avoids JSON round-trip)
 // ============================================================================
 
-/// Verify a receipt's Ed25519 signature, returning Ok(()) on success or Err(message) on failure.
-fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<(), String> {
+/// Verify a receipt's Ed25519 signature.
+///
+/// On success, returns the receipt as a JSON value containing exactly the
+/// content covered by the signature. Callers must read tier fields from this
+/// value only, never from the raw input.
+fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<serde_json::Value, String> {
     let receipt_val: serde_json::Value = serde_json::from_str(receipt_json)
         .map_err(|e| format!("Failed to parse receipt JSON: {e}"))?;
 
@@ -114,11 +118,22 @@ fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<(), Stri
 
     match receipt_val.get("signature") {
         Some(signature) if signature.is_object() => {
-            let receipt: receipt_core::ReceiptV2 = serde_json::from_value(receipt_val)
+            let receipt: receipt_core::ReceiptV2 = serde_json::from_value(receipt_val.clone())
                 .map_err(|e| format!("Failed to parse receipt v2 JSON: {e}"))?;
+            // The v2 signature covers the typed receipt body. Require the input to
+            // be exactly that body: no unknown fields at any level and no
+            // alternative encodings of signed values (e.g. timestamps).
+            let typed = serde_json::to_value(&receipt)
+                .map_err(|e| format!("Failed to serialize receipt v2: {e}"))?;
+            if typed != receipt_val {
+                return Err(
+                    "Receipt contains fields or encodings not covered by its signature".to_string(),
+                );
+            }
             let (unsigned, signature) = receipt.split();
             receipt_core::verify_receipt_v2(&unsigned, &signature, &public_key)
-                .map_err(|e| format!("Signature verification failed: {e}"))
+                .map_err(|e| format!("Signature verification failed: {e}"))?;
+            Ok(typed)
         }
         Some(signature) if signature.is_string() => {
             let signature_hex = signature
@@ -141,7 +156,9 @@ fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<(), Stri
             use ed25519_dalek::Verifier;
             public_key
                 .verify(&hash, &signature)
-                .map_err(|e| format!("Signature verification failed: {e}"))
+                .map_err(|e| format!("Signature verification failed: {e}"))?;
+            // The legacy signature covers every field of the parsed input.
+            Ok(receipt_val)
         }
         Some(_) => Err("Receipt has unsupported 'signature' field shape".to_string()),
         None => Err("Receipt missing 'signature' field".to_string()),
@@ -161,7 +178,7 @@ fn verify_receipt_inner(receipt_json: &str, pubkey_hex: &str) -> Result<(), Stri
 #[wasm_bindgen]
 pub fn verify_receipt(receipt_json: &str, pubkey_hex: &str) -> String {
     match verify_receipt_inner(receipt_json, pubkey_hex) {
-        Ok(()) => ok_json(),
+        Ok(_) => ok_json(),
         Err(e) => err_json(&e),
     }
 }
@@ -178,14 +195,10 @@ pub fn verify_with_artefacts(
     profile_json: &str,
     policy_json: &str,
 ) -> String {
-    // First verify receipt signature
-    if let Err(e) = verify_receipt_inner(receipt_json, pubkey_hex) {
-        return err_json(&e);
-    }
-
-    let receipt_val: serde_json::Value = match serde_json::from_str(receipt_json) {
+    // First verify receipt signature; read fields only from the signed content.
+    let receipt_val = match verify_receipt_inner(receipt_json, pubkey_hex) {
         Ok(v) => v,
-        Err(e) => return err_json(&format!("Failed to parse receipt JSON: {e}")),
+        Err(e) => return err_json(&e),
     };
 
     // Verify profile hash if present in receipt
@@ -234,14 +247,10 @@ pub fn verify_with_manifest(
     manifest_json: &str,
     strict_runtime: bool,
 ) -> String {
-    // First verify receipt signature
-    if let Err(e) = verify_receipt_inner(receipt_json, pubkey_hex) {
-        return err_json(&e);
-    }
-
-    let receipt_val: serde_json::Value = match serde_json::from_str(receipt_json) {
+    // First verify receipt signature; read fields only from the signed content.
+    let receipt_val = match verify_receipt_inner(receipt_json, pubkey_hex) {
         Ok(v) => v,
-        Err(e) => return err_json(&format!("Failed to parse receipt JSON: {e}")),
+        Err(e) => return err_json(&e),
     };
 
     let profile_hash = receipt_string(
@@ -351,7 +360,9 @@ pub fn verify_bundle(
         }
     };
 
-    let receipt_val: serde_json::Value = match serde_json::from_str(receipt_json) {
+    // --- Tier 1: Receipt signature verification ---
+    // Tier fields below are read only from the signed content returned here.
+    let receipt_val = match verify_receipt_inner(receipt_json, pubkey_hex) {
         Ok(v) => v,
         Err(e) => {
             return to_json_safe(&BundleVerifyResult {
@@ -366,28 +377,10 @@ pub fn verify_bundle(
                 manifest_policy_covered: None,
                 manifest_runtime_hash_match: None,
                 manifest_guardian_hash_match: None,
-                error: Some(format!("Failed to parse receipt JSON: {e}")),
+                error: Some(e),
             })
         }
     };
-
-    // --- Tier 1: Receipt signature verification ---
-    if let Err(e) = verify_receipt_inner(receipt_json, pubkey_hex) {
-        return to_json_safe(&BundleVerifyResult {
-            ok: false,
-            tier: 0,
-            agreement_hash_valid: None,
-            profile_hash_valid: None,
-            policy_hash_valid: None,
-            contract_hash_valid: None,
-            manifest_signature_valid: None,
-            manifest_profile_covered: None,
-            manifest_policy_covered: None,
-            manifest_runtime_hash_match: None,
-            manifest_guardian_hash_match: None,
-            error: Some(e),
-        });
-    }
 
     let mut tier: u8 = 1;
     let mut agreement_hash_valid: Option<bool> = None;
@@ -782,6 +775,113 @@ mod tests {
             parsed["policy_covered"], true,
             "expected nested policy hash lookup, got {parsed}"
         );
+    }
+
+    fn load_vector(name: &str) -> serde_json::Value {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../data/test-vectors")
+            .join(name);
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    /// Returns a signed receipt (as a JSON value) and its verifying key from a
+    /// positive v2 test vector.
+    fn signed_v2_vector_receipt(name: &str) -> (serde_json::Value, String) {
+        let vector = load_vector(name);
+        let pubkey_hex = vector["input"]["verifying_key_hex"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let mut receipt: serde_json::Value =
+            serde_json::from_str(vector["input"]["canonical_json"].as_str().unwrap()).unwrap();
+        receipt["signature"] = vector["expected"]["signature"].clone();
+        (receipt, pubkey_hex)
+    }
+
+    fn assert_rejected(result: &str) {
+        let parsed: serde_json::Value = serde_json::from_str(result).unwrap();
+        assert_eq!(parsed["ok"], false, "expected rejection, got {parsed}");
+    }
+
+    #[test]
+    fn verify_receipt_accepts_signed_v2_vectors() {
+        for name in ["receipt_v2_positive_01.json", "receipt_v2_positive_02.json"] {
+            let (receipt, pubkey_hex) = signed_v2_vector_receipt(name);
+            let result = verify_receipt(&receipt.to_string(), &pubkey_hex);
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["ok"], true, "{name}: expected success, got {parsed}");
+        }
+        for name in ["receipt_v2_vector_01.json", "receipt_v2_vector_02.json"] {
+            let vector = load_vector(name);
+            let pubkey_hex = vector["input"]["verifying_key_hex"].as_str().unwrap();
+            let receipt = vector["input"]["signed_receipt"].to_string();
+            let result = verify_receipt(&receipt, pubkey_hex);
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["ok"], true, "{name}: expected success, got {parsed}");
+        }
+    }
+
+    #[test]
+    fn verify_receipt_v2_rejects_top_level_fields_outside_signed_body() {
+        for (key, value) in [
+            ("model_profile_hash", json!("1".repeat(64))),
+            ("policy_bundle_hash", json!("2".repeat(64))),
+            ("contract_hash", json!("3".repeat(64))),
+        ] {
+            let (mut receipt, pubkey_hex) = signed_v2_vector_receipt("receipt_v2_positive_01.json");
+            receipt[key] = value;
+            assert_rejected(&verify_receipt(&receipt.to_string(), &pubkey_hex));
+        }
+    }
+
+    #[test]
+    fn verify_receipt_v2_rejects_nested_fields_outside_signed_body() {
+        let (mut receipt, pubkey_hex) = signed_v2_vector_receipt("receipt_v2_positive_02.json");
+        receipt["claims"]["policy_bundle_hash"] = json!("2".repeat(64));
+        assert_rejected(&verify_receipt(&receipt.to_string(), &pubkey_hex));
+
+        let (mut receipt, pubkey_hex) = signed_v2_vector_receipt("receipt_v2_positive_02.json");
+        receipt["commitments"]["guardian_policy_hash"] = json!("4".repeat(64));
+        assert_rejected(&verify_receipt(&receipt.to_string(), &pubkey_hex));
+    }
+
+    #[test]
+    fn verify_receipt_v2_rejects_reencoded_issued_at() {
+        let (mut receipt, pubkey_hex) = signed_v2_vector_receipt("receipt_v2_positive_01.json");
+        let issued_at = receipt["issued_at"].as_str().unwrap().to_string();
+        assert!(issued_at.ends_with('Z'));
+        receipt["issued_at"] = json!(issued_at.replace('Z', "+00:00"));
+        assert_rejected(&verify_receipt(&receipt.to_string(), &pubkey_hex));
+    }
+
+    #[test]
+    fn verify_bundle_ignores_contract_hash_outside_signed_body() {
+        let contract = json!({"participants": ["alice", "bob"], "purpose": "NEGOTIATION"});
+        let contract_hash = {
+            let mut hasher = Sha256::new();
+            hasher.update(receipt_core::canonicalize(&contract).as_bytes());
+            hex::encode(hasher.finalize())
+        };
+        let (mut receipt, pubkey_hex) = signed_v2_vector_receipt("receipt_v2_positive_01.json");
+        assert_ne!(
+            receipt["commitments"]["contract_hash"],
+            json!(contract_hash)
+        );
+        receipt["contract_hash"] = json!(contract_hash);
+        let bundle = json!({ "contract": contract });
+        let result = verify_bundle(
+            &receipt.to_string(),
+            &pubkey_hex,
+            &bundle.to_string(),
+            false,
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["ok"], false, "expected rejection, got {parsed}");
+        assert_ne!(
+            parsed["contract_hash_valid"], true,
+            "contract hash must come from the signed commitments, got {parsed}"
+        );
+        assert_ne!(parsed["tier"], 2, "got {parsed}");
     }
 
     #[test]

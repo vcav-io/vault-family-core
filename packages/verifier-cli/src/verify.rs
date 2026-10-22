@@ -508,8 +508,11 @@ pub(crate) fn verify(args: &Args) -> VerifyDetails {
     if let Some(ref contract_path) = args.contract {
         match fs::read_to_string(Path::new(contract_path)) {
             Ok(contract_content) => {
+                // Cross-check only the signed receipt fields, not the raw file
+                // (which may carry fields outside the signature).
+                let signed_receipt_json = serde_json::to_string(&receipt).unwrap_or_default();
                 match verifier_core::verify_contract_enforcement(
-                    &receipt_content,
+                    &signed_receipt_json,
                     &contract_content,
                     args.strict,
                 ) {
@@ -1056,6 +1059,60 @@ mod tests {
         let details = verify(&args);
         assert!(details.receipt.is_some());
         assert_eq!(details.status, VerificationStatus::Ok);
+    }
+
+    #[test]
+    fn test_contract_enforcement_reads_only_signed_receipt_fields() {
+        let contract_json = r#"{"entropy_budget_bits":999,"timing_class":"FAST"}"#;
+        let mut contract_file = NamedTempFile::new().unwrap();
+        write!(contract_file, "{contract_json}").unwrap();
+
+        let (signing_key, verifying_key) = generate_keypair();
+        let mut unsigned = sample_unsigned_receipt();
+        unsigned.contract_hash = Some(sha256_hex(contract_json.as_bytes()));
+        recompute_budget_chain_receipt_hash(&mut unsigned);
+        assert!(unsigned.entropy_budget_bits.is_none());
+        assert!(unsigned.contract_timing_class.is_none());
+        let signature = sign_receipt(&unsigned, &signing_key).unwrap();
+        let receipt = unsigned.sign(signature);
+
+        // Add values that are not part of the signed receipt.
+        let mut receipt_val = serde_json::to_value(&receipt).unwrap();
+        receipt_val["claims"] = serde_json::json!({
+            "entropy_budget_bits": 999,
+            "contract_timing_class": "FAST"
+        });
+        let mut receipt_file = NamedTempFile::new().unwrap();
+        writeln!(receipt_file, "{receipt_val}").unwrap();
+        let mut pubkey_file = NamedTempFile::new().unwrap();
+        writeln!(pubkey_file, "{}", public_key_to_hex(&verifying_key)).unwrap();
+
+        let args = Args {
+            receipt: receipt_file.path().to_str().unwrap().to_string(),
+            pubkey: Some(pubkey_file.path().to_str().unwrap().to_string()),
+            keyring_dir: None,
+            schema_dir: None,
+            skip_schema_validation: true,
+            validate_output: false,
+            output_schema_id: None,
+            format: OutputFormat::Text,
+            quiet: false,
+            agreement_fields: None,
+            profile: None,
+            policy: None,
+            contract: Some(contract_file.path().to_str().unwrap().to_string()),
+            manifest: None,
+            strict_runtime: false,
+            strict: false,
+        };
+
+        let details = verify(&args);
+        let enforcement = details
+            .tier_result
+            .contract_enforcement
+            .expect("contract enforcement should run");
+        assert_eq!(enforcement.entropy_budget_matches, None);
+        assert_eq!(enforcement.timing_class_matches, None);
     }
 
     #[test]
