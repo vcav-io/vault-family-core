@@ -344,3 +344,38 @@ fn hex_signed_vectors_verify_strictly() {
     let key = receipt_core::parse_public_key_hex(&manifest.operator_public_key_hex).unwrap();
     receipt_core::verify_manifest(&manifest, &key).unwrap();
 }
+
+/// Re-encode the final base64url character with different trailing bits.
+fn with_trailing_bits(b64: &str) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut bytes = b64.as_bytes().to_vec();
+    let last = bytes.pop().unwrap();
+    let idx = ALPHABET.iter().position(|c| *c == last).unwrap();
+    bytes.push(ALPHABET[idx ^ 1]);
+    String::from_utf8(bytes).unwrap()
+}
+
+#[test]
+fn base64url_signatures_must_be_canonical() {
+    // 64 bytes in unpadded base64url leave 4 unused bits in the last
+    // character; a different value there decodes to the same bytes.
+    let (receipt, _) = v2_receipt();
+    let (unsigned, signature) = receipt.split();
+    let pk = SigningKey::from_bytes(&[0x01; 32]).verifying_key();
+    verify_receipt_v2(&unsigned, &signature, &pk).unwrap();
+    let altered = SignatureV2 {
+        value: with_trailing_bits(&signature.value),
+        ..signature
+    };
+    assert!(verify_receipt_v2(&unsigned, &altered, &pk).is_err());
+
+    let sk = SigningKey::from_bytes(&[0x01; 32]);
+    let receipt = sign_and_assemble_receipt_v3(sample_unsigned_receipt_v3(&sk), &sk).unwrap();
+    let (unsigned, signature) = receipt.split();
+    verify_receipt_v3(&unsigned, &signature, &sk.verifying_key()).unwrap();
+    let altered = SignatureV3 {
+        value: with_trailing_bits(&signature.value),
+        ..signature
+    };
+    assert!(verify_receipt_v3(&unsigned, &altered, &sk.verifying_key()).is_err());
+}
