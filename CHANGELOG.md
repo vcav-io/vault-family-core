@@ -7,8 +7,10 @@
 - Renamed AgentVault → Selkey. Contract offer IDs and refs in fixtures now use the
   `selkey.` prefix (e.g. `selkey.mediation.v1.standard`). The
   `agentvault_*.schema.json` files are now `selkey_*.schema.json`, and their schema
-  titles are updated. Schema `$id` URLs, `VCAV-*` domain separators and the signed
-  `receipt_v2_*` test vectors are unchanged.
+  titles are updated. The two contract offer schemas' `$id` URLs now use
+  `https://vcav.io/schemas/selkey_contract_offer_{proposal,selection}.schema.json`
+  (vcav.io serves both the old `agentvault_*` and new `selkey_*` URLs). Other `$id` URLs,
+  `VCAV-*` domain separators and the signed `receipt_v2_*` test vectors are unchanged.
 
 ## 0.1.0 (2026-02-24)
 

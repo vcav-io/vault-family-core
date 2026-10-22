@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://vcav.io/schemas/agentvault_contract_offer_proposal.schema.json",
+  "$id": "https://vcav.io/schemas/selkey_contract_offer_proposal.schema.json",
   "title": "Selkey Contract Offer Proposal",
   "type": "object",
   "additionalProperties": false,
