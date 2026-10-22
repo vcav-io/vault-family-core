@@ -48,6 +48,7 @@
         }
       }
     },
+    "chosen_relay_url": { "type": "string", "minLength": 1 },
     "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
   }
 }
