@@ -133,6 +133,9 @@ pub enum DomainPrefix {
     Request,
     /// Recipient-issued IFC grant, version 2 (`VCAV-IFC-GRANT-V2:`).
     IfcGrantV2,
+    /// Agent key rotation statement, signed by the old key
+    /// (`VCAV-KEY-ROTATION-V1:`).
+    KeyRotation,
 }
 
 /// JSON canonicaliser used to compute an AFAL signing digest.
@@ -162,6 +165,7 @@ impl DomainPrefix {
             DomainPrefix::Message => "VCAV-MESSAGE-V1:",
             DomainPrefix::Request => "VCAV-REQUEST-V1:",
             DomainPrefix::IfcGrantV2 => "VCAV-IFC-GRANT-V2:",
+            DomainPrefix::KeyRotation => "VCAV-KEY-ROTATION-V1:",
         }
     }
 
@@ -180,7 +184,7 @@ impl DomainPrefix {
             | DomainPrefix::Commit
             | DomainPrefix::Message
             | DomainPrefix::Request => AfalCanonicalization::LegacyJcsV1,
-            DomainPrefix::IfcGrantV2 => AfalCanonicalization::Rfc8785,
+            DomainPrefix::IfcGrantV2 | DomainPrefix::KeyRotation => AfalCanonicalization::Rfc8785,
         }
     }
 
@@ -194,6 +198,7 @@ impl DomainPrefix {
         DomainPrefix::Message,
         DomainPrefix::Request,
         DomainPrefix::IfcGrantV2,
+        DomainPrefix::KeyRotation,
     ];
 }
 
@@ -301,13 +306,16 @@ mod tests {
         assert_eq!(DomainPrefix::Message.as_str(), "VCAV-MESSAGE-V1:");
         assert_eq!(DomainPrefix::Request.as_str(), "VCAV-REQUEST-V1:");
         assert_eq!(DomainPrefix::IfcGrantV2.as_str(), "VCAV-IFC-GRANT-V2:");
+        assert_eq!(DomainPrefix::KeyRotation.as_str(), "VCAV-KEY-ROTATION-V1:");
     }
 
     #[test]
     fn domain_prefix_canonicalization_frozen() {
         for domain in DomainPrefix::ALL {
             let expected = match domain {
-                DomainPrefix::IfcGrantV2 => AfalCanonicalization::Rfc8785,
+                DomainPrefix::IfcGrantV2 | DomainPrefix::KeyRotation => {
+                    AfalCanonicalization::Rfc8785
+                }
                 _ => AfalCanonicalization::LegacyJcsV1,
             };
             assert_eq!(domain.canonicalization(), expected, "{domain}");

@@ -34,6 +34,9 @@
   AFAL message types keep the legacy canonicaliser; `VCAV-IFC-GRANT-V2:` uses RFC 8785,
   as the TypeScript signer does.
 - `receipt-core::key_id`: the Ed25519 key id `ed25519:` + hex(SHA-256(raw key bytes)).
+- `afal-core::key_rotation`: key rotation statements (`VCAV-KEY-ROTATION-V1`) signed by the
+  old key, matching the TypeScript implementation byte for byte, with golden vectors in
+  `data/test-vectors/afal-key-rotation-*.json` (one produced by TypeScript, one by Rust).
 
 ### Changed
 
