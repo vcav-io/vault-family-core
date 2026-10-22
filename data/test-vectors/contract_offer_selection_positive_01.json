@@ -1,7 +1,7 @@
 {
   "negotiation_id": "neg-001",
   "state": "AGREED",
-  "selected_contract_offer_id": "agentvault.mediation.v1.standard",
+  "selected_contract_offer_id": "selkey.mediation.v1.standard",
   "selected_model_profile": {
     "id": "api-claude-sonnet-v1",
     "version": "1",

@@ -5,8 +5,8 @@
       "kind": "bespoke",
       "purpose_code": "MEDIATION",
       "schema_ref": "vcav_e_mediation_signal_v2",
-      "policy_ref": "agentvault.default.policy@active",
-      "program_ref": "agentvault.mediation.program@active",
+      "policy_ref": "selkey.default.policy@active",
+      "program_ref": "selkey.mediation.program@active",
       "acceptable_model_profiles": [
         {
           "id": "api-claude-sonnet-v1",

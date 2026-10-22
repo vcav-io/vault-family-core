@@ -609,7 +609,7 @@ mod tests {
             issued_at: Utc.with_ymd_and_hms(2026, 3, 8, 12, 0, 0).unwrap(),
             assurance_level: AssuranceLevel::SelfAsserted,
             operator: Operator {
-                operator_id: "relay.agentvault.dev".to_string(),
+                operator_id: "relay.selkey.dev".to_string(),
                 operator_key_fingerprint: "a".repeat(64),
                 operator_key_discovery: None,
             },
@@ -733,7 +733,7 @@ mod tests {
         let manifest_pubkey_hex = hex::encode(manifest_signing_key.verifying_key().as_bytes());
         let unsigned_manifest = UnsignedManifest {
             manifest_version: "1.0.0".to_string(),
-            operator_id: "relay.agentvault.dev".to_string(),
+            operator_id: "relay.selkey.dev".to_string(),
             operator_key_id: compute_operator_key_id(&manifest_pubkey_hex),
             operator_public_key_hex: manifest_pubkey_hex,
             protocol_version: "1.0.0".to_string(),

@@ -1,7 +1,7 @@
 //! Receipt v2 types
 //!
 //! Defines the ReceiptV2 struct and supporting types matching the
-//! `agentvault-receipt-schema-v2.1.0.revised.json` schema.
+//! Selkey receipt schema v2.1.0 (`schemas/receipt.v2.schema.json`).
 //!
 //! v2 is additive — v1 receipts remain verifiable. Verifiers dispatch on
 //! `receipt_schema_version`.
@@ -517,7 +517,7 @@ mod tests {
                 .with_timezone(&Utc),
             assurance_level: AssuranceLevel::SelfAsserted,
             operator: Operator {
-                operator_id: "relay.agentvault.dev".to_string(),
+                operator_id: "relay.selkey.dev".to_string(),
                 operator_key_fingerprint: "a".repeat(64),
                 operator_key_discovery: None,
             },
@@ -585,7 +585,7 @@ mod tests {
         let parsed: UnsignedReceiptV2 = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.receipt_schema_version, SCHEMA_VERSION_V2);
         assert_eq!(parsed.assurance_level, AssuranceLevel::SelfAsserted);
-        assert_eq!(parsed.operator.operator_id, "relay.agentvault.dev");
+        assert_eq!(parsed.operator.operator_id, "relay.selkey.dev");
         assert_eq!(parsed.commitments.input_commitments.len(), 1);
         assert_eq!(
             parsed.claims.model_identity_asserted.as_deref(),

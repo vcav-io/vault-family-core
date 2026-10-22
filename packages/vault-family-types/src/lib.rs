@@ -2,7 +2,7 @@
 //! # vault-family-types
 //!
 //! Shared receipt-level and protocol vocabulary types used by both VCAV (sealed vault)
-//! and AgentVault (bilateral relay). These types appear in signed receipts and
+//! and Selkey (bilateral relay). These types appear in signed receipts and
 //! domain-prefixed hashes — their serialization format is frozen.
 //!
 //! This crate has no enforcement logic. It defines enums, identifiers, and

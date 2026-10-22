@@ -1,6 +1,6 @@
 [package]
 name = "vault-family-types"
-description = "Shared receipt/protocol vocabulary types for the vault family (VCAV + AgentVault)"
+description = "Shared receipt/protocol vocabulary types for the vault family (VCAV + Selkey)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

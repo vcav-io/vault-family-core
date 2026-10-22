@@ -37,7 +37,7 @@ mod tests {
     #[test]
     fn test_topic_alignment_proposal_schema_accepts_current_shape() {
         let validator = compile_schema(include_str!(
-            "../../../schemas/agentvault_topic_alignment_proposal.schema.json"
+            "../../../schemas/selkey_topic_alignment_proposal.schema.json"
         ));
         let value = json!({
             "alignment_id": "align-123",
@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn test_topic_alignment_selection_schema_accepts_aligned_shape() {
         let validator = compile_schema(include_str!(
-            "../../../schemas/agentvault_topic_alignment_selection.schema.json"
+            "../../../schemas/selkey_topic_alignment_selection.schema.json"
         ));
         let value = json!({
             "alignment_id": "align-123",
@@ -65,7 +65,7 @@ mod tests {
     #[test]
     fn test_topic_alignment_selection_rejects_missing_topic_for_aligned() {
         let validator = compile_schema(include_str!(
-            "../../../schemas/agentvault_topic_alignment_selection.schema.json"
+            "../../../schemas/selkey_topic_alignment_selection.schema.json"
         ));
         let value = json!({
             "alignment_id": "align-123",

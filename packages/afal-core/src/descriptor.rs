@@ -29,7 +29,7 @@ pub struct IdentityKey {
 
 /// Envelope key advertised for AFAL input wrapping.
 ///
-/// Deployed AgentVault currently reuses the Ed25519 identity key here, while
+/// Deployed Selkey currently reuses the Ed25519 identity key here, while
 /// richer AFAL peers may advertise a distinct X25519 envelope key.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvelopeKey {
