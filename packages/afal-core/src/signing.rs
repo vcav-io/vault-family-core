@@ -2,17 +2,34 @@
 //!
 //! Implements the signing protocol from AFAL Binding Specification v1, §4:
 //!   1. unsigned = message with `signature` field removed
-//!   2. canonical = canonicalize(unsigned)        // JCS RFC 8785
+//!   2. canonical = canonicalize(unsigned)        // see below
 //!   3. prefixed = utf8(domain_prefix + canonical) // Domain-separated
 //!   4. digest = SHA-256(prefixed)                 // 32 bytes
 //!   5. signature = Ed25519.sign(digest, secret)   // 64 bytes → 128 hex
+//!
+//! # Canonicaliser
+//!
+//! The canonicaliser is fixed per domain prefix
+//! ([`DomainPrefix::canonicalization`]):
+//!
+//! - The original message types (descriptor, PROPOSE, ADMIT, DENY, COMMIT,
+//!   MESSAGE, REQUEST) use the frozen legacy canonicaliser
+//!   (`receipt_core::canonicalize`, `JCS_V1`), so their existing signatures
+//!   and vectors are unchanged.
+//! - Newer types (`VCAV-IFC-GRANT-V2:`) use RFC 8785 with the v3 number range
+//!   check (`receipt_core::canonicalize_v3`). The TypeScript signer
+//!   (`afal-signing.ts`, `json-canonicalize`) uses RFC 8785 for every prefix,
+//!   so for these types the two implementations agree byte for byte.
+//!
+//! The two canonicalisers agree on messages made of ASCII keys, strings
+//! without DEL/C1 control characters, and integers below 2^53.
 
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
 
-use receipt_core::canonicalize_serializable;
+use receipt_core::{canonicalize_serializable, canonicalize_v3_serializable};
 
-use crate::types::DomainPrefix;
+use crate::types::{AfalCanonicalization, DomainPrefix};
 
 /// Errors from signing/verification operations.
 #[derive(Debug, thiserror::Error)]
@@ -36,13 +53,18 @@ pub enum SigningError {
 
 /// Compute the domain-separated SHA-256 digest of a serializable value.
 ///
-/// Steps: canonicalize(value) → domain_prefix + canonical → SHA-256
+/// Steps: canonicalize(value) → domain_prefix + canonical → SHA-256, with
+/// the canonicaliser chosen by [`DomainPrefix::canonicalization`].
 pub fn compute_digest<T: serde::Serialize>(
     domain: DomainPrefix,
     value: &T,
 ) -> Result<[u8; 32], SigningError> {
-    let canonical = canonicalize_serializable(value)
-        .map_err(|e| SigningError::Canonicalization(e.to_string()))?;
+    let canonical = match domain.canonicalization() {
+        AfalCanonicalization::LegacyJcsV1 => canonicalize_serializable(value)
+            .map_err(|e| SigningError::Canonicalization(e.to_string()))?,
+        AfalCanonicalization::Rfc8785 => canonicalize_v3_serializable(value)
+            .map_err(|e| SigningError::Canonicalization(e.to_string()))?,
+    };
     let prefixed = format!("{}{}", domain.as_str(), canonical);
     let mut hasher = Sha256::new();
     hasher.update(prefixed.as_bytes());
@@ -244,6 +266,45 @@ mod tests {
             stripped.as_object().unwrap().get("a").unwrap(),
             &serde_json::json!(1)
         );
+    }
+
+    #[test]
+    fn legacy_domains_keep_legacy_canonicalizer() {
+        // DEL is escaped by the legacy canonicaliser and left raw by RFC 8785.
+        let value = serde_json::json!({"note": "a\u{7f}b"});
+        let legacy = canonicalize_serializable(&value).unwrap();
+        let rfc = canonicalize_v3_serializable(&value).unwrap();
+        assert_ne!(legacy, rfc);
+
+        let mut h = Sha256::new();
+        h.update(format!("VCAV-PROPOSE-V1:{legacy}").as_bytes());
+        let expected: [u8; 32] = h.finalize().into();
+        assert_eq!(
+            compute_digest(DomainPrefix::Propose, &value).unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn ifc_grant_v2_domain_uses_rfc8785() {
+        let value = serde_json::json!({"note": "a\u{7f}b", "n": 1e-7});
+        let rfc = canonicalize_v3_serializable(&value).unwrap();
+        assert_eq!(rfc, "{\"n\":1e-7,\"note\":\"a\u{7f}b\"}");
+
+        let mut h = Sha256::new();
+        h.update(format!("VCAV-IFC-GRANT-V2:{rfc}").as_bytes());
+        let expected: [u8; 32] = h.finalize().into();
+        assert_eq!(
+            compute_digest(DomainPrefix::IfcGrantV2, &value).unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn rfc8785_domain_rejects_unsafe_integers() {
+        let value = serde_json::json!({"n": 9_007_199_254_740_993u64});
+        assert!(compute_digest(DomainPrefix::IfcGrantV2, &value).is_err());
+        assert!(compute_digest(DomainPrefix::Propose, &value).is_ok());
     }
 
     #[test]

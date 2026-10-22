@@ -119,6 +119,9 @@ impl std::fmt::Display for AdmissionTier {
 ///
 /// **Wire format — frozen.** These prefixes are prepended to canonicalized
 /// JSON before SHA-256 hashing. Changing them breaks all existing signatures.
+///
+/// Each prefix also fixes the canonicaliser used for its messages; see
+/// [`DomainPrefix::canonicalization`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DomainPrefix {
     Descriptor,
@@ -128,6 +131,23 @@ pub enum DomainPrefix {
     Commit,
     Message,
     Request,
+    /// Recipient-issued IFC grant, version 2 (`VCAV-IFC-GRANT-V2:`).
+    IfcGrantV2,
+}
+
+/// JSON canonicaliser used to compute an AFAL signing digest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AfalCanonicalization {
+    /// The frozen legacy canonicaliser (`receipt_core::canonicalize`,
+    /// `JCS_V1`). Used by the original AFAL message types. It agrees with
+    /// RFC 8785 on ASCII strings, short integers and ASCII keys, and differs
+    /// on DEL/C1 control characters in strings, exponent formatting,
+    /// integers beyond 2^53 and the order of non-BMP keys.
+    LegacyJcsV1,
+    /// RFC 8785 with the v3 number range check
+    /// (`receipt_core::canonicalize_v3`, `JCS_RFC8785`). This is what the
+    /// TypeScript AFAL signer (`json-canonicalize`) produces.
+    Rfc8785,
 }
 
 impl DomainPrefix {
@@ -141,6 +161,26 @@ impl DomainPrefix {
             DomainPrefix::Commit => "VCAV-COMMIT-V1:",
             DomainPrefix::Message => "VCAV-MESSAGE-V1:",
             DomainPrefix::Request => "VCAV-REQUEST-V1:",
+            DomainPrefix::IfcGrantV2 => "VCAV-IFC-GRANT-V2:",
+        }
+    }
+
+    /// The canonicaliser for messages signed under this prefix.
+    ///
+    /// The original AFAL message types keep the legacy canonicaliser so
+    /// existing signatures and vectors are unchanged. Types introduced after
+    /// RFC 8785 support landed use RFC 8785, matching the TypeScript signer
+    /// byte for byte.
+    pub fn canonicalization(&self) -> AfalCanonicalization {
+        match self {
+            DomainPrefix::Descriptor
+            | DomainPrefix::Propose
+            | DomainPrefix::Admit
+            | DomainPrefix::Deny
+            | DomainPrefix::Commit
+            | DomainPrefix::Message
+            | DomainPrefix::Request => AfalCanonicalization::LegacyJcsV1,
+            DomainPrefix::IfcGrantV2 => AfalCanonicalization::Rfc8785,
         }
     }
 
@@ -153,6 +193,7 @@ impl DomainPrefix {
         DomainPrefix::Commit,
         DomainPrefix::Message,
         DomainPrefix::Request,
+        DomainPrefix::IfcGrantV2,
     ];
 }
 
@@ -259,5 +300,17 @@ mod tests {
         assert_eq!(DomainPrefix::Commit.as_str(), "VCAV-COMMIT-V1:");
         assert_eq!(DomainPrefix::Message.as_str(), "VCAV-MESSAGE-V1:");
         assert_eq!(DomainPrefix::Request.as_str(), "VCAV-REQUEST-V1:");
+        assert_eq!(DomainPrefix::IfcGrantV2.as_str(), "VCAV-IFC-GRANT-V2:");
+    }
+
+    #[test]
+    fn domain_prefix_canonicalization_frozen() {
+        for domain in DomainPrefix::ALL {
+            let expected = match domain {
+                DomainPrefix::IfcGrantV2 => AfalCanonicalization::Rfc8785,
+                _ => AfalCanonicalization::LegacyJcsV1,
+            };
+            assert_eq!(domain.canonicalization(), expected, "{domain}");
+        }
     }
 }

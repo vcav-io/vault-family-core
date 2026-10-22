@@ -20,6 +20,7 @@
 //! - [`commitment_v3`] - Nonce-based input commitments (`SHA256_N32_JCS_V3`)
 //! - [`contract_hash_v2`] - Contract hash v2 (`SHA256_JCS_V2`)
 //! - [`signer`] - Ed25519 signing with domain separation
+//! - [`key_id`] - Ed25519 key identifiers (`ed25519:` + SHA-256 of the key bytes)
 //! - [`manifest`] - Signed publication manifest for operator artefact bundles
 //! - [`agreement`] - Session agreement hash computation
 //! - [`attestation`] - Attestation challenge and evidence types
@@ -32,6 +33,7 @@ pub mod commitment_v3;
 pub mod contract_hash_v2;
 pub mod handoff;
 pub mod jcs;
+pub mod key_id;
 pub mod ledger;
 pub mod manifest;
 pub mod receipt;
@@ -71,6 +73,9 @@ pub use contract_hash_v2::{
 pub use jcs::{
     canonicalize_rfc8785, canonicalize_v3, canonicalize_v3_serializable, canonicalize_v3_str,
     parse_json_strict, JcsError, CANONICALIZATION_V3, MAX_SAFE_INTEGER,
+};
+pub use key_id::{
+    ed25519_key_id, ed25519_key_id_from_bytes, is_ed25519_key_id, ED25519_KEY_ID_PREFIX,
 };
 pub use manifest::{
     compute_operator_key_id, create_manifest_signing_message, sign_manifest, verify_manifest,

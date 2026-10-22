@@ -61,7 +61,7 @@ pub use signing::{
 // Re-exports: types
 // ---------------------------------------------------------------------------
 
-pub use types::{AdmissionTier, DomainPrefix, TrustTier};
+pub use types::{AdmissionTier, AfalCanonicalization, DomainPrefix, TrustTier};
 
 // ---------------------------------------------------------------------------
 // Re-exports: replay

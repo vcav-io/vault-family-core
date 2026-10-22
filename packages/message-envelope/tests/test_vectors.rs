@@ -4,6 +4,9 @@
 //! then validates them. The same vectors are stored as JSON files
 //! in `data/test-vectors/` for WASM and TypeScript validation.
 
+// The v1 grant vectors below exercise the deprecated `CapabilityGrant`.
+#![allow(deprecated)]
+
 use ed25519_dalek::SigningKey;
 use ifc_engine::{
     Confidentiality, DefaultPolicy, IfcPolicy, IntegrityLevel, Label, PolicyConfig, PolicyDecision,

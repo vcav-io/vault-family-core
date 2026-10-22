@@ -58,7 +58,8 @@ Dependencies flow downward. No crate depends on anything above it in this diagra
 - `ifc-engine` has no dependency on `vault-family-types` or `receipt-core`; it is a pure
   label algebra.
 - `label-registry` depends on both `ifc-engine` and `receipt-core`.
-- `message-envelope` depends on `ifc-engine` and `receipt-core` (not `label-registry`).
+- `message-envelope` depends on `ifc-engine`, `receipt-core` and `afal-core` (for AFAL
+  signing of IFC grant v2), not on `label-registry`.
 - `verifier-core` depends only on `receipt-core`; it is intentionally WASM-compatible with
   no filesystem access.
 - `escalation-interface` is a zero-dependency stub that defines the trait surface for
@@ -155,6 +156,9 @@ and must never change without a versioned migration path.
 | Pair ID derivation domain | `vcav/pair_id/v1` | `vault-family-types::agent_id::PAIR_ID_DOMAIN_PREFIX` |
 | Receipt schema version | `1.0.0` | `receipt-core::receipt::SCHEMA_VERSION` |
 | AFAL PROPOSE/ADMIT/DENY/COMMIT/MESSAGE prefixes | `VCAV-{TYPE}-V1:` | `afal-core::types::DomainPrefix` |
+| IFC grant v2 prefix (RFC 8785) | `VCAV-IFC-GRANT-V2:` | `afal-core::types::DomainPrefix::IfcGrantV2` |
+| AFAL canonicaliser per prefix | legacy `JCS_V1` for the V1 message types, RFC 8785 for newer types | `afal-core::types::DomainPrefix::canonicalization` |
+| Ed25519 key id | `ed25519:` + hex(SHA-256(32 key bytes)) | `receipt-core::key_id` |
 
 **Semver-tracked (may change with version bump):**
 

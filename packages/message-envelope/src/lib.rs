@@ -16,6 +16,7 @@
 #![forbid(unsafe_code)]
 
 pub mod grant;
+pub mod grant_v2;
 
 use std::fmt;
 
@@ -27,9 +28,16 @@ use ifc_engine::{Label, LabelReceipt, PolicyConfig, PrincipalId};
 use receipt_core::canonicalize::canonicalize_serializable;
 use receipt_core::signer::hash_message;
 
+#[allow(deprecated)]
 pub use grant::{
     sign_grant, verify_grant, CapabilityGrant, GrantPermissions, GrantProvenance, GrantScope,
     GrantVersion, UnsignedGrant, GRANT_DOMAIN_PREFIX,
+};
+pub use grant_v2::{
+    compute_grant_id_v2, grant_v2_signing_digest, parse_grant_v2_json, sign_grant_v2,
+    validate_unsigned_grant_v2, verify_grant_v2, IfcGrantV2, IfcGrantV2Permissions,
+    IfcGrantV2Provenance, IfcGrantV2Scope, IfcGrantV2Version, IfcLabelCeiling, IfcMessageClass,
+    IfcSessionRelation, UnsignedIfcGrantV2, IFC_GRANT_V2_DOMAIN_PREFIX, IFC_GRANT_V2_VERSION,
 };
 
 // ============================================================================
@@ -146,6 +154,14 @@ pub enum EnvelopeError {
     /// Grant registry is at capacity.
     #[error("grant registry full")]
     GrantRegistryFull,
+
+    /// A grant field is missing or malformed.
+    #[error("invalid grant: {0}")]
+    InvalidGrant(String),
+
+    /// Canonicalisation for hashing or signing failed.
+    #[error("canonicalization failed: {0}")]
+    Canonicalization(String),
 }
 
 // ============================================================================
