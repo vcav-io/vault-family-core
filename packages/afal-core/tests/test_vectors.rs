@@ -176,7 +176,7 @@ fn deny_constant_shape_matches_vector() {
 
     // Verify constant shape validation passes on the signed deny
     let signed_deny = &deny["signed_deny"];
-    validate_deny_canonical_form(signed_deny, &SEALED_MODE_DENY_FIELDS).unwrap();
+    validate_deny_canonical_form(signed_deny, SEALED_MODE_DENY_FIELDS).unwrap();
     assert!(deny["constant_shape_valid"].as_bool().unwrap());
 }
 

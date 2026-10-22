@@ -1,7 +1,11 @@
-//! JSON Canonicalization Scheme (RFC 8785)
+//! Legacy JSON canonicalisation (`JCS_V1`). Frozen.
 //!
-//! Implements RFC 8785 JCS for deterministic JSON serialization.
-//! Used for signing receipts - same logical data must produce identical bytes.
+//! This is the canonicaliser behind every v1/v2 signature and hash (receipt
+//! v1/v2, handoffs, agreement hashes, manifests, contract hash v1, ...). Its
+//! output must never change, or existing signatures stop verifying. It is
+//! close to RFC 8785 but differs on DEL/C1 characters, exponent formatting,
+//! integers beyond 2^53 and non-BMP key order. New formats use
+//! [`crate::jcs`] (`JCS_RFC8785`) instead.
 //!
 //! Key properties:
 //! - Lexicographic key sorting (recursive)

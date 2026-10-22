@@ -342,6 +342,9 @@ pub fn sign_receipt_v2(
 
 /// Verify a v2 receipt's signature.
 ///
+/// Uses strict Ed25519 verification (rejects small-order keys and signature
+/// points as well as non-canonical scalars).
+///
 /// Canonicalizes `receipt` with JCS using the v2 domain separator and verifies
 /// the provided `SignatureV2`. Only `SignatureAlgorithm::Ed25519` is supported;
 /// other algorithms return `SigningError::VerificationFailed`.
@@ -371,7 +374,7 @@ pub fn verify_receipt_v2(
     let hash = hash_message(&message);
 
     public_key
-        .verify(&hash, &ed_sig)
+        .verify_strict(&hash, &ed_sig)
         .map_err(|_| SigningError::VerificationFailed)
 }
 

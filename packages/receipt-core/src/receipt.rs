@@ -2252,7 +2252,7 @@ mod tests {
     #[test]
     fn test_signal_class_entropy_threshold_exceeded() {
         let sc = SignalClass::EntropyThresholdExceeded;
-        let json = serde_json::to_value(&sc).unwrap();
+        let json = serde_json::to_value(sc).unwrap();
         assert_eq!(json, "ENTROPY_THRESHOLD_EXCEEDED");
         let round_trip: SignalClass = serde_json::from_value(json).unwrap();
         assert_eq!(round_trip, SignalClass::EntropyThresholdExceeded);

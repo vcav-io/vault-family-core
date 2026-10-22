@@ -36,6 +36,12 @@ rand = "0.8"
 hex = "0.4"
 base64 = "0.22"
 
+# RFC 8785 canonicalization (receipt v3)
+serde_json_canonicalizer = "0.4.1"
+
+# Constant-time comparison
+subtle = "2.6"
+
 # Unicode normalization
 unicode-normalization = "0.1"
 
