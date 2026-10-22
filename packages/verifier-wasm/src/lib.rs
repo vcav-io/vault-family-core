@@ -299,7 +299,7 @@ pub fn verify_bundle(
     bundle_json: &str,
     strict_runtime: bool,
 ) -> String {
-    let bundle: serde_json::Value = match serde_json::from_str(bundle_json) {
+    let bundle: serde_json::Value = match receipt_core::parse_json_strict(bundle_json) {
         Ok(v) => v,
         Err(e) => {
             return to_json_safe(&BundleVerifyResult {
@@ -1190,5 +1190,27 @@ mod tests {
         ));
         assert_eq!(out["ok"], false);
         assert_eq!(out["contract_hash_valid"], false);
+    }
+
+    #[test]
+    fn verify_bundle_rejects_repeated_keys_in_bundle() {
+        let v = v3_vector();
+        let contract = v.vector["contract_json"].as_str().unwrap();
+        let bundle = format!(
+            r#"{{"contract":{},"contract":{}}}"#,
+            serde_json::to_string(contract).unwrap(),
+            serde_json::to_string(contract).unwrap()
+        );
+        let out = result(&verify_bundle(
+            &v.receipt_json,
+            &v.pubkey_hex,
+            &bundle,
+            false,
+        ));
+        assert_eq!(out["ok"], false);
+        assert!(out["error"]
+            .as_str()
+            .unwrap()
+            .contains("Failed to parse bundle JSON"));
     }
 }

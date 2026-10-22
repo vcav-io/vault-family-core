@@ -250,3 +250,32 @@ fn v2_rejects_v3_only_checks() {
     assert_eq!(r.code, 1);
     assert_eq!(r.json["error_class"], "UNSUPPORTED_VERSION");
 }
+
+#[test]
+fn v1_only_checks_are_rejected_for_versioned_receipts() {
+    let v = v3();
+    let artefact = temp_file("{}");
+    let path = artefact.path().to_str().unwrap();
+    for args in [
+        vec!["--manifest", path],
+        vec!["--policy", path],
+        vec!["--profile", path],
+        vec!["--agreement-fields", path],
+        vec!["--strict"],
+        vec!["--strict-runtime"],
+        vec!["--validate-output"],
+    ] {
+        let r = run(&v.receipt, &v.pubkey, &args);
+        assert_eq!(r.code, 1, "{args:?}: {}", r.json);
+        assert_eq!(r.json["valid"], false);
+        assert_eq!(r.json["error_class"], "UNSUPPORTED_CHECK", "{args:?}");
+    }
+    let r2 = load("receipt_v2_vector_01.json");
+    let r = run(
+        &r2["input"]["signed_receipt"].to_string(),
+        r2["input"]["verifying_key_hex"].as_str().unwrap(),
+        &["--strict"],
+    );
+    assert_eq!(r.code, 1);
+    assert_eq!(r.json["error_class"], "UNSUPPORTED_CHECK");
+}

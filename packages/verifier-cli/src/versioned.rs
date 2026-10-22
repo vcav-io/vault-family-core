@@ -85,19 +85,33 @@ pub(crate) fn verify_versioned(args: &Args) -> VersionedResult {
         receipt_file: args.receipt.clone(),
         ..Default::default()
     };
-    for (flag, given) in [
-        ("--schema-dir", args.schema_dir.is_some()),
+    if args.schema_dir.is_some() {
+        result
+            .warnings
+            .push("--schema-dir applies to v1 receipts only and was ignored".to_string());
+    }
+    // Checks that exist only for v1 receipts must not appear to pass.
+    let unsupported: Vec<&str> = [
         ("--validate-output", args.validate_output),
+        ("--output-schema-id", args.output_schema_id.is_some()),
         ("--agreement-fields", args.agreement_fields.is_some()),
         ("--profile", args.profile.is_some()),
         ("--policy", args.policy.is_some()),
         ("--manifest", args.manifest.is_some()),
-    ] {
-        if given {
-            result.warnings.push(format!(
-                "{flag} applies to v1 receipts only and was ignored"
-            ));
-        }
+        ("--strict", args.strict),
+        ("--strict-runtime", args.strict_runtime),
+    ]
+    .into_iter()
+    .filter_map(|(flag, given)| given.then_some(flag))
+    .collect();
+    if !unsupported.is_empty() {
+        return result.fail(
+            "UNSUPPORTED_CHECK",
+            format!(
+                "{} not supported for receipts with receipt_schema_version (v1 receipts only)",
+                unsupported.join(", ")
+            ),
+        );
     }
 
     let content = match fs::read_to_string(&args.receipt) {

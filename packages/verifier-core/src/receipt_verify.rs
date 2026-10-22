@@ -6,7 +6,8 @@
 //!   (`receipt_core::receipt_v3`; only `3.0.0` is accepted).
 //! - `signature` is an object and `receipt_schema_version` starts with `2.`:
 //!   receipt v2 (`VCAV-RECEIPT-V2:`, frozen `JCS_V1` canonicaliser).
-//! - `signature` is a string: legacy v1 receipt (`VCAV-RECEIPT-V1:`).
+//! - `signature` is a string: legacy v1 receipt (`VCAV-RECEIPT-V1:`), unless
+//!   the receipt declares a `receipt_schema_version` other than `1.x`.
 //! - anything else is rejected.
 //!
 //! Every path parses the JSON text strictly (repeated keys are rejected) and
@@ -82,6 +83,14 @@ pub fn verify_receipt_json(
             }
         }
         Some(signature) if signature.is_string() => {
+            // Legacy v1 receipts carry `schema_version`, not
+            // `receipt_schema_version`; a string signature on a receipt that
+            // declares another format version is not a legacy receipt.
+            if receipt_val.get("receipt_schema_version").is_some() && !version.starts_with("1.") {
+                return Err(format!(
+                    "Unsupported receipt_schema_version {version:?} for a hex signature"
+                ));
+            }
             let signature_hex = signature
                 .as_str()
                 .ok_or_else(|| "Receipt missing 'signature' field".to_string())?;
@@ -437,6 +446,25 @@ mod tests {
         receipt["receipt_schema_version"] = serde_json::json!("4.0.0");
         let err = verify_receipt_json(&receipt.to_string(), &f.key).unwrap_err();
         assert!(err.contains("Unsupported receipt_schema_version"), "{err}");
+    }
+
+    #[test]
+    fn hex_signature_with_non_v1_version_is_rejected() {
+        let f = fixture();
+        let mut receipt: Value = serde_json::from_str(&f.receipt_json).unwrap();
+        receipt["signature"] = serde_json::json!("00".repeat(64));
+        for version in ["4.0.0", "2.1.0", ""] {
+            receipt["receipt_schema_version"] = serde_json::json!(version);
+            let err = verify_receipt_json(&receipt.to_string(), &f.key).unwrap_err();
+            assert!(
+                err.contains("Unsupported receipt_schema_version"),
+                "{version}: {err}"
+            );
+        }
+        receipt["receipt_schema_version"] = serde_json::json!(4);
+        assert!(verify_receipt_json(&receipt.to_string(), &f.key)
+            .unwrap_err()
+            .contains("Unsupported receipt_schema_version"));
     }
 
     #[test]
