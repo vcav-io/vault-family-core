@@ -220,6 +220,13 @@ fn timing_class_window_seconds(class: &str) -> Option<u64> {
     }
 }
 
+// Receipt field lookup helpers.
+//
+// These helpers read from whatever JSON value they are given. Callers must pass
+// only receipt content that is covered by a verified signature (for example the
+// re-serialized typed receipt), never raw receipt input, so that the fallback
+// scopes cannot pick up fields the signer did not commit to.
+
 pub const RECEIPT_SCOPE_TOP_OR_CLAIMS: &str = "top_or_claims";
 pub const RECEIPT_SCOPE_TOP_OR_COMMITMENTS: &str = "top_or_commitments";
 pub const RECEIPT_SCOPE_PREFLIGHT: &str = "preflight";
@@ -298,6 +305,9 @@ pub struct ContractEnforcementResult {
 /// are recorded in warnings and the result fields.
 ///
 /// Fields that are absent from the receipt are not checked (None = not checked, not failure).
+///
+/// `receipt_json` must contain only signature-covered receipt content (see the
+/// receipt field lookup helpers above).
 pub fn verify_contract_enforcement(
     receipt_json: &str,
     contract_json: &str,
